@@ -27,6 +27,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Verify KeyboardColors file exists
+        run: |
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Files in theme directory:"
+          ls -la app/src/main/java/com/example/dualquick/theme/
+          echo "KeyboardColors.kt content:"
+          cat app/src/main/java/com/example/dualquick/theme/KeyboardColors.kt
+
       - name: Clean and Build Debug APK
         run: ./gradlew clean assembleDebug --no-build-cache
 
