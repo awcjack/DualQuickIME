@@ -11,12 +11,21 @@ import android.graphics.Color
 object ThemeManager {
     private const val PREFS_NAME = "dualquick_prefs"
     private const val KEY_THEME = "theme_mode"
+    private const val KEY_SHOW_COMPOSITION = "show_composition"
+    private const val KEY_CANDIDATES_PER_PAGE = "candidates_per_page"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
     const val THEME_AUTO = 2
 
+    // Default candidates per page (affects pill sizing)
+    const val CANDIDATES_MIN = 4
+    const val CANDIDATES_MAX = 10
+    const val CANDIDATES_DEFAULT = 6
+
     private var cachedTheme: Int = -1
+    private var cachedShowComposition: Boolean? = null
+    private var cachedCandidatesPerPage: Int = -1
 
     fun getThemeMode(context: Context): Int {
         if (cachedTheme == -1) {
@@ -28,6 +37,32 @@ object ThemeManager {
     fun setThemeMode(context: Context, mode: Int) {
         cachedTheme = mode
         getPrefs(context).edit().putInt(KEY_THEME, mode).apply()
+    }
+
+    // Composition display settings
+    fun getShowComposition(context: Context): Boolean {
+        if (cachedShowComposition == null) {
+            cachedShowComposition = getPrefs(context).getBoolean(KEY_SHOW_COMPOSITION, true)
+        }
+        return cachedShowComposition!!
+    }
+
+    fun setShowComposition(context: Context, show: Boolean) {
+        cachedShowComposition = show
+        getPrefs(context).edit().putBoolean(KEY_SHOW_COMPOSITION, show).apply()
+    }
+
+    // Candidates per page settings
+    fun getCandidatesPerPage(context: Context): Int {
+        if (cachedCandidatesPerPage == -1) {
+            cachedCandidatesPerPage = getPrefs(context).getInt(KEY_CANDIDATES_PER_PAGE, CANDIDATES_DEFAULT)
+        }
+        return cachedCandidatesPerPage
+    }
+
+    fun setCandidatesPerPage(context: Context, count: Int) {
+        cachedCandidatesPerPage = count.coerceIn(CANDIDATES_MIN, CANDIDATES_MAX)
+        getPrefs(context).edit().putInt(KEY_CANDIDATES_PER_PAGE, cachedCandidatesPerPage).apply()
     }
 
     /**
@@ -56,6 +91,15 @@ object ThemeManager {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
+    /**
+     * Invalidate all caches (call when settings might have changed externally).
+     */
+    fun invalidateCache() {
+        cachedTheme = -1
+        cachedShowComposition = null
+        cachedCandidatesPerPage = -1
+    }
+
     // Modern Dark Theme Colors (Material You inspired)
     private val darkColors = KeyboardColors(
         keyboardBackground = Color.parseColor("#1F1F1F"),
@@ -74,7 +118,11 @@ object ThemeManager {
         englishPillText = Color.parseColor("#8AB4F8"),
         pageIndicatorText = Color.parseColor("#9E9E9E"),
         noMatchText = Color.parseColor("#757575"),
-        keyShadowColor = Color.parseColor("#0D000000")
+        keyShadowColor = Color.parseColor("#0D000000"),
+        emojiCategoryBackground = Color.parseColor("#2A2A2A"),
+        emojiCategorySelectedBackground = Color.parseColor("#424242"),
+        emojiCategoryText = Color.parseColor("#9E9E9E"),
+        emojiCategorySelectedText = Color.parseColor("#E8E8E8")
     )
 
     // Modern Light Theme Colors (Material You inspired)
@@ -95,7 +143,11 @@ object ThemeManager {
         englishPillText = Color.parseColor("#1A73E8"),
         pageIndicatorText = Color.parseColor("#5F6368"),
         noMatchText = Color.parseColor("#9E9E9E"),
-        keyShadowColor = Color.parseColor("#1A000000")
+        keyShadowColor = Color.parseColor("#1A000000"),
+        emojiCategoryBackground = Color.parseColor("#FFFFFF"),
+        emojiCategorySelectedBackground = Color.parseColor("#D4D8E0"),
+        emojiCategoryText = Color.parseColor("#5F6368"),
+        emojiCategorySelectedText = Color.parseColor("#1F1F1F")
     )
 }
 
@@ -119,5 +171,9 @@ data class KeyboardColors(
     val englishPillText: Int,
     val pageIndicatorText: Int,
     val noMatchText: Int,
-    val keyShadowColor: Int
+    val keyShadowColor: Int,
+    val emojiCategoryBackground: Int,
+    val emojiCategorySelectedBackground: Int,
+    val emojiCategoryText: Int,
+    val emojiCategorySelectedText: Int
 )
