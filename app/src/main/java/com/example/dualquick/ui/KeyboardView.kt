@@ -29,6 +29,8 @@ class KeyboardView @JvmOverloads constructor(
     private var onKeyPress: ((KeyEvent) -> Unit)? = null
     private var onModeChange: ((Boolean) -> Unit)? = null
     private var onCandidateSelected: ((String) -> Unit)? = null
+    private var onEnglishSelected: ((String) -> Unit)? = null
+    private var currentRawKeys: String = ""
     private var isShiftOn = false
     private var isSymbolMode = false
     private var isSymbolPage2 = false
@@ -179,12 +181,45 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Creates a pill for the English option (tappable to commit as English).
+     */
+    private fun createEnglishPill(text: String): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(32)).apply {
+                setMargins(dpToPx(3), 0, dpToPx(3), 0)
+            }
+            gravity = Gravity.CENTER
+            minWidth = dpToPx(40)
+            setPadding(dpToPx(12), dpToPx(4), dpToPx(12), dpToPx(4))
+            this.text = text
+            textSize = 18f
+            setTextColor(Color.parseColor("#4FC3F7"))  // Blue color to distinguish English
+            setBackgroundResource(R.drawable.suggestion_pill_background)
+
+            setOnClickListener {
+                if (currentRawKeys.isNotEmpty()) {
+                    onEnglishSelected?.invoke(currentRawKeys)
+                }
+            }
+
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
+                }
+                false
+            }
+        }
+    }
+
     // ==================== PUBLIC CANDIDATE METHODS ====================
 
     /**
      * Update the composition display (radicals).
      */
     fun setComposition(radicals: String, rawKeys: String) {
+        currentRawKeys = rawKeys
         compositionText?.let { tv ->
             if (radicals.isNotEmpty()) {
                 tv.text = "$radicals"
@@ -197,6 +232,7 @@ class KeyboardView @JvmOverloads constructor(
 
     /**
      * Update the displayed candidates with Gboard-style pills.
+     * First pill is always the English option (rawKeys), followed by Chinese candidates.
      */
     fun setCandidates(candidates: List<String>, currentPage: Int, totalPages: Int) {
         candidateRow?.removeAllViews()
@@ -205,6 +241,13 @@ class KeyboardView @JvmOverloads constructor(
         // Scroll back to start when candidates change
         candidateScrollView?.scrollTo(0, 0)
 
+        // First pill: English option (always available when composing)
+        if (currentRawKeys.isNotEmpty()) {
+            val englishPill = createEnglishPill(currentRawKeys)
+            candidateRow?.addView(englishPill)
+        }
+
+        // Then Chinese candidates
         candidates.forEach { candidate ->
             val pill = createCandidatePill(candidate)
             candidateButtons.add(pill)
@@ -223,11 +266,17 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
-     * Show a "no match" message.
+     * Show a "no match" message with English option.
      */
     fun showNoMatch() {
         candidateRow?.removeAllViews()
         candidateButtons.clear()
+
+        // Still show English option even when no Chinese match
+        if (currentRawKeys.isNotEmpty()) {
+            val englishPill = createEnglishPill(currentRawKeys)
+            candidateRow?.addView(englishPill)
+        }
 
         val noMatchText = TextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
@@ -245,6 +294,7 @@ class KeyboardView @JvmOverloads constructor(
      * Clear all candidates and composition.
      */
     fun clearCandidates() {
+        currentRawKeys = ""
         compositionText?.visibility = View.GONE
         candidateRow?.removeAllViews()
         candidateButtons.clear()
@@ -573,10 +623,17 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
-     * Set the callback for candidate selection.
+     * Set the callback for Chinese candidate selection.
      */
     fun setOnCandidateSelectedListener(listener: (String) -> Unit) {
         onCandidateSelected = listener
+    }
+
+    /**
+     * Set the callback for English selection (tap on English pill).
+     */
+    fun setOnEnglishSelectedListener(listener: (String) -> Unit) {
+        onEnglishSelected = listener
     }
 
     /**

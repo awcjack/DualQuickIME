@@ -50,8 +50,13 @@ class DualQuickInputMethodService : InputMethodService() {
                 isSymbolMode = symbolMode
             }
             setOnCandidateSelectedListener { candidate ->
-                // User TAPPED a candidate pill - commit Chinese
+                // User TAPPED a Chinese candidate pill - commit Chinese
                 commitChinese(candidate)
+                clearComposition()
+            }
+            setOnEnglishSelectedListener { english ->
+                // User TAPPED the English pill - commit as English
+                commitEnglish(english)
                 clearComposition()
             }
         }
