@@ -1,6 +1,7 @@
 package com.example.dualquick
 
 import android.inputmethodservice.InputMethodService
+import android.inputmethodservice.InputMethodService.Insets
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import com.example.dualquick.data.CinParser
@@ -27,6 +28,9 @@ class DualQuickInputMethodService : InputMethodService() {
     private var keyboardView: KeyboardView? = null
     private var candidateView: CandidateView? = null
 
+    // Track current keyboard mode
+    private var isSymbolMode = false
+
     override fun onCreate() {
         super.onCreate()
         // Load simplex.cin from assets
@@ -43,6 +47,9 @@ class DualQuickInputMethodService : InputMethodService() {
             setOnKeyPressListener { event ->
                 handleKeyEvent(event)
             }
+            setOnModeChangeListener { symbolMode ->
+                isSymbolMode = symbolMode
+            }
         }
         return keyboardView!!
     }
@@ -58,10 +65,27 @@ class DualQuickInputMethodService : InputMethodService() {
         return candidateView!!
     }
 
+    /**
+     * Ensure candidates view is shown above keyboard.
+     * Without this override, the candidates view may not display properly.
+     */
+    override fun onComputeInsets(outInsets: Insets?) {
+        super.onComputeInsets(outInsets)
+        outInsets?.contentTopInsets = outInsets?.visibleTopInsets ?: 0
+    }
+
+    /**
+     * Never use fullscreen mode so candidates view is always visible.
+     */
+    override fun onEvaluateFullscreenMode(): Boolean = false
+
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         // Clear composition when starting new input
         clearComposition()
+        // Reset to letter mode
+        isSymbolMode = false
+        keyboardView?.setLetterMode()
     }
 
     private fun handleKeyEvent(event: KeyboardView.KeyEvent) {
