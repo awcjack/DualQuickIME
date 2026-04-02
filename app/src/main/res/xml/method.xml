@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.example.dualquick.SettingsActivity"
+    android:icon="@mipmap/ic_launcher">
+
+    <subtype
+        android:label="@string/subtype_zh_TW"
+        android:imeSubtypeLocale="zh_TW"
+        android:imeSubtypeMode="keyboard" />
+
+    <subtype
+        android:label="@string/subtype_zh_HK"
+        android:imeSubtypeLocale="zh_HK"
+        android:imeSubtypeMode="keyboard" />
+
+    <subtype
+        android:label="@string/subtype_en_US"
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="keyboard" />
+
+</input-method>

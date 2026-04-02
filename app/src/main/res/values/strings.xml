@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">雙拼速成</string>
+    <string name="ime_name">DualQuick 中英速成</string>
+    <string name="settings_name">雙拼速成設定</string>
+
+    <string name="subtype_zh_TW">繁體中文 (台灣)</string>
+    <string name="subtype_zh_HK">繁體中文 (香港)</string>
+    <string name="subtype_en_US">English (US)</string>
+
+    <string name="no_candidates">無此字</string>
+    <string name="space_hint">Space = 下一頁</string>
+</resources>
