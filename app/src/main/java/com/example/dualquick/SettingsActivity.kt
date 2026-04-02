@@ -1,26 +1,30 @@
 package com.example.dualquick
 
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.RadioGroup
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.widget.SwitchCompat
 import com.example.dualquick.theme.ThemeManager
 
 /**
  * Settings activity for the DualQuick IME.
- * Allows users to configure theme (light/dark/auto).
+ * Allows users to configure theme, composition display, and candidate count.
  */
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var themeRadioGroup: RadioGroup
     private lateinit var previewContainer: LinearLayout
     private lateinit var previewKeyRow: LinearLayout
+    private lateinit var switchShowComposition: SwitchCompat
+    private lateinit var seekBarCandidates: SeekBar
+    private lateinit var textCandidatesValue: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,8 +33,13 @@ class SettingsActivity : AppCompatActivity() {
         themeRadioGroup = findViewById(R.id.themeRadioGroup)
         previewContainer = findViewById(R.id.previewContainer)
         previewKeyRow = findViewById(R.id.previewKeyRow)
+        switchShowComposition = findViewById(R.id.switchShowComposition)
+        seekBarCandidates = findViewById(R.id.seekBarCandidates)
+        textCandidatesValue = findViewById(R.id.textCandidatesValue)
 
         setupThemeSelection()
+        setupCompositionToggle()
+        setupCandidatesSeekBar()
         updatePreview()
     }
 
@@ -61,6 +70,37 @@ class SettingsActivity : AppCompatActivity() {
             }
             AppCompatDelegate.setDefaultNightMode(nightMode)
         }
+    }
+
+    private fun setupCompositionToggle() {
+        // Set current value
+        switchShowComposition.isChecked = ThemeManager.getShowComposition(this)
+
+        // Listen for changes
+        switchShowComposition.setOnCheckedChangeListener { _, isChecked ->
+            ThemeManager.setShowComposition(this, isChecked)
+        }
+    }
+
+    private fun setupCandidatesSeekBar() {
+        // Set current value
+        val currentValue = ThemeManager.getCandidatesPerPage(this)
+        seekBarCandidates.progress = currentValue
+        textCandidatesValue.text = currentValue.toString()
+
+        // Listen for changes
+        seekBarCandidates.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = progress.coerceIn(ThemeManager.CANDIDATES_MIN, ThemeManager.CANDIDATES_MAX)
+                textCandidatesValue.text = value.toString()
+                if (fromUser) {
+                    ThemeManager.setCandidatesPerPage(this@SettingsActivity, value)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
     }
 
     private fun updatePreview() {

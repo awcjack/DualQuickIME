@@ -15,6 +15,11 @@
     <string name="settings_title">設定 Settings</string>
     <string name="settings_appearance">外觀 Appearance</string>
     <string name="settings_theme">主題 Theme</string>
+    <string name="settings_candidate_bar">候選字列 Candidate Bar</string>
+    <string name="settings_show_composition">顯示輸入碼 Show composition code</string>
+    <string name="settings_show_composition_desc">在候選字列中顯示速成碼</string>
+    <string name="settings_candidates_per_page">每頁候選字數量 Candidates per page</string>
+    <string name="settings_candidates_per_page_desc">調整候選字顯示數量 (較少 = 較大)</string>
     <string name="settings_preview">預覽 Preview</string>
     <string name="settings_about">關於 About</string>
 
