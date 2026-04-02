@@ -12,9 +12,11 @@ local.properties
 *.apk
 *.aab
 
-# Keystore
+# Keystore (NEVER commit these)
 *.jks
 *.keystore
+keystore.properties
+signing.properties
 
 # Logs
 *.log
