@@ -24,24 +24,56 @@ class KeyboardView @JvmOverloads constructor(
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
     private var onKeyPress: ((KeyEvent) -> Unit)? = null
+    private var onModeChange: ((Boolean) -> Unit)? = null
     private var isShiftOn = false
+    private var isSymbolMode = false
+    private var isSymbolPage2 = false
     private var shiftKey: TextView? = null
+    private var modeToggleKey: TextView? = null
 
     // QWERTY layout rows
     private val row1 = listOf('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p')
     private val row2 = listOf('a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l')
     private val row3 = listOf('z', 'x', 'c', 'v', 'b', 'n', 'm')
 
+    // Number/Symbol rows (page 1)
+    private val numRow1 = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
+    private val symRow2Page1 = listOf('@', '#', '$', '%', '&', '-', '+', '(', ')')
+    private val symRow3Page1 = listOf('*', '"', '\'', ':', ';', '!', '?')
+
+    // Symbol rows (page 2)
+    private val symRow1Page2 = listOf('~', '`', '|', '·', '√', 'π', '÷', '×', '¶', '∆')
+    private val symRow2Page2 = listOf('£', '¥', '€', '¢', '^', '°', '=', '{', '}')
+    private val symRow3Page2 = listOf('\\', '©', '®', '™', '℅', '[', ']')
+
     init {
         orientation = VERTICAL
         setBackgroundColor(Color.parseColor("#1B1B1B"))
         setPadding(dpToPx(2), dpToPx(4), dpToPx(2), dpToPx(4))
 
-        // Add keyboard rows
-        addView(createKeyRow(row1))
-        addView(createKeyRow(row2, leftPadding = 0.5f))
-        addView(createSpecialRow3())
-        addView(createBottomRow())
+        buildKeyboard()
+    }
+
+    private fun buildKeyboard() {
+        removeAllViews()
+
+        if (isSymbolMode) {
+            if (isSymbolPage2) {
+                addView(createSymbolRow(symRow1Page2))
+                addView(createSymbolRow(symRow2Page2, leftPadding = 0.5f))
+                addView(createSymbolSpecialRow3(symRow3Page2))
+            } else {
+                addView(createSymbolRow(numRow1))
+                addView(createSymbolRow(symRow2Page1, leftPadding = 0.5f))
+                addView(createSymbolSpecialRow3(symRow3Page1))
+            }
+            addView(createSymbolBottomRow())
+        } else {
+            addView(createKeyRow(row1))
+            addView(createKeyRow(row2, leftPadding = 0.5f))
+            addView(createSpecialRow3())
+            addView(createBottomRow())
+        }
     }
 
     private fun createKeyRow(keys: List<Char>, leftPadding: Float = 0f): LinearLayout {
@@ -108,9 +140,133 @@ class KeyboardView @JvmOverloads constructor(
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Number/Symbol toggle (placeholder)
-            addView(createSpecialKey("123", 1.2f) {
-                // TODO: Switch to number/symbol keyboard
+            // Number/Symbol toggle
+            modeToggleKey = createSpecialKey("123", 1.2f) {
+                isSymbolMode = true
+                isSymbolPage2 = false
+                onModeChange?.invoke(true)
+                buildKeyboard()
+            }
+            addView(modeToggleKey)
+
+            // Comma
+            addView(createSpecialKey(",", 1f) {
+                onKeyPress?.invoke(KeyEvent.Symbol(','))
+            })
+
+            // Space bar
+            addView(createSpecialKey("Space", 4f) {
+                onKeyPress?.invoke(KeyEvent.Space)
+            }.apply {
+                setBackgroundResource(R.drawable.space_key_background)
+            })
+
+            // Period
+            addView(createSpecialKey(".", 1f) {
+                onKeyPress?.invoke(KeyEvent.Symbol('.'))
+            })
+
+            // Enter key
+            addView(createSpecialKey("↵", 1.2f) {
+                onKeyPress?.invoke(KeyEvent.Enter)
+            })
+        }
+    }
+
+    private fun createSymbolRow(chars: List<Char>, leftPadding: Float = 0f): LinearLayout {
+        return LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER
+
+            if (leftPadding > 0) {
+                addView(View(context).apply {
+                    layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, leftPadding)
+                })
+            }
+
+            chars.forEach { char ->
+                addView(createSymbolKey(char))
+            }
+
+            if (leftPadding > 0) {
+                addView(View(context).apply {
+                    layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, leftPadding)
+                })
+            }
+        }
+    }
+
+    private fun createSymbolKey(char: Char): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
+                setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
+            }
+            gravity = Gravity.CENTER
+            text = char.toString()
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            setBackgroundResource(R.drawable.key_background)
+
+            setOnClickListener {
+                if (char.isDigit()) {
+                    onKeyPress?.invoke(KeyEvent.Number(char.digitToInt()))
+                } else {
+                    onKeyPress?.invoke(KeyEvent.Symbol(char))
+                }
+            }
+
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
+                }
+                false
+            }
+        }
+    }
+
+    private fun createSymbolSpecialRow3(chars: List<Char>): LinearLayout {
+        return LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER
+
+            // Page toggle key (1/2 or 2/2)
+            val pageLabel = if (isSymbolPage2) "1/2" else "2/2"
+            addView(createSpecialKey(pageLabel, 1.5f) {
+                isSymbolPage2 = !isSymbolPage2
+                buildKeyboard()
+            })
+
+            // Symbol keys
+            chars.forEach { char ->
+                addView(createSymbolKey(char))
+            }
+
+            // Backspace key
+            addView(createSpecialKey("⌫", 1.5f) {
+                onKeyPress?.invoke(KeyEvent.Backspace)
+            }.apply {
+                setOnLongClickListener {
+                    onKeyPress?.invoke(KeyEvent.Backspace)
+                    true
+                }
+            })
+        }
+    }
+
+    private fun createSymbolBottomRow(): LinearLayout {
+        return LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER
+
+            // ABC toggle (back to letters)
+            addView(createSpecialKey("ABC", 1.2f) {
+                isSymbolMode = false
+                onModeChange?.invoke(false)
+                buildKeyboard()
             })
 
             // Comma
@@ -228,6 +384,24 @@ class KeyboardView @JvmOverloads constructor(
      */
     fun setOnKeyPressListener(listener: (KeyEvent) -> Unit) {
         onKeyPress = listener
+    }
+
+    /**
+     * Set the callback for mode changes (letter/symbol mode).
+     */
+    fun setOnModeChangeListener(listener: (Boolean) -> Unit) {
+        onModeChange = listener
+    }
+
+    /**
+     * Switch back to letter mode programmatically.
+     */
+    fun setLetterMode() {
+        if (isSymbolMode) {
+            isSymbolMode = false
+            isSymbolPage2 = false
+            buildKeyboard()
+        }
     }
 
     private fun dpToPx(dp: Int): Int {
