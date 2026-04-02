@@ -370,9 +370,10 @@ class ClipboardKeyboardView @JvmOverloads constructor(
     }
 
     private fun createIconBackground(): StateListDrawable {
+        val pressedColor = colors.clipboardItemBackgroundPressed
         val pressed = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(colors.clipboardItemBackgroundPressed)
+            setColor(pressedColor)
         }
         val normal = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
