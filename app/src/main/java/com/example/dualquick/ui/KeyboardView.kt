@@ -61,15 +61,30 @@ class KeyboardView @JvmOverloads constructor(
     private val row2 = listOf('a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l')
     private val row3 = listOf('z', 'x', 'c', 'v', 'b', 'n', 'm')
 
-    // Number/Symbol rows (page 1)
+    // Number/Symbol rows (page 1) - Common punctuation
     private val numRow1 = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
     private val symRow2Page1 = listOf('@', '#', '$', '%', '&', '-', '+', '(', ')')
     private val symRow3Page1 = listOf('*', '"', '\'', ':', ';', '!', '?')
 
-    // Symbol rows (page 2)
-    private val symRow1Page2 = listOf('~', '`', '|', '·', '√', 'π', '÷', '×', '¶', '∆')
-    private val symRow2Page2 = listOf('£', '¥', '€', '¢', '^', '°', '=', '{', '}')
-    private val symRow3Page2 = listOf('\\', '©', '®', '™', '℅', '[', ']')
+    // Symbol rows (page 2) - Brackets and math
+    private val symRow1Page2 = listOf('~', '`', '|', '\\', '/', '<', '>', '{', '}', '^')
+    private val symRow2Page2 = listOf('[', ']', '(', ')', '「', '」', '『', '』', '【')
+    private val symRow3Page2 = listOf('=', '_', '《', '》', '〈', '〉', '】')
+
+    // Symbol rows (page 3) - Currency and units
+    private val symRow1Page3 = listOf('$', '¥', '€', '£', '¢', '₩', '₹', '฿', '₱', '₽')
+    private val symRow2Page3 = listOf('%', '‰', '°', '℃', '℉', '±', '×', '÷', '√')
+    private val symRow3Page3 = listOf('∞', '≈', '≠', '≤', '≥', '∑', '∏')
+
+    // Symbol rows (page 4) - Miscellaneous symbols
+    private val symRow1Page4 = listOf('©', '®', '™', '℠', '†', '‡', '§', '¶', '•', '·')
+    private val symRow2Page4 = listOf('…', '—', '–', '―', '‖', '¦', '※', '♪', '♫')
+    private val symRow3Page4 = listOf('♠', '♣', '♥', '♦', '★', '☆', '○')
+
+    // Symbol rows (page 5) - Arrows and shapes
+    private val symRow1Page5 = listOf('←', '→', '↑', '↓', '↔', '↕', '⇐', '⇒', '⇑', '⇓')
+    private val symRow2Page5 = listOf('▲', '▼', '◀', '▶', '◆', '◇', '□', '■', '△')
+    private val symRow3Page5 = listOf('▽', '○', '●', '◎', '⊙', '⊕', '⊗')
 
     init {
         orientation = VERTICAL
@@ -99,8 +114,8 @@ class KeyboardView @JvmOverloads constructor(
     private fun buildKeyboard() {
         removeAllViews()
 
-        // Check if we're in full emoji mode (page 2 of symbol mode)
-        if (isSymbolMode && symbolPage == 2) {
+        // Check if we're in full emoji mode (page 99 is emoji mode)
+        if (isSymbolMode && symbolPage == 99) {
             // Show full-featured emoji keyboard
             if (emojiKeyboardView == null) {
                 emojiKeyboardView = EmojiKeyboardView(context).apply {
@@ -137,6 +152,21 @@ class KeyboardView @JvmOverloads constructor(
                     addView(createSymbolRow(symRow1Page2))
                     addView(createSymbolRow(symRow2Page2, leftPadding = 0.5f))
                     addView(createSymbolSpecialRow3(symRow3Page2))
+                }
+                2 -> {
+                    addView(createSymbolRow(symRow1Page3))
+                    addView(createSymbolRow(symRow2Page3, leftPadding = 0.5f))
+                    addView(createSymbolSpecialRow3(symRow3Page3))
+                }
+                3 -> {
+                    addView(createSymbolRow(symRow1Page4))
+                    addView(createSymbolRow(symRow2Page4, leftPadding = 0.5f))
+                    addView(createSymbolSpecialRow3(symRow3Page4))
+                }
+                4 -> {
+                    addView(createSymbolRow(symRow1Page5))
+                    addView(createSymbolRow(symRow2Page5, leftPadding = 0.5f))
+                    addView(createSymbolSpecialRow3(symRow3Page5))
                 }
             }
             addView(createSymbolBottomRow())
@@ -427,7 +457,7 @@ class KeyboardView @JvmOverloads constructor(
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            shiftKey = createSpecialKey("⇧", 1.5f) {
+            shiftKey = createShiftKey {
                 isShiftOn = !isShiftOn
                 updateShiftState()
             }
@@ -499,7 +529,7 @@ class KeyboardView @JvmOverloads constructor(
             }
             gravity = Gravity.CENTER
             text = label
-            textSize = 16f
+            textSize = 18f
             setTextColor(colors.keyTextPrimary)
             background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
             elevation = dpToPx(1).toFloat()
@@ -508,15 +538,36 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Create the shift key with bolder styling.
+     */
+    private fun createShiftKey(onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1.8f).apply {
+                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
+            }
+            gravity = Gravity.CENTER
+            text = "⇧"
+            textSize = 22f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(colors.keyTextPrimary)
+            background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
+            elevation = dpToPx(2).toFloat()
+
+            setOnClickListener { onClick() }
+        }
+    }
+
     private fun createKeyBackground(normalColor: Int, pressedColor: Int): StateListDrawable {
+        val cornerRadiusPx = dpToPx(12).toFloat()  // More rounded for modern look
         val pressed = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dpToPx(10).toFloat()
+            cornerRadius = cornerRadiusPx
             setColor(pressedColor)
         }
         val normal = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dpToPx(10).toFloat()
+            cornerRadius = cornerRadiusPx
             setColor(normalColor)
         }
         return StateListDrawable().apply {
@@ -577,10 +628,11 @@ class KeyboardView @JvmOverloads constructor(
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Page button: cycles through 1/2 -> 2/2 -> emoji keyboard
-            val pageLabel = if (symbolPage == 0) "1/2" else "2/2"
+            // Page button: cycles through pages 1-5
+            val totalPages = 5
+            val pageLabel = "${symbolPage + 1}/$totalPages"
             addView(createSpecialKey(pageLabel, 1.5f) {
-                symbolPage = (symbolPage + 1) % 2
+                symbolPage = (symbolPage + 1) % totalPages
                 buildKeyboard()
             })
 
@@ -612,7 +664,7 @@ class KeyboardView @JvmOverloads constructor(
 
             // Emoji button to switch to full emoji keyboard
             addView(createSpecialKey("😀", 1f) {
-                symbolPage = 2  // Emoji mode
+                symbolPage = 99  // Emoji mode
                 buildKeyboard()
             })
 
