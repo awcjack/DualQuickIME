@@ -1,4 +1,4 @@
-# DualQuickIME - 雙拼速成 (Dual Chinese/English Quick Input)
+# DualQuickIME - 雙拼速成
 
 A dual-mode Chinese/English Input Method Editor (IME) for Android that supports 速成 (Quick/Simplified Cangjie) input **without switching keyboards**.
 
@@ -9,6 +9,10 @@ A dual-mode Chinese/English Input Method Editor (IME) for Android that supports 
 - **Space pagination**: Press Space to navigate through candidate pages
 - **OpenVanilla compatible**: Uses the same character ordering as OpenVanilla on macOS
 - **QWERTY layout**: Each key shows both the English letter and Chinese radical
+- **Multi-language UI**: English, Traditional Chinese (TW/HK), Simplified Chinese
+- **Theme support**: System default, Light mode, Dark mode
+- **Extended special characters**: 5 pages of symbols, brackets, currency, arrows, and more
+- **Full emoji keyboard**: 8 categories of emojis
 
 ## How It Works
 
@@ -55,7 +59,31 @@ To type "我love你":
 
 Result: **我love你**
 
-## Building
+## Installation
+
+### From GitHub Releases
+
+1. Download the latest APK from [Releases](https://github.com/awcjack/DualQuickIME/releases)
+2. Install the APK on your Android device
+3. Enable the keyboard in Settings (see below)
+
+### From GitHub Actions
+
+1. Go to [Actions](https://github.com/awcjack/DualQuickIME/actions)
+2. Click on the latest successful build
+3. Download the `app-release-signed` artifact
+4. Unzip and install `app-release.apk`
+
+### Enable the Keyboard
+
+1. Go to **Settings → System → Languages & Input**
+2. Tap **Virtual Keyboard** or **On-screen keyboard**
+3. Tap **Manage keyboards**
+4. Enable **DualQuick IME** (雙拼速成)
+5. Accept the security warning
+6. Switch keyboard: Long-press the globe/keyboard icon in any text field
+
+## Building from Source
 
 ### Prerequisites
 
@@ -67,7 +95,7 @@ Result: **我love你**
 
 ```bash
 # Clone the repository
-git clone https://github.com/user/DualQuickIME.git
+git clone https://github.com/awcjack/DualQuickIME.git
 cd DualQuickIME
 
 # Build debug APK
@@ -83,20 +111,11 @@ cd DualQuickIME
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 # Enable the keyboard
-adb shell ime enable com.example.dualquick/.DualQuickInputMethodService
+adb shell ime enable com.awcjack.dualquickime/.DualQuickInputMethodService
 
 # Set as default (optional)
-adb shell ime set com.example.dualquick/.DualQuickInputMethodService
+adb shell ime set com.awcjack.dualquickime/.DualQuickInputMethodService
 ```
-
-### Enable Manually
-
-1. Go to **Settings → System → Languages & Input**
-2. Tap **Virtual Keyboard** or **On-screen keyboard**
-3. Tap **Manage keyboards**
-4. Enable **DualQuick 中英速成**
-5. Accept the security warning
-6. Switch keyboard: Long-press the globe/keyboard icon in any text field
 
 ## Project Structure
 
@@ -104,7 +123,7 @@ adb shell ime set com.example.dualquick/.DualQuickInputMethodService
 DualQuickIME/
 ├── .github/workflows/build.yml    # CI/CD pipeline
 ├── app/src/main/
-│   ├── java/com/example/dualquick/
+│   ├── java/com/awcjack/dualquickime/
 │   │   ├── DualQuickInputMethodService.kt  # Main IME service
 │   │   ├── data/
 │   │   │   ├── CinParser.kt                # .cin file parser
@@ -121,13 +140,13 @@ DualQuickIME/
 │   └── res/
 │       ├── xml/method.xml                  # IME configuration
 │       ├── values/                         # Strings, colors, themes
+│       ├── values-en/                      # English strings
+│       ├── values-zh-rTW/                  # Traditional Chinese (Taiwan)
+│       ├── values-zh-rHK/                  # Traditional Chinese (Hong Kong)
+│       ├── values-zh-rCN/                  # Simplified Chinese
 │       └── drawable/                       # Key backgrounds
 └── build.gradle.kts
 ```
-
-## Data Source
-
-Character data is from [OpenVanilla](https://github.com/openvanilla/openvanilla), specifically the `simplex.cin` file which contains ~13,000 character mappings in Traditional Chinese frequency order.
 
 ## Key Behaviors
 
@@ -139,16 +158,41 @@ Character data is from [OpenVanilla](https://github.com/openvanilla/openvanilla)
 | Backspace | Delete last character | Delete in text field |
 | 0-9 | Commit composition as English, then number | Insert number |
 
+## Special Characters
+
+The symbol keyboard includes 5 pages:
+
+| Page | Content |
+|------|---------|
+| 1 | Numbers (0-9), common punctuation (@#$%&-+etc.) |
+| 2 | Brackets and math symbols ({}[]<>「」『』etc.) |
+| 3 | Currency and units ($¥€£¢ %‰°℃℉±×÷√etc.) |
+| 4 | Miscellaneous symbols (©®™†‡§¶•·…—etc.) |
+| 5 | Arrows and shapes (←→↑↓▲▼◀▶★☆○●etc.) |
+
+## Data Source
+
+Character data is from [OpenVanilla](https://github.com/openvanilla/openvanilla), specifically the `simplex.cin` file which contains ~13,000 character mappings in Traditional Chinese frequency order.
+
 ## CI/CD
 
 This project uses GitHub Actions for continuous integration. On every push:
 - Builds debug and release APKs
 - Runs unit tests
-- Uploads APKs as artifacts
+- Uploads signed release APKs as artifacts (when secrets are configured)
+
+## Privacy
+
+This keyboard:
+- Does NOT collect or transmit any data
+- Does NOT require internet permission
+- Processes all input locally on device
+
+See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for details.
 
 ## License
 
-MIT License
+MIT License - see [LICENSE](LICENSE)
 
 ## Credits
 
