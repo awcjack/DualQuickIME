@@ -31,9 +31,9 @@ jobs:
         run: |
           echo "Commit: $(git rev-parse HEAD)"
           echo "Files in theme directory:"
-          ls -la app/src/main/java/com/example/dualquick/theme/
+          ls -la app/src/main/java/com/awcjack/dualquickime/theme/
           echo "KeyboardColors.kt content:"
-          cat app/src/main/java/com/example/dualquick/theme/KeyboardColors.kt
+          cat app/src/main/java/com/awcjack/dualquickime/theme/KeyboardColors.kt
 
       - name: Clean Gradle caches
         run: |
