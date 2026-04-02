@@ -54,6 +54,7 @@ class KeyboardView @JvmOverloads constructor(
 
     // Emoji keyboard view (full-featured)
     private var emojiKeyboardView: EmojiKeyboardView? = null
+    private var clipboardKeyboardView: ClipboardKeyboardView? = null
     private var mainKeyboardContainer: LinearLayout? = null
 
     // QWERTY layout rows
@@ -135,6 +136,30 @@ class KeyboardView @JvmOverloads constructor(
             }
             emojiKeyboardView?.refreshTheme()
             addView(emojiKeyboardView)
+            return
+        }
+
+        // Check if we're in clipboard mode (page 100 is clipboard mode)
+        if (isSymbolMode && symbolPage == 100) {
+            if (clipboardKeyboardView == null) {
+                clipboardKeyboardView = ClipboardKeyboardView(context).apply {
+                    setOnClipboardItemSelectedListener { text ->
+                        onKeyPress?.invoke(KeyEvent.ClipboardPaste(text))
+                    }
+                    setOnBackspacePressedListener {
+                        onKeyPress?.invoke(KeyEvent.Backspace)
+                    }
+                    setOnAbcPressedListener {
+                        isSymbolMode = false
+                        symbolPage = 0
+                        onModeChange?.invoke(false)
+                        buildKeyboard()
+                    }
+                }
+            }
+            clipboardKeyboardView?.refreshTheme()
+            clipboardKeyboardView?.refreshContent()
+            addView(clipboardKeyboardView)
             return
         }
 
@@ -668,11 +693,13 @@ class KeyboardView @JvmOverloads constructor(
                 buildKeyboard()
             })
 
-            addView(createSpaceKey())
-
-            addView(createSpecialKey(".", 1f) {
-                onKeyPress?.invoke(KeyEvent.Symbol('.'))
+            // Clipboard button
+            addView(createSpecialKey("📋", 1f) {
+                symbolPage = 100  // Clipboard mode
+                buildKeyboard()
             })
+
+            addView(createSpaceKey())
 
             addView(createSpecialKey("↵", 1.2f) {
                 onKeyPress?.invoke(KeyEvent.Enter)
@@ -725,6 +752,7 @@ class KeyboardView @JvmOverloads constructor(
         data class Number(val digit: Int) : KeyEvent()
         data class Symbol(val char: Char) : KeyEvent()
         data class Emoji(val emoji: String) : KeyEvent()
+        data class ClipboardPaste(val text: String) : KeyEvent()
         object Space : KeyEvent()
         object Backspace : KeyEvent()
         object Enter : KeyEvent()

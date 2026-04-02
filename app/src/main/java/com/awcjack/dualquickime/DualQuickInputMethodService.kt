@@ -4,6 +4,7 @@ import android.inputmethodservice.InputMethodService
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import com.awcjack.dualquickime.data.CinParser
+import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.CompositionState
 import com.awcjack.dualquickime.data.SimplexTable
 import com.awcjack.dualquickime.theme.ThemeManager
@@ -71,8 +72,9 @@ class DualQuickInputMethodService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        // Invalidate cache to pick up any settings changes
+        // Invalidate caches to pick up any settings changes
         ThemeManager.invalidateCache()
+        ClipboardHistoryManager.invalidateCache()
         // Refresh theme in case it changed in settings
         keyboardView?.refreshTheme()
         // Clear composition when starting new input
@@ -88,6 +90,7 @@ class DualQuickInputMethodService : InputMethodService() {
             is KeyboardView.KeyEvent.Number -> handleNumber(event.digit)
             is KeyboardView.KeyEvent.Symbol -> handleSymbol(event.char)
             is KeyboardView.KeyEvent.Emoji -> handleEmoji(event.emoji)
+            is KeyboardView.KeyEvent.ClipboardPaste -> handleClipboardPaste(event.text)
             KeyboardView.KeyEvent.Space -> handleSpace()
             KeyboardView.KeyEvent.Backspace -> handleBackspace()
             KeyboardView.KeyEvent.Enter -> handleEnter()
@@ -137,6 +140,16 @@ class DualQuickInputMethodService : InputMethodService() {
         commitText(emoji)
     }
 
+    private fun handleClipboardPaste(text: String) {
+        // Clipboard paste commits composition as English first
+        if (composition.rawKeys.isNotEmpty()) {
+            commitEnglish(composition.rawKeys)
+            clearComposition()
+        }
+        // Then commit the clipboard text
+        commitText(text)
+    }
+
     private fun handleSpace() {
         if (composition.hasCandidates) {
             // NEXT PAGE - do NOT commit
@@ -184,8 +197,12 @@ class DualQuickInputMethodService : InputMethodService() {
         commitText(text)
     }
 
-    private fun commitText(text: String) {
+    private fun commitText(text: String, addToClipboard: Boolean = true) {
         currentInputConnection?.commitText(text, 1)
+        // Add to clipboard history if enabled and text is substantial
+        if (addToClipboard && ClipboardHistoryManager.isEnabled(this)) {
+            ClipboardHistoryManager.addItem(this, text)
+        }
     }
 
     private fun updateComposition(rawKeys: String) {
