@@ -32,6 +32,10 @@ class DualQuickInputMethodService : InputMethodService() {
     // Track current keyboard mode
     private var isSymbolMode = false
 
+    // Track original case of letters for English output
+    // Maps index position to whether it was uppercase
+    private var letterCases = mutableListOf<Boolean>()
+
     override fun onCreate() {
         super.onCreate()
         // Load simplex.cin from assets
@@ -98,14 +102,18 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleLetter(char: Char) {
+        val isUpperCase = char.isUpperCase()
         val lowerChar = char.lowercaseChar()
         val newRawKeys = composition.rawKeys + lowerChar
 
         if (newRawKeys.length > 2) {
-            // 3rd key: commit first 2 as English, start new composition
-            commitEnglish(composition.rawKeys)
+            // 3rd key: commit first 2 as English (preserving case), start new composition
+            commitEnglishPreservingCase(composition.rawKeys, letterCases)
+            letterCases.clear()
+            letterCases.add(isUpperCase)
             updateComposition(lowerChar.toString())
         } else {
+            letterCases.add(isUpperCase)
             updateComposition(newRawKeys)
         }
     }
@@ -168,6 +176,10 @@ class DualQuickInputMethodService : InputMethodService() {
     private fun handleBackspace() {
         if (composition.rawKeys.isNotEmpty()) {
             val newKeys = composition.rawKeys.dropLast(1)
+            // Also remove the case tracking for the deleted letter
+            if (letterCases.isNotEmpty()) {
+                letterCases.removeAt(letterCases.lastIndex)
+            }
             if (newKeys.isEmpty()) {
                 clearComposition()
             } else {
@@ -194,7 +206,19 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun commitEnglish(text: String) {
-        commitText(text)
+        commitEnglishPreservingCase(text, letterCases)
+        letterCases.clear()
+    }
+
+    private fun commitEnglishPreservingCase(text: String, cases: List<Boolean>) {
+        val result = StringBuilder()
+        for (i in text.indices) {
+            val char = text[i]
+            // Use stored case if available, otherwise keep original
+            val shouldBeUpper = cases.getOrNull(i) ?: false
+            result.append(if (shouldBeUpper) char.uppercaseChar() else char.lowercaseChar())
+        }
+        commitText(result.toString())
     }
 
     private fun commitText(text: String, addToClipboard: Boolean = true) {
@@ -219,6 +243,7 @@ class DualQuickInputMethodService : InputMethodService() {
 
     private fun clearComposition() {
         composition = CompositionState.EMPTY
+        letterCases.clear()
         keyboardView?.clearCandidates()
     }
 
