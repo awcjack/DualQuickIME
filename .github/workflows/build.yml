@@ -52,13 +52,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug - Show KeyboardColors definition
-        run: |
-          echo "=== KeyboardColors data class ==="
-          grep -A 25 "data class KeyboardColors" app/src/main/java/com/example/dualquick/theme/ThemeManager.kt
-          echo "=== EmojiKeyboardView usage ==="
-          grep -n "emojiCategory" app/src/main/java/com/example/dualquick/ui/EmojiKeyboardView.kt || echo "No matches"
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
