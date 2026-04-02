@@ -3,11 +3,13 @@ package com.example.dualquick.ui
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.dualquick.R
@@ -15,6 +17,7 @@ import com.example.dualquick.util.KeyMapping
 
 /**
  * Custom keyboard view displaying QWERTY layout with Chinese radicals.
+ * Includes an embedded candidate bar at the top (Gboard-style).
  * Each key shows the English letter and its corresponding radical below.
  */
 class KeyboardView @JvmOverloads constructor(
@@ -25,11 +28,20 @@ class KeyboardView @JvmOverloads constructor(
 
     private var onKeyPress: ((KeyEvent) -> Unit)? = null
     private var onModeChange: ((Boolean) -> Unit)? = null
+    private var onCandidateSelected: ((String) -> Unit)? = null
     private var isShiftOn = false
     private var isSymbolMode = false
     private var isSymbolPage2 = false
     private var shiftKey: TextView? = null
     private var modeToggleKey: TextView? = null
+
+    // Candidate bar components (embedded, Gboard-style)
+    private var candidateContainer: LinearLayout? = null
+    private var compositionText: TextView? = null
+    private var candidateScrollView: HorizontalScrollView? = null
+    private var candidateRow: LinearLayout? = null
+    private var pageIndicator: TextView? = null
+    private val candidateButtons = mutableListOf<TextView>()
 
     // QWERTY layout rows
     private val row1 = listOf('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p')
@@ -57,6 +69,9 @@ class KeyboardView @JvmOverloads constructor(
     private fun buildKeyboard() {
         removeAllViews()
 
+        // Always add the candidate bar at the top (Gboard-style)
+        addView(createCandidateBar())
+
         if (isSymbolMode) {
             if (isSymbolPage2) {
                 addView(createSymbolRow(symRow1Page2))
@@ -75,6 +90,168 @@ class KeyboardView @JvmOverloads constructor(
             addView(createBottomRow())
         }
     }
+
+    /**
+     * Creates the Gboard-style candidate bar with composition display and pill-shaped suggestions.
+     */
+    private fun createCandidateBar(): LinearLayout {
+        candidateButtons.clear()
+
+        candidateContainer = LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(44))
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor("#1B1B1B"))
+            setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
+        }
+
+        // Composition text (shows radicals like "手口 (hq)")
+        compositionText = TextView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpToPx(8), 0, dpToPx(12), 0)
+            setTextColor(Color.parseColor("#4FC3F7"))
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+            visibility = View.GONE
+        }
+        candidateContainer?.addView(compositionText)
+
+        // Horizontal scroll view for candidates (allows many suggestions)
+        candidateScrollView = HorizontalScrollView(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
+            isHorizontalScrollBarEnabled = false
+            isFillViewport = true
+        }
+
+        // Row of candidate pills
+        candidateRow = LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        candidateScrollView?.addView(candidateRow)
+        candidateContainer?.addView(candidateScrollView)
+
+        // Page indicator (e.g., "1/5")
+        pageIndicator = TextView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpToPx(8), 0, dpToPx(4), 0)
+            setTextColor(Color.parseColor("#888888"))
+            textSize = 12f
+            visibility = View.GONE
+        }
+        candidateContainer?.addView(pageIndicator)
+
+        return candidateContainer!!
+    }
+
+    /**
+     * Creates a pill-shaped candidate button (Gboard-style).
+     */
+    private fun createCandidatePill(text: String): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(32)).apply {
+                setMargins(dpToPx(3), 0, dpToPx(3), 0)
+            }
+            gravity = Gravity.CENTER
+            minWidth = dpToPx(40)
+            setPadding(dpToPx(12), dpToPx(4), dpToPx(12), dpToPx(4))
+            this.text = text
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setBackgroundResource(R.drawable.suggestion_pill_background)
+
+            setOnClickListener {
+                this.text?.toString()?.takeIf { it.isNotBlank() }?.let { char ->
+                    onCandidateSelected?.invoke(char)
+                }
+            }
+
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
+                }
+                false
+            }
+        }
+    }
+
+    // ==================== PUBLIC CANDIDATE METHODS ====================
+
+    /**
+     * Update the composition display (radicals).
+     */
+    fun setComposition(radicals: String, rawKeys: String) {
+        compositionText?.let { tv ->
+            if (radicals.isNotEmpty()) {
+                tv.text = "$radicals"
+                tv.visibility = View.VISIBLE
+            } else {
+                tv.visibility = View.GONE
+            }
+        }
+    }
+
+    /**
+     * Update the displayed candidates with Gboard-style pills.
+     */
+    fun setCandidates(candidates: List<String>, currentPage: Int, totalPages: Int) {
+        candidateRow?.removeAllViews()
+        candidateButtons.clear()
+
+        // Scroll back to start when candidates change
+        candidateScrollView?.scrollTo(0, 0)
+
+        candidates.forEach { candidate ->
+            val pill = createCandidatePill(candidate)
+            candidateButtons.add(pill)
+            candidateRow?.addView(pill)
+        }
+
+        // Update page indicator
+        pageIndicator?.let { pi ->
+            if (totalPages > 1) {
+                pi.text = "$currentPage/$totalPages"
+                pi.visibility = View.VISIBLE
+            } else {
+                pi.visibility = View.GONE
+            }
+        }
+    }
+
+    /**
+     * Show a "no match" message.
+     */
+    fun showNoMatch() {
+        candidateRow?.removeAllViews()
+        candidateButtons.clear()
+
+        val noMatchText = TextView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpToPx(8), 0, dpToPx(8), 0)
+            text = "無此字"
+            textSize = 14f
+            setTextColor(Color.parseColor("#666666"))
+        }
+        candidateRow?.addView(noMatchText)
+        pageIndicator?.visibility = View.GONE
+    }
+
+    /**
+     * Clear all candidates and composition.
+     */
+    fun clearCandidates() {
+        compositionText?.visibility = View.GONE
+        candidateRow?.removeAllViews()
+        candidateButtons.clear()
+        pageIndicator?.visibility = View.GONE
+    }
+
+    // ==================== KEYBOARD ROWS ====================
 
     private fun createKeyRow(keys: List<Char>, leftPadding: Float = 0f): LinearLayout {
         return LinearLayout(context).apply {
@@ -379,6 +556,8 @@ class KeyboardView @JvmOverloads constructor(
         )
     }
 
+    // ==================== PUBLIC LISTENERS ====================
+
     /**
      * Set the callback for key press events.
      */
@@ -391,6 +570,13 @@ class KeyboardView @JvmOverloads constructor(
      */
     fun setOnModeChangeListener(listener: (Boolean) -> Unit) {
         onModeChange = listener
+    }
+
+    /**
+     * Set the callback for candidate selection.
+     */
+    fun setOnCandidateSelectedListener(listener: (String) -> Unit) {
+        onCandidateSelected = listener
     }
 
     /**

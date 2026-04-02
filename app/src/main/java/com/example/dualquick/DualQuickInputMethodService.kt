@@ -1,24 +1,24 @@
 package com.example.dualquick
 
 import android.inputmethodservice.InputMethodService
-import android.inputmethodservice.InputMethodService.Insets
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import com.example.dualquick.data.CinParser
 import com.example.dualquick.data.CompositionState
 import com.example.dualquick.data.SimplexTable
-import com.example.dualquick.ui.CandidateView
 import com.example.dualquick.ui.KeyboardView
 
 /**
  * Quick (速成) Input Method Service for Android.
  *
  * Supports dual-mode Chinese/English input:
- * - TAP on candidate to commit Chinese character
+ * - TAP on candidate pill to commit Chinese character
  * - SPACE to navigate candidate pages
  * - Type 3rd letter key to commit previous as English and start new composition
  * - ENTER to commit composition as English
  * - Numbers commit composition as English first, then the number
+ *
+ * Uses embedded Gboard-style candidate bar (not system candidates view).
  */
 class DualQuickInputMethodService : InputMethodService() {
 
@@ -26,7 +26,6 @@ class DualQuickInputMethodService : InputMethodService() {
     private var composition = CompositionState.EMPTY
 
     private var keyboardView: KeyboardView? = null
-    private var candidateView: CandidateView? = null
 
     // Track current keyboard mode
     private var isSymbolMode = false
@@ -50,32 +49,17 @@ class DualQuickInputMethodService : InputMethodService() {
             setOnModeChangeListener { symbolMode ->
                 isSymbolMode = symbolMode
             }
-        }
-        return keyboardView!!
-    }
-
-    override fun onCreateCandidatesView(): View {
-        candidateView = CandidateView(this).apply {
             setOnCandidateSelectedListener { candidate ->
-                // User TAPPED a candidate - commit Chinese
+                // User TAPPED a candidate pill - commit Chinese
                 commitChinese(candidate)
                 clearComposition()
             }
         }
-        return candidateView!!
+        return keyboardView!!
     }
 
     /**
-     * Ensure candidates view is shown above keyboard.
-     * Without this override, the candidates view may not display properly.
-     */
-    override fun onComputeInsets(outInsets: Insets?) {
-        super.onComputeInsets(outInsets)
-        outInsets?.contentTopInsets = outInsets?.visibleTopInsets ?: 0
-    }
-
-    /**
-     * Never use fullscreen mode so candidates view is always visible.
+     * Never use fullscreen mode so keyboard is always visible properly.
      */
     override fun onEvaluateFullscreenMode(): Boolean = false
 
@@ -195,25 +179,19 @@ class DualQuickInputMethodService : InputMethodService() {
 
     private fun clearComposition() {
         composition = CompositionState.EMPTY
-        candidateView?.clear()
-        setCandidatesViewShown(false)
+        keyboardView?.clearCandidates()
     }
 
     private fun updateUI() {
         updateCandidateView()
-
-        // Show/hide candidates view based on whether we have a composition
-        val shouldShow = composition.rawKeys.isNotEmpty()
-        setCandidatesViewShown(shouldShow)
     }
 
     private fun updateCandidateView() {
-        candidateView?.let { view ->
+        keyboardView?.let { view ->
             // Update composition display (radicals)
             view.setComposition(composition.radicalDisplay, composition.rawKeys)
 
             if (composition.hasCandidates) {
-                view.resetButtonColors()
                 view.setCandidates(
                     candidates = composition.currentPageCandidates,
                     currentPage = composition.currentPage + 1, // 1-based for display
@@ -223,7 +201,7 @@ class DualQuickInputMethodService : InputMethodService() {
                 // Show "no match" message
                 view.showNoMatch()
             } else {
-                view.clear()
+                view.clearCandidates()
             }
         }
     }
