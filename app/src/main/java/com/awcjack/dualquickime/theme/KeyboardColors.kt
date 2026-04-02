@@ -24,5 +24,12 @@ data class KeyboardColors(
     val emojiCategoryBackground: Int,
     val emojiCategorySelectedBackground: Int,
     val emojiCategoryText: Int,
-    val emojiCategorySelectedText: Int
+    val emojiCategorySelectedText: Int,
+    // Clipboard colors
+    val clipboardItemBackground: Int,
+    val clipboardItemBackgroundPressed: Int,
+    val clipboardItemText: Int,
+    val clipboardPinnedIcon: Int,
+    val clipboardDeleteIcon: Int,
+    val clipboardEmptyText: Int
 )

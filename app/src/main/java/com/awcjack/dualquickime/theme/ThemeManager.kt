@@ -122,7 +122,14 @@ object ThemeManager {
         emojiCategoryBackground = Color.parseColor("#2A2A2A"),
         emojiCategorySelectedBackground = Color.parseColor("#424242"),
         emojiCategoryText = Color.parseColor("#9E9E9E"),
-        emojiCategorySelectedText = Color.parseColor("#E8E8E8")
+        emojiCategorySelectedText = Color.parseColor("#E8E8E8"),
+        // Clipboard colors
+        clipboardItemBackground = Color.parseColor("#2A2A2A"),
+        clipboardItemBackgroundPressed = Color.parseColor("#424242"),
+        clipboardItemText = Color.parseColor("#E8E8E8"),
+        clipboardPinnedIcon = Color.parseColor("#8AB4F8"),
+        clipboardDeleteIcon = Color.parseColor("#9E9E9E"),
+        clipboardEmptyText = Color.parseColor("#757575")
     )
 
     // Modern Light Theme Colors (Material You inspired)
@@ -147,6 +154,13 @@ object ThemeManager {
         emojiCategoryBackground = Color.parseColor("#FFFFFF"),
         emojiCategorySelectedBackground = Color.parseColor("#D4D8E0"),
         emojiCategoryText = Color.parseColor("#5F6368"),
-        emojiCategorySelectedText = Color.parseColor("#1F1F1F")
+        emojiCategorySelectedText = Color.parseColor("#1F1F1F"),
+        // Clipboard colors
+        clipboardItemBackground = Color.parseColor("#FFFFFF"),
+        clipboardItemBackgroundPressed = Color.parseColor("#D0D0D0"),
+        clipboardItemText = Color.parseColor("#1F1F1F"),
+        clipboardPinnedIcon = Color.parseColor("#1A73E8"),
+        clipboardDeleteIcon = Color.parseColor("#5F6368"),
+        clipboardEmptyText = Color.parseColor("#9E9E9E")
     )
 }
