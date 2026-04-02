@@ -35,4 +35,7 @@
     <!-- About -->
     <string name="app_description">Quick input method with Chinese/English dual input support</string>
     <string name="version_info">Version 1.0.0</string>
+    <string name="github_link_text">View on GitHub</string>
+    <string name="github_icon_desc">GitHub</string>
+    <string name="github_url" translatable="false">https://github.com/awcjack/DualQuickIME</string>
 </resources>

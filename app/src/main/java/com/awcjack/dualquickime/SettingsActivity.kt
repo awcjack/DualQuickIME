@@ -1,6 +1,8 @@
 package com.awcjack.dualquickime
 
+import android.content.Intent
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -40,7 +42,15 @@ class SettingsActivity : AppCompatActivity() {
         setupThemeSelection()
         setupCompositionToggle()
         setupCandidatesSeekBar()
+        setupGitHubLink()
         updatePreview()
+    }
+
+    private fun setupGitHubLink() {
+        findViewById<LinearLayout>(R.id.githubLink).setOnClickListener {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.github_url)))
+            startActivity(intent)
+        }
     }
 
     private fun setupThemeSelection() {
