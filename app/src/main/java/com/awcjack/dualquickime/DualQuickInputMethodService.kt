@@ -1,5 +1,7 @@
 package com.awcjack.dualquickime
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.inputmethodservice.InputMethodService
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -36,6 +38,12 @@ class DualQuickInputMethodService : InputMethodService() {
     // Maps index position to whether it was uppercase
     private var letterCases = mutableListOf<Boolean>()
 
+    // System clipboard manager and listener
+    private var clipboardManager: ClipboardManager? = null
+    private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
+        handleSystemClipboardChange()
+    }
+
     override fun onCreate() {
         super.onCreate()
         // Load simplex.cin from assets
@@ -44,6 +52,33 @@ class DualQuickInputMethodService : InputMethodService() {
         } catch (e: Exception) {
             // Fallback to empty table if loading fails
             simplexTable = SimplexTable(emptyList())
+        }
+
+        // Register clipboard listener to capture system clipboard changes
+        clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        clipboardManager?.addPrimaryClipChangedListener(clipboardListener)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Unregister clipboard listener to avoid memory leaks
+        clipboardManager?.removePrimaryClipChangedListener(clipboardListener)
+    }
+
+    /**
+     * Handle system clipboard changes (text copied from other apps).
+     */
+    private fun handleSystemClipboardChange() {
+        if (!ClipboardHistoryManager.isEnabled(this)) return
+
+        val clip = clipboardManager?.primaryClip ?: return
+        if (clip.itemCount == 0) return
+
+        val item = clip.getItemAt(0)
+        val text = item.coerceToText(this)?.toString()
+
+        if (!text.isNullOrBlank()) {
+            ClipboardHistoryManager.addItem(this, text)
         }
     }
 
