@@ -1,4 +1,4 @@
-package com.example.dualquick.theme
+package com.awcjack.dualquickime.theme
 
 /**
  * Data class holding all keyboard theme colors.

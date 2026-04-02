@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.dualquick"
+    namespace = "com.awcjack.dualquickime"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.dualquick"
+        applicationId = "com.awcjack.dualquickime"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

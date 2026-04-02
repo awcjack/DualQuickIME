@@ -1,4 +1,4 @@
-package com.example.dualquick.data
+package com.awcjack.dualquickime.data
 
 /**
  * Represents a single character entry from the simplex.cin file.

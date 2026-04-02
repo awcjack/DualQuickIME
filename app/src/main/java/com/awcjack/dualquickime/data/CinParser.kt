@@ -1,4 +1,4 @@
-package com.example.dualquick.data
+package com.awcjack.dualquickime.data
 
 import java.io.InputStream
 

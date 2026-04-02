@@ -1,6 +1,6 @@
-package com.example.dualquick.data
+package com.awcjack.dualquickime.data
 
-import com.example.dualquick.util.KeyMapping
+import com.awcjack.dualquickime.util.KeyMapping
 
 /**
  * Lookup table for 速成 (Quick/Simplified Cangjie) input method.

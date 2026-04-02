@@ -1,4 +1,4 @@
-package com.example.dualquick.theme
+package com.awcjack.dualquickime.theme
 
 import android.content.Context
 import android.content.SharedPreferences

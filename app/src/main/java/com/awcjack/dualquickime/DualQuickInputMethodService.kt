@@ -1,12 +1,12 @@
-package com.example.dualquick
+package com.awcjack.dualquickime
 
 import android.inputmethodservice.InputMethodService
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import com.example.dualquick.data.CinParser
-import com.example.dualquick.data.CompositionState
-import com.example.dualquick.data.SimplexTable
-import com.example.dualquick.ui.KeyboardView
+import com.awcjack.dualquickime.data.CinParser
+import com.awcjack.dualquickime.data.CompositionState
+import com.awcjack.dualquickime.data.SimplexTable
+import com.awcjack.dualquickime.ui.KeyboardView
 
 /**
  * Quick (速成) Input Method Service for Android.

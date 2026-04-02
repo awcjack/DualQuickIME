@@ -1,4 +1,4 @@
-package com.example.dualquick.ui
+package com.awcjack.dualquickime.ui
 
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
@@ -12,9 +12,9 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import com.example.dualquick.data.EmojiData
-import com.example.dualquick.theme.KeyboardColors
-import com.example.dualquick.theme.ThemeManager
+import com.awcjack.dualquickime.data.EmojiData
+import com.awcjack.dualquickime.theme.KeyboardColors
+import com.awcjack.dualquickime.theme.ThemeManager
 
 /**
  * Full emoji keyboard with category tabs and scrolling grid.

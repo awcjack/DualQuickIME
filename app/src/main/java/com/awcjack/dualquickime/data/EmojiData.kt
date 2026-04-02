@@ -1,4 +1,4 @@
-package com.example.dualquick.data
+package com.awcjack.dualquickime.data
 
 /**
  * Comprehensive emoji data organized by categories.

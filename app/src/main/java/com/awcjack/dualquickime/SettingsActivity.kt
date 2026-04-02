@@ -1,4 +1,4 @@
-package com.example.dualquick
+package com.awcjack.dualquickime
 
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -11,7 +11,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
-import com.example.dualquick.theme.ThemeManager
+import com.awcjack.dualquickime.theme.ThemeManager
 
 /**
  * Settings activity for the DualQuick IME.
@@ -126,7 +126,7 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun createPreviewKey(letter: String, radical: String, colors: com.example.dualquick.theme.KeyboardColors): View {
+    private fun createPreviewKey(letter: String, radical: String, colors: com.awcjack.dualquickime.theme.KeyboardColors): View {
         return LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
                 setMargins(dpToPx(3), dpToPx(3), dpToPx(3), dpToPx(3))

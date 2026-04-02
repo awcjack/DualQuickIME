@@ -1,4 +1,4 @@
-package com.example.dualquick.util
+package com.awcjack.dualquickime.util
 
 /**
  * Key-to-Radical mapping for 速成 (Quick/Simplified Cangjie) input method.

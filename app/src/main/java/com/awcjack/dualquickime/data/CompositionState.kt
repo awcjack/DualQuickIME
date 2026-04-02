@@ -1,6 +1,6 @@
-package com.example.dualquick.data
+package com.awcjack.dualquickime.data
 
-import com.example.dualquick.util.KeyMapping
+import com.awcjack.dualquickime.util.KeyMapping
 
 /**
  * Tracks the current composition state during input.

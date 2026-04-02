@@ -1,4 +1,4 @@
-package com.example.dualquick.ui
+package com.awcjack.dualquickime.ui
 
 import android.content.Context
 import android.graphics.Typeface
@@ -11,9 +11,9 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.example.dualquick.theme.KeyboardColors
-import com.example.dualquick.theme.ThemeManager
-import com.example.dualquick.util.KeyMapping
+import com.awcjack.dualquickime.theme.KeyboardColors
+import com.awcjack.dualquickime.theme.ThemeManager
+import com.awcjack.dualquickime.util.KeyMapping
 
 /**
  * Custom keyboard view displaying QWERTY layout with Chinese radicals.
