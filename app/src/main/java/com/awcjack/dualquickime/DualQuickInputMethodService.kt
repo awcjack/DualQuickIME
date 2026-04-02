@@ -6,6 +6,7 @@ import android.view.inputmethod.EditorInfo
 import com.awcjack.dualquickime.data.CinParser
 import com.awcjack.dualquickime.data.CompositionState
 import com.awcjack.dualquickime.data.SimplexTable
+import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.ui.KeyboardView
 
 /**
@@ -70,6 +71,8 @@ class DualQuickInputMethodService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // Invalidate cache to pick up any settings changes
+        ThemeManager.invalidateCache()
         // Refresh theme in case it changed in settings
         keyboardView?.refreshTheme()
         // Clear composition when starting new input
@@ -187,10 +190,12 @@ class DualQuickInputMethodService : InputMethodService() {
 
     private fun updateComposition(rawKeys: String) {
         val candidates = simplexTable.lookup(rawKeys)
+        val pageSize = ThemeManager.getCandidatesPerPage(this)
         composition = CompositionState(
             rawKeys = rawKeys,
             candidates = candidates,
-            currentPage = 0
+            currentPage = 0,
+            pageSize = pageSize
         )
         updateUI()
     }
