@@ -32,6 +32,9 @@ class KeyboardView @JvmOverloads constructor(
     private var onEnglishSelected: ((String) -> Unit)? = null
     private var currentRawKeys: String = ""
     private var isShiftOn = false
+    private var isCapsLock = false
+    private var lastShiftTapTime = 0L
+    private val DOUBLE_TAP_INTERVAL = 300L  // milliseconds
     private var isSymbolMode = false
     private var symbolPage = 0  // 0 = numbers, 1 = symbols, 2 = emoji
     private var shiftKey: TextView? = null
@@ -466,9 +469,10 @@ class KeyboardView @JvmOverloads constructor(
             })
 
             setOnClickListener {
-                val letter = if (isShiftOn) char.uppercaseChar() else char
+                val letter = if (isShiftOn || isCapsLock) char.uppercaseChar() else char
                 onKeyPress?.invoke(KeyEvent.Letter(letter))
-                if (isShiftOn) {
+                // Turn off shift after typing (but not caps lock)
+                if (isShiftOn && !isCapsLock) {
                     isShiftOn = false
                     updateShiftState()
                 }
@@ -483,7 +487,22 @@ class KeyboardView @JvmOverloads constructor(
             gravity = Gravity.CENTER
 
             shiftKey = createShiftKey {
-                isShiftOn = !isShiftOn
+                val currentTime = System.currentTimeMillis()
+
+                if (isCapsLock) {
+                    // If caps lock is on, single tap turns it off
+                    isCapsLock = false
+                    isShiftOn = false
+                } else if (isShiftOn && (currentTime - lastShiftTapTime) < DOUBLE_TAP_INTERVAL) {
+                    // Double tap detected - enable caps lock
+                    isCapsLock = true
+                    isShiftOn = true
+                } else {
+                    // Single tap - toggle shift
+                    isShiftOn = !isShiftOn
+                }
+
+                lastShiftTapTime = currentTime
                 updateShiftState()
             }
             addView(shiftKey)
@@ -708,9 +727,29 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun updateShiftState() {
-        shiftKey?.setTextColor(
-            if (isShiftOn) colors.compositionText else colors.keyTextPrimary
-        )
+        shiftKey?.apply {
+            when {
+                isCapsLock -> {
+                    // Caps lock: filled arrow with underline, accent color
+                    text = "⇧̲"  // Shift with combining underline
+                    setTextColor(colors.compositionText)
+                    background = createKeyBackground(colors.compositionText, colors.specialKeyBackgroundPressed)
+                    setTextColor(colors.keyBackground)  // Inverted color for visibility
+                }
+                isShiftOn -> {
+                    // Shift on: accent color
+                    text = "⇧"
+                    setTextColor(colors.compositionText)
+                    background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
+                }
+                else -> {
+                    // Shift off: normal
+                    text = "⇧"
+                    setTextColor(colors.keyTextPrimary)
+                    background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
+                }
+            }
+        }
     }
 
     // ==================== PUBLIC LISTENERS ====================
