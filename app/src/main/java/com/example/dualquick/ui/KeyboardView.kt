@@ -459,8 +459,8 @@ class KeyboardView @JvmOverloads constructor(
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Page toggle key (1/2 or 2/2)
-            val pageLabel = if (isSymbolPage2) "1/2" else "2/2"
+            // Page toggle key (shows current page: 1/2 or 2/2)
+            val pageLabel = if (isSymbolPage2) "2/2" else "1/2"
             addView(createSpecialKey(pageLabel, 1.5f) {
                 isSymbolPage2 = !isSymbolPage2
                 buildKeyboard()
