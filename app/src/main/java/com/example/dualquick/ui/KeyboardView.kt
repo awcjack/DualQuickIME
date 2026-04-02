@@ -1,9 +1,9 @@
 package com.example.dualquick.ui
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
@@ -12,13 +12,14 @@ import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.example.dualquick.R
+import com.example.dualquick.theme.KeyboardColors
+import com.example.dualquick.theme.ThemeManager
 import com.example.dualquick.util.KeyMapping
 
 /**
  * Custom keyboard view displaying QWERTY layout with Chinese radicals.
  * Includes an embedded candidate bar at the top (Gboard-style).
- * Each key shows the English letter and its corresponding radical below.
+ * Supports dynamic light/dark theming via ThemeManager.
  */
 class KeyboardView @JvmOverloads constructor(
     context: Context,
@@ -36,6 +37,9 @@ class KeyboardView @JvmOverloads constructor(
     private var symbolPage = 0  // 0 = numbers, 1 = symbols, 2 = emoji
     private var shiftKey: TextView? = null
     private var modeToggleKey: TextView? = null
+
+    // Current theme colors
+    private lateinit var colors: KeyboardColors
 
     // Candidate bar components (embedded, Gboard-style)
     private var candidateContainer: LinearLayout? = null
@@ -60,16 +64,31 @@ class KeyboardView @JvmOverloads constructor(
     private val symRow2Page2 = listOf('£', '¥', '€', '¢', '^', '°', '=', '{', '}')
     private val symRow3Page2 = listOf('\\', '©', '®', '™', '℅', '[', ']')
 
-    // Emoji rows (page 3) - common emojis
+    // Emoji rows (page 3)
     private val emojiRow1 = listOf("😀", "😂", "🥹", "😍", "🥰", "😘", "😎", "🤔", "😢", "😭")
     private val emojiRow2 = listOf("👍", "👎", "👏", "🙏", "💪", "❤️", "🔥", "✨", "🎉")
     private val emojiRow3 = listOf("👋", "✌️", "🤝", "💯", "⭐", "💀", "🤡")
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(Color.parseColor("#1B1B1B"))
-        setPadding(dpToPx(2), dpToPx(4), dpToPx(2), dpToPx(4))
+        loadTheme()
+        buildKeyboard()
+    }
 
+    /**
+     * Load theme colors from ThemeManager.
+     */
+    private fun loadTheme() {
+        colors = ThemeManager.getColors(context)
+        setBackgroundColor(colors.keyboardBackground)
+        setPadding(dpToPx(3), dpToPx(6), dpToPx(3), dpToPx(8))
+    }
+
+    /**
+     * Refresh the keyboard when theme changes.
+     */
+    fun refreshTheme() {
+        loadTheme()
         buildKeyboard()
     }
 
@@ -82,19 +101,16 @@ class KeyboardView @JvmOverloads constructor(
         if (isSymbolMode) {
             when (symbolPage) {
                 0 -> {
-                    // Page 1: Numbers
                     addView(createSymbolRow(numRow1))
                     addView(createSymbolRow(symRow2Page1, leftPadding = 0.5f))
                     addView(createSymbolSpecialRow3(symRow3Page1))
                 }
                 1 -> {
-                    // Page 2: Symbols
                     addView(createSymbolRow(symRow1Page2))
                     addView(createSymbolRow(symRow2Page2, leftPadding = 0.5f))
                     addView(createSymbolSpecialRow3(symRow3Page2))
                 }
                 2 -> {
-                    // Page 3: Emoji
                     addView(createEmojiRow(emojiRow1))
                     addView(createEmojiRow(emojiRow2, leftPadding = 0.5f))
                     addView(createEmojiSpecialRow3(emojiRow3))
@@ -109,40 +125,38 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Creates the Gboard-style candidate bar with composition display and pill-shaped suggestions.
-     */
+    // ==================== CANDIDATE BAR ====================
+
     private fun createCandidateBar(): LinearLayout {
         candidateButtons.clear()
 
         candidateContainer = LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(44))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(46))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor("#1B1B1B"))
+            setBackgroundColor(colors.candidateBarBackground)
             setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
         }
 
-        // Composition text (shows radicals like "手口 (hq)")
+        // Composition text (radicals display)
         compositionText = TextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpToPx(8), 0, dpToPx(12), 0)
-            setTextColor(Color.parseColor("#4FC3F7"))
-            textSize = 16f
+            setPadding(dpToPx(10), 0, dpToPx(14), 0)
+            setTextColor(colors.compositionText)
+            textSize = 17f
             typeface = Typeface.DEFAULT_BOLD
             visibility = View.GONE
         }
         candidateContainer?.addView(compositionText)
 
-        // Horizontal scroll view for candidates (allows many suggestions)
+        // Horizontal scroll view for candidates
         candidateScrollView = HorizontalScrollView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
             isHorizontalScrollBarEnabled = false
             isFillViewport = true
         }
 
-        // Row of candidate pills
         candidateRow = LinearLayout(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
             orientation = HORIZONTAL
@@ -151,12 +165,12 @@ class KeyboardView @JvmOverloads constructor(
         candidateScrollView?.addView(candidateRow)
         candidateContainer?.addView(candidateScrollView)
 
-        // Page indicator (e.g., "1/5")
+        // Page indicator
         pageIndicator = TextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpToPx(8), 0, dpToPx(4), 0)
-            setTextColor(Color.parseColor("#888888"))
+            setPadding(dpToPx(10), 0, dpToPx(6), 0)
+            setTextColor(colors.pageIndicatorText)
             textSize = 12f
             visibility = View.GONE
         }
@@ -165,80 +179,74 @@ class KeyboardView @JvmOverloads constructor(
         return candidateContainer!!
     }
 
-    /**
-     * Creates a pill-shaped candidate button (Gboard-style).
-     */
     private fun createCandidatePill(text: String): TextView {
         return TextView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(32)).apply {
-                setMargins(dpToPx(3), 0, dpToPx(3), 0)
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(34)).apply {
+                setMargins(dpToPx(4), 0, dpToPx(4), 0)
             }
             gravity = Gravity.CENTER
-            minWidth = dpToPx(40)
-            setPadding(dpToPx(12), dpToPx(4), dpToPx(12), dpToPx(4))
+            minWidth = dpToPx(44)
+            setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6))
             this.text = text
-            textSize = 18f
-            setTextColor(Color.WHITE)
-            setBackgroundResource(R.drawable.suggestion_pill_background)
+            textSize = 19f
+            setTextColor(colors.candidateText)
+            background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
+            elevation = dpToPx(1).toFloat()
 
             setOnClickListener {
                 this.text?.toString()?.takeIf { it.isNotBlank() }?.let { char ->
                     onCandidateSelected?.invoke(char)
                 }
             }
-
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
-                }
-                false
-            }
         }
     }
 
-    /**
-     * Creates a pill for the English option (tappable to commit as English).
-     */
     private fun createEnglishPill(text: String): TextView {
         return TextView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(32)).apply {
-                setMargins(dpToPx(3), 0, dpToPx(3), 0)
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(34)).apply {
+                setMargins(dpToPx(4), 0, dpToPx(4), 0)
             }
             gravity = Gravity.CENTER
-            minWidth = dpToPx(40)
-            setPadding(dpToPx(12), dpToPx(4), dpToPx(12), dpToPx(4))
+            minWidth = dpToPx(44)
+            setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6))
             this.text = text
-            textSize = 18f
-            setTextColor(Color.parseColor("#4FC3F7"))  // Blue color to distinguish English
-            setBackgroundResource(R.drawable.suggestion_pill_background)
+            textSize = 19f
+            setTextColor(colors.englishPillText)
+            background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
+            elevation = dpToPx(1).toFloat()
 
             setOnClickListener {
                 if (currentRawKeys.isNotEmpty()) {
                     onEnglishSelected?.invoke(currentRawKeys)
                 }
             }
+        }
+    }
 
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
-                }
-                false
-            }
+    private fun createPillBackground(normalColor: Int, pressedColor: Int): StateListDrawable {
+        val pressed = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(18).toFloat()
+            setColor(pressedColor)
+        }
+        val normal = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(18).toFloat()
+            setColor(normalColor)
+        }
+        return StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), pressed)
+            addState(intArrayOf(), normal)
         }
     }
 
     // ==================== PUBLIC CANDIDATE METHODS ====================
 
-    /**
-     * Update the composition display (radicals).
-     */
     fun setComposition(radicals: String, rawKeys: String) {
         currentRawKeys = rawKeys
         compositionText?.let { tv ->
             if (radicals.isNotEmpty()) {
-                tv.text = "$radicals"
+                tv.text = radicals
                 tv.visibility = View.VISIBLE
             } else {
                 tv.visibility = View.GONE
@@ -246,31 +254,21 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Update the displayed candidates with Gboard-style pills.
-     * First pill is always the English option (rawKeys), followed by Chinese candidates.
-     */
     fun setCandidates(candidates: List<String>, currentPage: Int, totalPages: Int) {
         candidateRow?.removeAllViews()
         candidateButtons.clear()
-
-        // Scroll back to start when candidates change
         candidateScrollView?.scrollTo(0, 0)
 
-        // First pill: English option (always available when composing)
         if (currentRawKeys.isNotEmpty()) {
-            val englishPill = createEnglishPill(currentRawKeys)
-            candidateRow?.addView(englishPill)
+            candidateRow?.addView(createEnglishPill(currentRawKeys))
         }
 
-        // Then Chinese candidates
         candidates.forEach { candidate ->
             val pill = createCandidatePill(candidate)
             candidateButtons.add(pill)
             candidateRow?.addView(pill)
         }
 
-        // Update page indicator
         pageIndicator?.let { pi ->
             if (totalPages > 1) {
                 pi.text = "$currentPage/$totalPages"
@@ -281,34 +279,26 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Show a "no match" message with English option.
-     */
     fun showNoMatch() {
         candidateRow?.removeAllViews()
         candidateButtons.clear()
 
-        // Still show English option even when no Chinese match
         if (currentRawKeys.isNotEmpty()) {
-            val englishPill = createEnglishPill(currentRawKeys)
-            candidateRow?.addView(englishPill)
+            candidateRow?.addView(createEnglishPill(currentRawKeys))
         }
 
         val noMatchText = TextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpToPx(8), 0, dpToPx(8), 0)
+            setPadding(dpToPx(10), 0, dpToPx(10), 0)
             text = "無此字"
             textSize = 14f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(colors.noMatchText)
         }
         candidateRow?.addView(noMatchText)
         pageIndicator?.visibility = View.GONE
     }
 
-    /**
-     * Clear all candidates and composition.
-     */
     fun clearCandidates() {
         currentRawKeys = ""
         compositionText?.visibility = View.GONE
@@ -321,23 +311,18 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun createKeyRow(keys: List<Char>, leftPadding: Float = 0f): LinearLayout {
         return LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(58))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Left padding spacer
             if (leftPadding > 0) {
                 addView(View(context).apply {
                     layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, leftPadding)
                 })
             }
 
-            // Create letter keys
-            keys.forEach { char ->
-                addView(createLetterKey(char))
-            }
+            keys.forEach { char -> addView(createLetterKey(char)) }
 
-            // Right padding spacer
             if (leftPadding > 0) {
                 addView(View(context).apply {
                     layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, leftPadding)
@@ -346,30 +331,68 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
+    private fun createLetterKey(char: Char): LinearLayout {
+        val radical = KeyMapping.getRadical(char) ?: ""
+
+        return LinearLayout(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
+                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
+            }
+            orientation = VERTICAL
+            gravity = Gravity.CENTER
+            background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
+            elevation = dpToPx(2).toFloat()
+
+            // English letter
+            addView(TextView(context).apply {
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
+                gravity = Gravity.CENTER or Gravity.BOTTOM
+                text = char.uppercaseChar().toString()
+                textSize = 20f
+                setTextColor(colors.keyTextPrimary)
+                typeface = Typeface.DEFAULT_BOLD
+                includeFontPadding = false
+            })
+
+            // Chinese radical
+            addView(TextView(context).apply {
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 0.65f)
+                gravity = Gravity.CENTER or Gravity.TOP
+                text = radical
+                textSize = 12f
+                setTextColor(colors.keyTextSecondary)
+                includeFontPadding = false
+            })
+
+            setOnClickListener {
+                val letter = if (isShiftOn) char.uppercaseChar() else char
+                onKeyPress?.invoke(KeyEvent.Letter(letter))
+                if (isShiftOn) {
+                    isShiftOn = false
+                    updateShiftState()
+                }
+            }
+        }
+    }
+
     private fun createSpecialRow3(): LinearLayout {
         return LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(58))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Shift key
             shiftKey = createSpecialKey("⇧", 1.5f) {
                 isShiftOn = !isShiftOn
                 updateShiftState()
             }
             addView(shiftKey)
 
-            // Letter keys
-            row3.forEach { char ->
-                addView(createLetterKey(char))
-            }
+            row3.forEach { char -> addView(createLetterKey(char)) }
 
-            // Backspace key
             addView(createSpecialKey("⌫", 1.5f) {
                 onKeyPress?.invoke(KeyEvent.Backspace)
             }.apply {
                 setOnLongClickListener {
-                    // Repeat backspace on long press
                     onKeyPress?.invoke(KeyEvent.Backspace)
                     true
                 }
@@ -379,11 +402,10 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun createBottomRow(): LinearLayout {
         return LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(58))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Number/Symbol toggle
             modeToggleKey = createSpecialKey("123", 1.2f) {
                 isSymbolMode = true
                 symbolPage = 0
@@ -392,33 +414,76 @@ class KeyboardView @JvmOverloads constructor(
             }
             addView(modeToggleKey)
 
-            // Comma
             addView(createSpecialKey(",", 1f) {
                 onKeyPress?.invoke(KeyEvent.Symbol(','))
             })
 
-            // Space bar
-            addView(createSpecialKey("Space", 4f) {
-                onKeyPress?.invoke(KeyEvent.Space)
-            }.apply {
-                setBackgroundResource(R.drawable.space_key_background)
-            })
+            addView(createSpaceKey())
 
-            // Period
             addView(createSpecialKey(".", 1f) {
                 onKeyPress?.invoke(KeyEvent.Symbol('.'))
             })
 
-            // Enter key
             addView(createSpecialKey("↵", 1.2f) {
                 onKeyPress?.invoke(KeyEvent.Enter)
             })
         }
     }
 
+    private fun createSpaceKey(): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 4f).apply {
+                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
+            }
+            gravity = Gravity.CENTER
+            text = "space"
+            textSize = 14f
+            setTextColor(colors.keyTextSecondary)
+            background = createKeyBackground(colors.spaceKeyBackground, colors.keyBackgroundPressed)
+            elevation = dpToPx(2).toFloat()
+
+            setOnClickListener { onKeyPress?.invoke(KeyEvent.Space) }
+        }
+    }
+
+    private fun createSpecialKey(label: String, weight: Float, onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, weight).apply {
+                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
+            }
+            gravity = Gravity.CENTER
+            text = label
+            textSize = 16f
+            setTextColor(colors.keyTextPrimary)
+            background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
+            elevation = dpToPx(1).toFloat()
+
+            setOnClickListener { onClick() }
+        }
+    }
+
+    private fun createKeyBackground(normalColor: Int, pressedColor: Int): StateListDrawable {
+        val pressed = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(10).toFloat()
+            setColor(pressedColor)
+        }
+        val normal = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(10).toFloat()
+            setColor(normalColor)
+        }
+        return StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), pressed)
+            addState(intArrayOf(), normal)
+        }
+    }
+
+    // ==================== SYMBOL/EMOJI KEYBOARD ====================
+
     private fun createSymbolRow(chars: List<Char>, leftPadding: Float = 0f): LinearLayout {
         return LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(58))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
@@ -428,9 +493,7 @@ class KeyboardView @JvmOverloads constructor(
                 })
             }
 
-            chars.forEach { char ->
-                addView(createSymbolKey(char))
-            }
+            chars.forEach { char -> addView(createSymbolKey(char)) }
 
             if (leftPadding > 0) {
                 addView(View(context).apply {
@@ -443,13 +506,14 @@ class KeyboardView @JvmOverloads constructor(
     private fun createSymbolKey(char: Char): TextView {
         return TextView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
-                setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
+                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
             }
             gravity = Gravity.CENTER
             text = char.toString()
-            textSize = 20f
-            setTextColor(Color.WHITE)
-            setBackgroundResource(R.drawable.key_background)
+            textSize = 22f
+            setTextColor(colors.keyTextPrimary)
+            background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
+            elevation = dpToPx(2).toFloat()
 
             setOnClickListener {
                 if (char.isDigit()) {
@@ -458,36 +522,23 @@ class KeyboardView @JvmOverloads constructor(
                     onKeyPress?.invoke(KeyEvent.Symbol(char))
                 }
             }
-
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
-                }
-                false
-            }
         }
     }
 
     private fun createSymbolSpecialRow3(chars: List<Char>): LinearLayout {
         return LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(58))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Page toggle key (shows current page: 1/3, 2/3, or 3/3)
             val pageLabel = "${symbolPage + 1}/3"
             addView(createSpecialKey(pageLabel, 1.5f) {
                 symbolPage = (symbolPage + 1) % 3
                 buildKeyboard()
             })
 
-            // Symbol keys
-            chars.forEach { char ->
-                addView(createSymbolKey(char))
-            }
+            chars.forEach { char -> addView(createSymbolKey(char)) }
 
-            // Backspace key
             addView(createSpecialKey("⌫", 1.5f) {
                 onKeyPress?.invoke(KeyEvent.Backspace)
             }.apply {
@@ -501,7 +552,7 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun createEmojiRow(emojis: List<String>, leftPadding: Float = 0f): LinearLayout {
         return LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(58))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
@@ -511,9 +562,7 @@ class KeyboardView @JvmOverloads constructor(
                 })
             }
 
-            emojis.forEach { emoji ->
-                addView(createEmojiKey(emoji))
-            }
+            emojis.forEach { emoji -> addView(createEmojiKey(emoji)) }
 
             if (leftPadding > 0) {
                 addView(View(context).apply {
@@ -526,47 +575,34 @@ class KeyboardView @JvmOverloads constructor(
     private fun createEmojiKey(emoji: String): TextView {
         return TextView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
-                setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
+                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
             }
             gravity = Gravity.CENTER
             text = emoji
-            textSize = 24f
-            setBackgroundResource(R.drawable.key_background)
+            textSize = 26f
+            background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
+            elevation = dpToPx(2).toFloat()
 
             setOnClickListener {
-                // Emit emoji as a special event
                 onKeyPress?.invoke(KeyEvent.Emoji(emoji))
-            }
-
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
-                }
-                false
             }
         }
     }
 
     private fun createEmojiSpecialRow3(emojis: List<String>): LinearLayout {
         return LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(58))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Page toggle key (shows current page: 1/3, 2/3, or 3/3)
             val pageLabel = "${symbolPage + 1}/3"
             addView(createSpecialKey(pageLabel, 1.5f) {
                 symbolPage = (symbolPage + 1) % 3
                 buildKeyboard()
             })
 
-            // Emoji keys
-            emojis.forEach { emoji ->
-                addView(createEmojiKey(emoji))
-            }
+            emojis.forEach { emoji -> addView(createEmojiKey(emoji)) }
 
-            // Backspace key
             addView(createSpecialKey("⌫", 1.5f) {
                 onKeyPress?.invoke(KeyEvent.Backspace)
             }.apply {
@@ -580,160 +616,56 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun createSymbolBottomRow(): LinearLayout {
         return LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(58))
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // ABC toggle (back to letters)
             addView(createSpecialKey("ABC", 1.2f) {
                 isSymbolMode = false
                 onModeChange?.invoke(false)
                 buildKeyboard()
             })
 
-            // Comma
             addView(createSpecialKey(",", 1f) {
                 onKeyPress?.invoke(KeyEvent.Symbol(','))
             })
 
-            // Space bar
-            addView(createSpecialKey("Space", 4f) {
-                onKeyPress?.invoke(KeyEvent.Space)
-            }.apply {
-                setBackgroundResource(R.drawable.space_key_background)
-            })
+            addView(createSpaceKey())
 
-            // Period
             addView(createSpecialKey(".", 1f) {
                 onKeyPress?.invoke(KeyEvent.Symbol('.'))
             })
 
-            // Enter key
             addView(createSpecialKey("↵", 1.2f) {
                 onKeyPress?.invoke(KeyEvent.Enter)
             })
         }
     }
 
-    private fun createLetterKey(char: Char): LinearLayout {
-        val radical = KeyMapping.getRadical(char) ?: ""
-
-        return LinearLayout(context).apply {
-            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
-                setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
-            }
-            orientation = VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundResource(R.drawable.key_background)
-
-            // English letter (larger)
-            val letterView = TextView(context).apply {
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
-                gravity = Gravity.CENTER or Gravity.BOTTOM
-                text = char.uppercaseChar().toString()
-                textSize = 18f
-                setTextColor(Color.WHITE)
-                typeface = Typeface.DEFAULT_BOLD
-            }
-            addView(letterView)
-
-            // Chinese radical (smaller)
-            addView(TextView(context).apply {
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 0.7f)
-                gravity = Gravity.CENTER or Gravity.TOP
-                text = radical
-                textSize = 12f
-                setTextColor(Color.parseColor("#888888"))
-            })
-
-            // Click handler
-            setOnClickListener {
-                val letter = if (isShiftOn) char.uppercaseChar() else char
-                onKeyPress?.invoke(KeyEvent.Letter(letter))
-                // Turn off shift after one letter (like standard keyboard)
-                if (isShiftOn) {
-                    isShiftOn = false
-                    updateShiftState()
-                }
-            }
-
-            // Visual feedback
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.alpha = 0.7f
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.alpha = 1f
-                    }
-                }
-                false
-            }
-        }
-    }
-
-    private fun createSpecialKey(label: String, weight: Float, onClick: () -> Unit): TextView {
-        return TextView(context).apply {
-            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, weight).apply {
-                setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
-            }
-            gravity = Gravity.CENTER
-            text = label
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            setBackgroundResource(R.drawable.special_key_background)
-
-            setOnClickListener { onClick() }
-
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
-                }
-                false
-            }
-        }
-    }
-
     private fun updateShiftState() {
         shiftKey?.setTextColor(
-            if (isShiftOn) Color.parseColor("#4FC3F7") else Color.WHITE
+            if (isShiftOn) colors.compositionText else colors.keyTextPrimary
         )
     }
 
     // ==================== PUBLIC LISTENERS ====================
 
-    /**
-     * Set the callback for key press events.
-     */
     fun setOnKeyPressListener(listener: (KeyEvent) -> Unit) {
         onKeyPress = listener
     }
 
-    /**
-     * Set the callback for mode changes (letter/symbol mode).
-     */
     fun setOnModeChangeListener(listener: (Boolean) -> Unit) {
         onModeChange = listener
     }
 
-    /**
-     * Set the callback for Chinese candidate selection.
-     */
     fun setOnCandidateSelectedListener(listener: (String) -> Unit) {
         onCandidateSelected = listener
     }
 
-    /**
-     * Set the callback for English selection (tap on English pill).
-     */
     fun setOnEnglishSelectedListener(listener: (String) -> Unit) {
         onEnglishSelected = listener
     }
 
-    /**
-     * Switch back to letter mode programmatically.
-     */
     fun setLetterMode() {
         if (isSymbolMode) {
             isSymbolMode = false
@@ -750,9 +682,6 @@ class KeyboardView @JvmOverloads constructor(
         ).toInt()
     }
 
-    /**
-     * Key event types emitted by the keyboard.
-     */
     sealed class KeyEvent {
         data class Letter(val char: Char) : KeyEvent()
         data class Number(val digit: Int) : KeyEvent()

@@ -10,4 +10,23 @@
 
     <string name="no_candidates">無此字</string>
     <string name="space_hint">Space = 下一頁</string>
+
+    <!-- Settings -->
+    <string name="settings_title">設定 Settings</string>
+    <string name="settings_appearance">外觀 Appearance</string>
+    <string name="settings_theme">主題 Theme</string>
+    <string name="settings_preview">預覽 Preview</string>
+    <string name="settings_about">關於 About</string>
+
+    <!-- Theme options -->
+    <string name="theme_light">淺色 Light</string>
+    <string name="theme_dark">深色 Dark</string>
+    <string name="theme_auto">自動 (跟隨系統) Auto (Follow system)</string>
+
+    <!-- Preview -->
+    <string name="preview_hint">主題預覽 Theme preview</string>
+
+    <!-- About -->
+    <string name="app_description">支援中英雙輸入的速成輸入法\nQuick input method with Chinese/English dual input</string>
+    <string name="version_info">Version 1.0.0</string>
 </resources>

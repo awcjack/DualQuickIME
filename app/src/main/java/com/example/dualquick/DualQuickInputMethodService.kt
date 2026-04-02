@@ -70,6 +70,8 @@ class DualQuickInputMethodService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // Refresh theme in case it changed in settings
+        keyboardView?.refreshTheme()
         // Clear composition when starting new input
         clearComposition()
         // Reset to letter mode
