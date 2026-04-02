@@ -60,9 +60,9 @@ class DualQuickInputMethodService : InputMethodService() {
                 commitChinese(candidate)
                 clearComposition()
             }
-            setOnEnglishSelectedListener { english ->
-                // User TAPPED the English pill - commit as English
-                commitEnglish(english)
+            setOnEnglishSelectedListener { _ ->
+                // User TAPPED the English pill - commit as English with preserved case
+                commitEnglishPreservingCase(composition.rawKeys, letterCases)
                 clearComposition()
             }
         }
@@ -247,14 +247,27 @@ class DualQuickInputMethodService : InputMethodService() {
         keyboardView?.clearCandidates()
     }
 
+    /**
+     * Get the raw keys with proper case applied for display purposes.
+     */
+    private fun getDisplayKeys(): String {
+        val result = StringBuilder()
+        for (i in composition.rawKeys.indices) {
+            val char = composition.rawKeys[i]
+            val shouldBeUpper = letterCases.getOrNull(i) ?: false
+            result.append(if (shouldBeUpper) char.uppercaseChar() else char.lowercaseChar())
+        }
+        return result.toString()
+    }
+
     private fun updateUI() {
         updateCandidateView()
     }
 
     private fun updateCandidateView() {
         keyboardView?.let { view ->
-            // Update composition display (radicals)
-            view.setComposition(composition.radicalDisplay, composition.rawKeys)
+            // Update composition display (radicals) with properly cased keys for English preview
+            view.setComposition(composition.radicalDisplay, getDisplayKeys())
 
             if (composition.hasCandidates) {
                 view.setCandidates(
