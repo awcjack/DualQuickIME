@@ -13,6 +13,7 @@ object ThemeManager {
     private const val KEY_THEME = "theme_mode"
     private const val KEY_SHOW_COMPOSITION = "show_composition"
     private const val KEY_CANDIDATES_PER_PAGE = "candidates_per_page"
+    private const val KEY_USE_EXTENDED_CHARSET = "use_extended_charset"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
@@ -26,6 +27,7 @@ object ThemeManager {
     private var cachedTheme: Int = -1
     private var cachedShowComposition: Boolean? = null
     private var cachedCandidatesPerPage: Int = -1
+    private var cachedUseExtendedCharset: Boolean? = null
 
     fun getThemeMode(context: Context): Int {
         if (cachedTheme == -1) {
@@ -65,6 +67,26 @@ object ThemeManager {
         getPrefs(context).edit().putInt(KEY_CANDIDATES_PER_PAGE, cachedCandidatesPerPage).apply()
     }
 
+    // Extended character set settings (default: true for extended)
+    fun getUseExtendedCharset(context: Context): Boolean {
+        if (cachedUseExtendedCharset == null) {
+            cachedUseExtendedCharset = getPrefs(context).getBoolean(KEY_USE_EXTENDED_CHARSET, true)
+        }
+        return cachedUseExtendedCharset!!
+    }
+
+    fun setUseExtendedCharset(context: Context, useExtended: Boolean) {
+        cachedUseExtendedCharset = useExtended
+        getPrefs(context).edit().putBoolean(KEY_USE_EXTENDED_CHARSET, useExtended).apply()
+    }
+
+    /**
+     * Get the appropriate simplex.cin filename based on settings.
+     */
+    fun getSimplexFilename(context: Context): String {
+        return if (getUseExtendedCharset(context)) "simplex-ext.cin" else "simplex.cin"
+    }
+
     /**
      * Returns true if dark theme should be used based on current settings.
      */
@@ -98,6 +120,7 @@ object ThemeManager {
         cachedTheme = -1
         cachedShowComposition = null
         cachedCandidatesPerPage = -1
+        cachedUseExtendedCharset = null
     }
 
     // Modern Dark Theme Colors (Material You inspired)

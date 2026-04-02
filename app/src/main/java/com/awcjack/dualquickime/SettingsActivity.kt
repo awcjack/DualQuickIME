@@ -46,9 +46,25 @@ class SettingsActivity : AppCompatActivity() {
         setupThemeSelection()
         setupCompositionToggle()
         setupCandidatesSeekBar()
+        setupCharacterSetSettings()
         setupClipboardSettings()
         setupGitHubLink()
         updatePreview()
+    }
+
+    private fun setupCharacterSetSettings() {
+        val switchExtended = findViewById<SwitchCompat>(R.id.switchExtendedCharset)
+        val hintText = findViewById<TextView>(R.id.textCharsetHint)
+
+        // Set current value (default: extended = true)
+        switchExtended.isChecked = ThemeManager.getUseExtendedCharset(this)
+
+        // Listen for changes
+        switchExtended.setOnCheckedChangeListener { _, isChecked ->
+            ThemeManager.setUseExtendedCharset(this, isChecked)
+            // Show restart hint
+            hintText.visibility = View.VISIBLE
+        }
     }
 
     private fun setupClipboardSettings() {

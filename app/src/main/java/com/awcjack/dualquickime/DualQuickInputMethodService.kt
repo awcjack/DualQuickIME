@@ -38,6 +38,9 @@ class DualQuickInputMethodService : InputMethodService() {
     // Maps index position to whether it was uppercase
     private var letterCases = mutableListOf<Boolean>()
 
+    // Track which character set is currently loaded
+    private var currentCharsetExtended: Boolean? = null
+
     // System clipboard manager and listener
     private var clipboardManager: ClipboardManager? = null
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
@@ -46,17 +49,34 @@ class DualQuickInputMethodService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
-        // Load simplex.cin from assets
-        try {
-            simplexTable = CinParser().parse(assets.open("simplex.cin"))
-        } catch (e: Exception) {
-            // Fallback to empty table if loading fails
-            simplexTable = SimplexTable(emptyList())
-        }
+        // Load simplex data based on user setting (extended by default)
+        loadSimplexTable()
 
         // Register clipboard listener to capture system clipboard changes
         clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         clipboardManager?.addPrimaryClipChangedListener(clipboardListener)
+    }
+
+    /**
+     * Load the simplex table based on user's character set preference.
+     */
+    private fun loadSimplexTable() {
+        val filename = ThemeManager.getSimplexFilename(this)
+        try {
+            simplexTable = CinParser().parse(assets.open(filename))
+        } catch (e: Exception) {
+            // Fallback to empty table if loading fails
+            simplexTable = SimplexTable(emptyList())
+        }
+    }
+
+    /**
+     * Reload the simplex table (call when character set setting changes).
+     */
+    fun reloadSimplexTable() {
+        loadSimplexTable()
+        // Clear current composition since character mappings may have changed
+        clearComposition()
     }
 
     override fun onDestroy() {
@@ -114,6 +134,14 @@ class DualQuickInputMethodService : InputMethodService() {
         // Invalidate caches to pick up any settings changes
         ThemeManager.invalidateCache()
         ClipboardHistoryManager.invalidateCache()
+
+        // Check if character set setting changed - reload if needed
+        val useExtended = ThemeManager.getUseExtendedCharset(this)
+        if (currentCharsetExtended != useExtended) {
+            currentCharsetExtended = useExtended
+            loadSimplexTable()
+        }
+
         // Refresh theme in case it changed in settings
         keyboardView?.refreshTheme()
         // Clear composition when starting new input
