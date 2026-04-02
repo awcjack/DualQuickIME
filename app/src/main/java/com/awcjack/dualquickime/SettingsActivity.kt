@@ -6,13 +6,17 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.RadioGroup
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
+import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.theme.ThemeManager
 
 /**
@@ -42,8 +46,35 @@ class SettingsActivity : AppCompatActivity() {
         setupThemeSelection()
         setupCompositionToggle()
         setupCandidatesSeekBar()
+        setupClipboardSettings()
         setupGitHubLink()
         updatePreview()
+    }
+
+    private fun setupClipboardSettings() {
+        val switchEnabled = findViewById<SwitchCompat>(R.id.switchClipboardEnabled)
+        val btnClear = findViewById<Button>(R.id.btnClearClipboard)
+
+        // Set current value
+        switchEnabled.isChecked = ClipboardHistoryManager.isEnabled(this)
+
+        // Listen for changes
+        switchEnabled.setOnCheckedChangeListener { _, isChecked ->
+            ClipboardHistoryManager.setEnabled(this, isChecked)
+        }
+
+        // Clear history button
+        btnClear.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.settings_clipboard_clear_confirm_title)
+                .setMessage(R.string.settings_clipboard_clear_confirm_message)
+                .setPositiveButton(R.string.settings_clipboard_clear_confirm_yes) { _, _ ->
+                    ClipboardHistoryManager.clearHistory(this, includePinned = true)
+                    Toast.makeText(this, R.string.settings_clipboard_cleared, Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
     }
 
     private fun setupGitHubLink() {
