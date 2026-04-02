@@ -35,11 +35,18 @@ jobs:
           echo "KeyboardColors.kt content:"
           cat app/src/main/java/com/example/dualquick/theme/KeyboardColors.kt
 
+      - name: Clean Gradle caches
+        run: |
+          rm -rf ~/.gradle/caches/modules-2/files-2.1/
+          rm -rf ~/.gradle/caches/transforms-*/
+          rm -rf ~/.gradle/kotlin-profile/
+          rm -rf .gradle/
+
       - name: Clean and Build Debug APK
-        run: ./gradlew clean assembleDebug --no-build-cache
+        run: ./gradlew clean assembleDebug --no-build-cache --no-daemon --no-configuration-cache
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease --no-build-cache
+        run: ./gradlew assembleRelease --no-build-cache --no-daemon --no-configuration-cache
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -72,8 +79,15 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Clean Gradle caches
+        run: |
+          rm -rf ~/.gradle/caches/modules-2/files-2.1/
+          rm -rf ~/.gradle/caches/transforms-*/
+          rm -rf ~/.gradle/kotlin-profile/
+          rm -rf .gradle/
+
       - name: Clean and run unit tests
-        run: ./gradlew clean test --no-build-cache
+        run: ./gradlew clean test --no-build-cache --no-daemon --no-configuration-cache
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
