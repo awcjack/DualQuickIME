@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">双拼速成</string>
+    <string name="ime_name">双拼速成 中英输入</string>
+    <string name="settings_name">双拼速成设置</string>
+
+    <string name="subtype_zh_TW">繁体中文（台湾）</string>
+    <string name="subtype_zh_HK">繁体中文（香港）</string>
+    <string name="subtype_en_US">英文（美国）</string>
+
+    <string name="no_candidates">无此字</string>
+    <string name="space_hint">空格键 = 下一页</string>
+
+    <!-- Settings -->
+    <string name="settings_title">设置</string>
+    <string name="settings_appearance">外观</string>
+    <string name="settings_theme">主题</string>
+    <string name="settings_candidate_bar">候选字栏</string>
+    <string name="settings_show_composition">显示输入码</string>
+    <string name="settings_show_composition_desc">在候选字栏中显示速成码</string>
+    <string name="settings_candidates_per_page">每页候选字数量</string>
+    <string name="settings_candidates_per_page_desc">调整候选字显示数量（较少 = 较大）</string>
+    <string name="settings_preview">预览</string>
+    <string name="settings_about">关于</string>
+
+    <!-- Theme options -->
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_auto">自动（跟随系统）</string>
+
+    <!-- Preview -->
+    <string name="preview_hint">主题预览</string>
+
+    <!-- About -->
+    <string name="app_description">支持中英双输入的速成输入法</string>
+    <string name="version_info">版本 1.0.0</string>
+</resources>

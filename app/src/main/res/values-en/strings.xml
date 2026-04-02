@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Default strings (English as fallback) -->
     <string name="app_name">DualQuick IME</string>
     <string name="ime_name">DualQuick Chinese/English</string>
     <string name="settings_name">DualQuick Settings</string>
