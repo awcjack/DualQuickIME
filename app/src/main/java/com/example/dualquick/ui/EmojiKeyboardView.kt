@@ -196,7 +196,7 @@ class EmojiKeyboardView @JvmOverloads constructor(
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dpToPx(8).toFloat()
-            setColor(colors.emojiCategoryBackground)
+            setColor(this@EmojiKeyboardView.colors.emojiCategoryBackground)
         }
     }
 
@@ -204,7 +204,7 @@ class EmojiKeyboardView @JvmOverloads constructor(
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dpToPx(8).toFloat()
-            setColor(colors.emojiCategorySelectedBackground)
+            setColor(this@EmojiKeyboardView.colors.emojiCategorySelectedBackground)
         }
     }
 
