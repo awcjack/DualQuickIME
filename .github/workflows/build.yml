@@ -27,11 +27,11 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Clean and Build Debug APK
+        run: ./gradlew clean assembleDebug --no-build-cache
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --no-build-cache
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -52,6 +52,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Debug - Show KeyboardColors definition
+        run: |
+          echo "=== KeyboardColors data class ==="
+          grep -A 25 "data class KeyboardColors" app/src/main/java/com/example/dualquick/theme/ThemeManager.kt
+          echo "=== EmojiKeyboardView usage ==="
+          grep -n "emojiCategory" app/src/main/java/com/example/dualquick/ui/EmojiKeyboardView.kt || echo "No matches"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -64,8 +71,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run unit tests
-        run: ./gradlew test
+      - name: Clean and run unit tests
+        run: ./gradlew clean test --no-build-cache
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
