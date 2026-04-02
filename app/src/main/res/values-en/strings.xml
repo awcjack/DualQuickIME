@@ -36,4 +36,18 @@
     <string name="version_info">Version 1.0.0</string>
     <string name="github_link_text">View on GitHub</string>
     <string name="github_icon_desc">GitHub</string>
+
+    <!-- Clipboard -->
+    <string name="settings_clipboard">Clipboard</string>
+    <string name="settings_clipboard_enable">Enable clipboard history</string>
+    <string name="settings_clipboard_enable_desc">Store typed text for quick access</string>
+    <string name="settings_clipboard_clear">Clear clipboard history</string>
+    <string name="settings_clipboard_clear_confirm_title">Clear History?</string>
+    <string name="settings_clipboard_clear_confirm_message">This will delete all clipboard history including pinned items.</string>
+    <string name="settings_clipboard_clear_confirm_yes">Clear</string>
+    <string name="settings_clipboard_cleared">Clipboard history cleared</string>
+    <string name="clipboard_empty">No clipboard history</string>
+    <string name="clipboard_pinned_empty">No pinned items</string>
+    <string name="clipboard_tab_all">All</string>
+    <string name="clipboard_tab_pinned">Pinned</string>
 </resources>

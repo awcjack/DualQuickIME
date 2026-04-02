@@ -36,4 +36,18 @@
     <string name="version_info">版本 1.0.0</string>
     <string name="github_link_text">喺 GitHub 上查看</string>
     <string name="github_icon_desc">GitHub</string>
+
+    <!-- Clipboard -->
+    <string name="settings_clipboard">剪貼簿</string>
+    <string name="settings_clipboard_enable">啟用剪貼簿歷史</string>
+    <string name="settings_clipboard_enable_desc">儲存輸入嘅文字以便快速存取</string>
+    <string name="settings_clipboard_clear">清除剪貼簿歷史</string>
+    <string name="settings_clipboard_clear_confirm_title">清除歷史？</string>
+    <string name="settings_clipboard_clear_confirm_message">呢個會刪除所有剪貼簿歷史，包括已釘選嘅項目。</string>
+    <string name="settings_clipboard_clear_confirm_yes">清除</string>
+    <string name="settings_clipboard_cleared">剪貼簿歷史已清除</string>
+    <string name="clipboard_empty">冇剪貼簿歷史</string>
+    <string name="clipboard_pinned_empty">冇釘選嘅項目</string>
+    <string name="clipboard_tab_all">全部</string>
+    <string name="clipboard_tab_pinned">已釘選</string>
 </resources>
