@@ -1,6 +1,6 @@
 # Privacy Policy for DualQuickIME
 
-**Last updated:** April 2024
+**Last updated:** April 2026
 
 ## Overview
 
@@ -37,8 +37,23 @@ The only data stored locally on your device:
 
 - **User preferences**: Theme selection, display settings (stored in Android SharedPreferences)
 - **Character mapping data**: The simplex.cin dictionary file bundled with the app
+- **Clipboard history** (optional): If enabled, stores recently typed or pasted text for quick access
 
 This data never leaves your device.
+
+## Clipboard History Feature
+
+DualQuickIME includes an optional clipboard history feature that allows you to access recently typed or pasted text:
+
+- **Disabled by default**: Clipboard history is turned off by default and must be explicitly enabled in Settings
+- **Local storage only**: All clipboard data is stored locally on your device using SharedPreferences
+- **No transmission**: Clipboard data is never sent to any server or third party
+- **User control**: You can:
+  - Enable or disable the feature at any time in Settings
+  - Clear all clipboard history with one tap
+  - Pin frequently used items for easy access
+  - Delete individual items
+- **Limited retention**: Maximum of 50 items are stored, with oldest items automatically removed
 
 ## Third-Party Services
 
