@@ -82,6 +82,7 @@ class DualQuickInputMethodService : InputMethodService() {
             is KeyboardView.KeyEvent.Letter -> handleLetter(event.char)
             is KeyboardView.KeyEvent.Number -> handleNumber(event.digit)
             is KeyboardView.KeyEvent.Symbol -> handleSymbol(event.char)
+            is KeyboardView.KeyEvent.Emoji -> handleEmoji(event.emoji)
             KeyboardView.KeyEvent.Space -> handleSpace()
             KeyboardView.KeyEvent.Backspace -> handleBackspace()
             KeyboardView.KeyEvent.Enter -> handleEnter()
@@ -119,6 +120,16 @@ class DualQuickInputMethodService : InputMethodService() {
         }
         // Then commit the symbol
         commitText(char.toString())
+    }
+
+    private fun handleEmoji(emoji: String) {
+        // Emoji commits composition as English first
+        if (composition.rawKeys.isNotEmpty()) {
+            commitEnglish(composition.rawKeys)
+            clearComposition()
+        }
+        // Then commit the emoji
+        commitText(emoji)
     }
 
     private fun handleSpace() {

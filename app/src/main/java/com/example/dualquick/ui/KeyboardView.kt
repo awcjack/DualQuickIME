@@ -33,7 +33,7 @@ class KeyboardView @JvmOverloads constructor(
     private var currentRawKeys: String = ""
     private var isShiftOn = false
     private var isSymbolMode = false
-    private var isSymbolPage2 = false
+    private var symbolPage = 0  // 0 = numbers, 1 = symbols, 2 = emoji
     private var shiftKey: TextView? = null
     private var modeToggleKey: TextView? = null
 
@@ -60,6 +60,11 @@ class KeyboardView @JvmOverloads constructor(
     private val symRow2Page2 = listOf('£', '¥', '€', '¢', '^', '°', '=', '{', '}')
     private val symRow3Page2 = listOf('\\', '©', '®', '™', '℅', '[', ']')
 
+    // Emoji rows (page 3) - common emojis
+    private val emojiRow1 = listOf("😀", "😂", "🥹", "😍", "🥰", "😘", "😎", "🤔", "😢", "😭")
+    private val emojiRow2 = listOf("👍", "👎", "👏", "🙏", "💪", "❤️", "🔥", "✨", "🎉")
+    private val emojiRow3 = listOf("👋", "✌️", "🤝", "💯", "⭐", "💀", "🤡")
+
     init {
         orientation = VERTICAL
         setBackgroundColor(Color.parseColor("#1B1B1B"))
@@ -75,14 +80,25 @@ class KeyboardView @JvmOverloads constructor(
         addView(createCandidateBar())
 
         if (isSymbolMode) {
-            if (isSymbolPage2) {
-                addView(createSymbolRow(symRow1Page2))
-                addView(createSymbolRow(symRow2Page2, leftPadding = 0.5f))
-                addView(createSymbolSpecialRow3(symRow3Page2))
-            } else {
-                addView(createSymbolRow(numRow1))
-                addView(createSymbolRow(symRow2Page1, leftPadding = 0.5f))
-                addView(createSymbolSpecialRow3(symRow3Page1))
+            when (symbolPage) {
+                0 -> {
+                    // Page 1: Numbers
+                    addView(createSymbolRow(numRow1))
+                    addView(createSymbolRow(symRow2Page1, leftPadding = 0.5f))
+                    addView(createSymbolSpecialRow3(symRow3Page1))
+                }
+                1 -> {
+                    // Page 2: Symbols
+                    addView(createSymbolRow(symRow1Page2))
+                    addView(createSymbolRow(symRow2Page2, leftPadding = 0.5f))
+                    addView(createSymbolSpecialRow3(symRow3Page2))
+                }
+                2 -> {
+                    // Page 3: Emoji
+                    addView(createEmojiRow(emojiRow1))
+                    addView(createEmojiRow(emojiRow2, leftPadding = 0.5f))
+                    addView(createEmojiSpecialRow3(emojiRow3))
+                }
             }
             addView(createSymbolBottomRow())
         } else {
@@ -370,7 +386,7 @@ class KeyboardView @JvmOverloads constructor(
             // Number/Symbol toggle
             modeToggleKey = createSpecialKey("123", 1.2f) {
                 isSymbolMode = true
-                isSymbolPage2 = false
+                symbolPage = 0
                 onModeChange?.invoke(true)
                 buildKeyboard()
             }
@@ -459,16 +475,95 @@ class KeyboardView @JvmOverloads constructor(
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
 
-            // Page toggle key (shows current page: 1/2 or 2/2)
-            val pageLabel = if (isSymbolPage2) "2/2" else "1/2"
+            // Page toggle key (shows current page: 1/3, 2/3, or 3/3)
+            val pageLabel = "${symbolPage + 1}/3"
             addView(createSpecialKey(pageLabel, 1.5f) {
-                isSymbolPage2 = !isSymbolPage2
+                symbolPage = (symbolPage + 1) % 3
                 buildKeyboard()
             })
 
             // Symbol keys
             chars.forEach { char ->
                 addView(createSymbolKey(char))
+            }
+
+            // Backspace key
+            addView(createSpecialKey("⌫", 1.5f) {
+                onKeyPress?.invoke(KeyEvent.Backspace)
+            }.apply {
+                setOnLongClickListener {
+                    onKeyPress?.invoke(KeyEvent.Backspace)
+                    true
+                }
+            })
+        }
+    }
+
+    private fun createEmojiRow(emojis: List<String>, leftPadding: Float = 0f): LinearLayout {
+        return LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER
+
+            if (leftPadding > 0) {
+                addView(View(context).apply {
+                    layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, leftPadding)
+                })
+            }
+
+            emojis.forEach { emoji ->
+                addView(createEmojiKey(emoji))
+            }
+
+            if (leftPadding > 0) {
+                addView(View(context).apply {
+                    layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, leftPadding)
+                })
+            }
+        }
+    }
+
+    private fun createEmojiKey(emoji: String): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
+                setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
+            }
+            gravity = Gravity.CENTER
+            text = emoji
+            textSize = 24f
+            setBackgroundResource(R.drawable.key_background)
+
+            setOnClickListener {
+                // Emit emoji as a special event
+                onKeyPress?.invoke(KeyEvent.Emoji(emoji))
+            }
+
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> v.alpha = 0.7f
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.alpha = 1f
+                }
+                false
+            }
+        }
+    }
+
+    private fun createEmojiSpecialRow3(emojis: List<String>): LinearLayout {
+        return LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(54))
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER
+
+            // Page toggle key (shows current page: 1/3, 2/3, or 3/3)
+            val pageLabel = "${symbolPage + 1}/3"
+            addView(createSpecialKey(pageLabel, 1.5f) {
+                symbolPage = (symbolPage + 1) % 3
+                buildKeyboard()
+            })
+
+            // Emoji keys
+            emojis.forEach { emoji ->
+                addView(createEmojiKey(emoji))
             }
 
             // Backspace key
@@ -642,7 +737,7 @@ class KeyboardView @JvmOverloads constructor(
     fun setLetterMode() {
         if (isSymbolMode) {
             isSymbolMode = false
-            isSymbolPage2 = false
+            symbolPage = 0
             buildKeyboard()
         }
     }
@@ -662,6 +757,7 @@ class KeyboardView @JvmOverloads constructor(
         data class Letter(val char: Char) : KeyEvent()
         data class Number(val digit: Int) : KeyEvent()
         data class Symbol(val char: Char) : KeyEvent()
+        data class Emoji(val emoji: String) : KeyEvent()
         object Space : KeyEvent()
         object Backspace : KeyEvent()
         object Enter : KeyEvent()
