@@ -189,9 +189,8 @@ class DualQuickInputMethodService : InputMethodService() {
             commitEnglish(composition.rawKeys)
             clearComposition()
         }
-        // Commit the clipboard text without adding to clipboard history
-        // (it's already in the history since user selected it from there)
-        commitText(text, addToClipboard = false)
+        // Commit the clipboard text
+        commitText(text)
     }
 
     private fun handleSpace() {
@@ -257,12 +256,8 @@ class DualQuickInputMethodService : InputMethodService() {
         commitText(result.toString())
     }
 
-    private fun commitText(text: String, addToClipboard: Boolean = true) {
+    private fun commitText(text: String) {
         currentInputConnection?.commitText(text, 1)
-        // Add to clipboard history if enabled and text is substantial
-        if (addToClipboard && ClipboardHistoryManager.isEnabled(this)) {
-            ClipboardHistoryManager.addItem(this, text)
-        }
     }
 
     private fun updateComposition(rawKeys: String) {
