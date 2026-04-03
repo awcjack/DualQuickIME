@@ -79,6 +79,8 @@
     <string name="voice_listening">Listening...</string>
     <string name="voice_processing">Processing...</string>
     <string name="voice_cancel">Cancel</string>
+    <string name="voice_reset">Reset</string>
+    <string name="voice_commit">Commit</string>
     <string name="voice_downloading_model">Downloading voice model...</string>
     <string name="voice_download_starting">Starting download...</string>
     <string name="voice_permission_required">Audio permission required for voice input</string>
