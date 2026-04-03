@@ -69,7 +69,7 @@ class KeyboardView @JvmOverloads constructor(
     // Number/Symbol rows (page 1) - Common punctuation
     private val numRow1 = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
     private val symRow2Page1 = listOf('@', '#', '$', '%', '&', '-', '+', '(', ')')
-    private val symRow3Page1 = listOf('*', '"', '\'', ':', ';', '!', '?')
+    private val symRow3Page1 = listOf('*', '"', '\'', ':', ';', '!', '?', ',', '.')
 
     // Symbol rows (page 2) - Brackets and math
     private val symRow1Page2 = listOf('~', '`', '|', '\\', '/', '<', '>', '{', '}', '^')
@@ -535,8 +535,8 @@ class KeyboardView @JvmOverloads constructor(
             }
             addView(modeToggleKey)
 
-            addView(createSpecialKey(",", 1f) {
-                onKeyPress?.invoke(KeyEvent.Symbol(','))
+            addView(createSpecialKey("，", 1f) {
+                onKeyPress?.invoke(KeyEvent.Symbol('，'))
             })
 
             // Voice input button (only in full version)
@@ -548,8 +548,8 @@ class KeyboardView @JvmOverloads constructor(
 
             addView(createSpaceKey())
 
-            addView(createSpecialKey(".", 1f) {
-                onKeyPress?.invoke(KeyEvent.Symbol('.'))
+            addView(createSpecialKey("。", 1f) {
+                onKeyPress?.invoke(KeyEvent.Symbol('。'))
             })
 
             addView(createSpecialKey("↵", 1.2f) {
