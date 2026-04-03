@@ -57,6 +57,23 @@ android {
         jvmTarget = "1.8"
     }
 
+    // Product flavors: full (with voice input) and lite (without voice input)
+    flavorDimensions += "version"
+    productFlavors {
+        create("full") {
+            dimension = "version"
+            // Full version includes voice input (requires INTERNET permission for model download)
+            buildConfigField("boolean", "VOICE_INPUT_ENABLED", "true")
+        }
+        create("lite") {
+            dimension = "version"
+            // Lite version without voice input (no INTERNET permission required)
+            applicationIdSuffix = ".lite"
+            versionNameSuffix = "-lite"
+            buildConfigField("boolean", "VOICE_INPUT_ENABLED", "false")
+        }
+    }
+
     // Generate separate APKs per ABI to reduce download size
     // arm64-v8a: Modern 64-bit devices (most common)
     // armeabi-v7a: Older 32-bit devices
@@ -68,6 +85,10 @@ android {
             isUniversalApk = true // Also build a universal APK for fallback
         }
     }
+
+    buildFeatures {
+        buildConfig = true
+    }
 }
 
 dependencies {
@@ -77,6 +98,6 @@ dependencies {
     implementation("androidx.cardview:cardview:1.0.0")
 
     // Sherpa-ONNX for offline voice recognition (Cantonese/Chinese/English)
-    // Using bihe0832's Maven Central wrapper which packages the official k2-fsa sherpa-onnx
-    implementation("com.bihe0832.android:lib-sherpa-onnx:8.4.2")
+    // Only included in the full flavor
+    "fullImplementation"("com.bihe0832.android:lib-sherpa-onnx:8.4.2")
 }

@@ -39,14 +39,14 @@ jobs:
           rm -rf ~/.gradle/kotlin-profile/
           rm -rf .gradle/
 
-      - name: Clean and Build Debug APK
+      - name: Clean and Build Debug APKs (all flavors)
         run: ./gradlew clean assembleDebug --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Debug APKs (all ABIs)
+      - name: Upload Debug APKs (all flavors and ABIs)
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/*/debug/*.apk
 
       # Signed Release Build (only if secrets are configured)
       - name: Decode Keystore
@@ -77,14 +77,14 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: ./gradlew assembleRelease --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Signed Release APKs (all ABIs)
+      - name: Upload Signed Release APKs (all flavors and ABIs)
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release-signed
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/*/release/*.apk
 
       # Unsigned Release Build (fallback if no secrets)
       - name: Build Unsigned Release APK
@@ -93,14 +93,14 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: ./gradlew assembleRelease --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Unsigned Release APKs (all ABIs)
+      - name: Upload Unsigned Release APKs (all flavors and ABIs)
         if: ${{ env.KEYSTORE_BASE64 == '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release-unsigned
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/*/release/*.apk
 
       # Create GitHub Release (only on version tags)
       - name: Rename APKs for release
@@ -109,18 +109,35 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          cd app/build/outputs/apk/release
-          # Rename each ABI-specific APK
+          mkdir -p app/build/outputs/apk/release-renamed
+
+          # Process full flavor APKs
+          cd app/build/outputs/apk/full/release
           for apk in app-*.apk; do
-            # Extract ABI from filename (e.g., app-arm64-v8a-release.apk -> arm64-v8a)
-            ABI=$(echo "$apk" | sed -E 's/app-(.+)-release\.apk/\1/')
+            # Extract ABI from filename (e.g., app-full-arm64-v8a-release.apk -> arm64-v8a)
+            ABI=$(echo "$apk" | sed -E 's/app-full-(.+)-release\.apk/\1/')
             if [ "$ABI" = "universal" ]; then
-              mv "$apk" "DualQuickIME-${VERSION}-universal.apk"
+              cp "$apk" "../../release-renamed/DualQuickIME-${VERSION}-universal.apk"
             else
-              mv "$apk" "DualQuickIME-${VERSION}-${ABI}.apk"
+              cp "$apk" "../../release-renamed/DualQuickIME-${VERSION}-${ABI}.apk"
             fi
           done
-          ls -la
+          cd -
+
+          # Process lite flavor APKs
+          cd app/build/outputs/apk/lite/release
+          for apk in app-*.apk; do
+            # Extract ABI from filename (e.g., app-lite-arm64-v8a-release.apk -> arm64-v8a)
+            ABI=$(echo "$apk" | sed -E 's/app-lite-(.+)-release\.apk/\1/')
+            if [ "$ABI" = "universal" ]; then
+              cp "$apk" "../../release-renamed/DualQuickIME-${VERSION}-lite-universal.apk"
+            else
+              cp "$apk" "../../release-renamed/DualQuickIME-${VERSION}-lite-${ABI}.apk"
+            fi
+          done
+          cd -
+
+          ls -la app/build/outputs/apk/release-renamed/
 
       - name: Generate Changelog from Conventional Commits
         if: startsWith(github.ref, 'refs/tags/v') && env.KEYSTORE_BASE64 != ''
@@ -196,11 +213,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          # Upload all ABI APKs to the release
+          # Upload all flavors and ABI APKs to the release
           gh release create "$VERSION" \
             --title "DualQuickIME $VERSION" \
             --notes-file CHANGELOG_RELEASE.md \
-            app/build/outputs/apk/release/DualQuickIME-${VERSION}-*.apk
+            app/build/outputs/apk/release-renamed/DualQuickIME-${VERSION}-*.apk
 
       # Cleanup sensitive files
       - name: Cleanup keystore

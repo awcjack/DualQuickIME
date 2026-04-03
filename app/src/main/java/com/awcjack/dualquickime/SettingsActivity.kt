@@ -71,12 +71,21 @@ class SettingsActivity : AppCompatActivity() {
         setupCandidatesSeekBar()
         setupCharacterSetSettings()
         setupClipboardSettings()
-        setupVoiceInputSettings()
+
+        // Voice input settings only available in full version
+        if (BuildConfig.VOICE_INPUT_ENABLED) {
+            setupVoiceInputSettings()
+        } else {
+            // Hide voice input section in lite version
+            findViewById<View>(R.id.voiceInputSection)?.visibility = View.GONE
+            findViewById<View>(R.id.voiceInputSectionHeader)?.visibility = View.GONE
+        }
+
         setupGitHubLink()
         updatePreview()
 
         // Handle permission request from IME
-        if (intent.getBooleanExtra("request_audio_permission", false)) {
+        if (BuildConfig.VOICE_INPUT_ENABLED && intent.getBooleanExtra("request_audio_permission", false)) {
             requestAudioPermission()
         }
     }
@@ -84,7 +93,9 @@ class SettingsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         // Update voice settings UI when returning to activity
-        updateVoiceSettingsUI()
+        if (BuildConfig.VOICE_INPUT_ENABLED) {
+            updateVoiceSettingsUI()
+        }
     }
 
     private fun setupCharacterSetSettings() {

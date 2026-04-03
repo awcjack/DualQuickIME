@@ -36,25 +36,38 @@ class VoiceInputManager(private val context: Context) {
         // Punctuation conversion map (spoken words to symbols)
         // Supports Cantonese, Mandarin and English
         private val PUNCTUATION_MAP = mapOf(
-            // Chinese punctuation - Mandarin
+            // Chinese punctuation - Mandarin (Simplified)
             "逗号" to "，",
             "句号" to "。",
             "问号" to "？",
             "感叹号" to "！",
             "叹号" to "！",
+            "惊叹号" to "！",
             "冒号" to "：",
             "分号" to "；",
             "顿号" to "、",
             "省略号" to "……",
             "破折号" to "——",
+            "连接号" to "—",
             "左括号" to "（",
             "右括号" to "）",
+            "括号" to "（",
+            "圆括号" to "（",
             "引号" to "「",
             "左引号" to "「",
             "右引号" to "」",
+            "双引号" to "「",
+            "单引号" to "『",
             "书名号" to "《",
             "左书名号" to "《",
             "右书名号" to "》",
+            "方括号" to "【",
+            "左方括号" to "【",
+            "右方括号" to "】",
+            "间隔号" to "·",
+            "分隔号" to "／",
+            "斜线" to "／",
+            "波浪号" to "～",
 
             // Chinese punctuation - Cantonese/Traditional
             "逗號" to "，",
@@ -64,19 +77,33 @@ class VoiceInputManager(private val context: Context) {
             "感歎號" to "！",
             "嘆號" to "！",
             "歎號" to "！",
+            "驚嘆號" to "！",
+            "驚歎號" to "！",
             "冒號" to "：",
             "分號" to "；",
             "頓號" to "、",
             "省略號" to "……",
             "破折號" to "——",
+            "連接號" to "—",
             "左括號" to "（",
             "右括號" to "）",
+            "括號" to "（",
+            "圓括號" to "（",
             "引號" to "「",
             "左引號" to "「",
             "右引號" to "」",
+            "雙引號" to "「",
+            "單引號" to "『",
             "書名號" to "《",
             "左書名號" to "《",
             "右書名號" to "》",
+            "方括號" to "【",
+            "左方括號" to "【",
+            "右方括號" to "】",
+            "間隔號" to "·",
+            "分隔號" to "／",
+            "斜線" to "／",
+            "波浪號" to "～",
 
             // English punctuation
             "comma" to ",",
@@ -94,14 +121,89 @@ class VoiceInputManager(private val context: Context) {
             "right parenthesis" to ")",
             "open parenthesis" to "(",
             "close parenthesis" to ")",
+            "left bracket" to "[",
+            "right bracket" to "]",
+            "open bracket" to "[",
+            "close bracket" to "]",
+            "left brace" to "{",
+            "right brace" to "}",
             "quotation mark" to "\"",
             "quote" to "\"",
+            "double quote" to "\"",
+            "single quote" to "'",
             "apostrophe" to "'",
+            "slash" to "/",
+            "backslash" to "\\",
+            "at sign" to "@",
+            "hash" to "#",
+            "hashtag" to "#",
+            "percent" to "%",
+            "ampersand" to "&",
+            "asterisk" to "*",
+            "plus" to "+",
+            "equals" to "=",
+            "minus" to "-",
+            "underscore" to "_",
+            "tilde" to "~",
 
-            // Common variations
+            // Common variations / shortcuts
             "dot" to "。",
             "點" to "。",
-            "点" to "。"
+            "点" to "。",
+            "句點" to "。",
+            "句点" to "。",
+            "逗點" to "，",
+            "逗点" to "，",
+
+            // Special commands (formatting)
+            "空格" to " ",
+            "换行" to "\n",
+            "換行" to "\n",
+            "新行" to "\n",
+            "new line" to "\n",
+            "newline" to "\n"
+        )
+
+        // Simplified to Traditional Chinese conversion map (common characters)
+        // This covers the most frequently used characters that differ between S and T
+        private val SIMPLIFIED_TO_TRADITIONAL = mapOf(
+            // Common verbs
+            '说' to '說', '话' to '話', '请' to '請', '让' to '讓', '给' to '給',
+            '对' to '對', '过' to '過', '进' to '進', '还' to '還', '着' to '著',
+            '动' to '動', '开' to '開', '关' to '關', '问' to '問', '听' to '聽',
+            '见' to '見', '写' to '寫', '读' to '讀', '学' to '學', '认' to '認',
+            '识' to '識', '记' to '記', '买' to '買', '卖' to '賣', '办' to '辦',
+
+            // Common nouns
+            '个' to '個', '们' to '們', '儿' to '兒', '头' to '頭', '边' to '邊',
+            '里' to '裡', '时' to '時', '会' to '會', '国' to '國', '车' to '車',
+            '门' to '門', '书' to '書', '电' to '電', '话' to '話', '钱' to '錢',
+            '东' to '東', '西' to '西', '南' to '南', '北' to '北', '风' to '風',
+            '马' to '馬', '鸟' to '鳥', '鱼' to '魚', '龙' to '龍', '飞' to '飛',
+
+            // Common adjectives
+            '长' to '長', '广' to '廣', '乐' to '樂', '难' to '難', '双' to '雙',
+            '红' to '紅', '绿' to '綠', '蓝' to '藍', '黄' to '黃', '黑' to '黑',
+            '热' to '熱', '冷' to '冷', '远' to '遠', '近' to '近', '轻' to '輕',
+            '贵' to '貴', '简' to '簡', '复' to '復', '旧' to '舊', '新' to '新',
+
+            // Common radicals/components
+            '讠' to '訁', '钅' to '釒', '饣' to '飠', '纟' to '糹', '贝' to '貝',
+            '车' to '車', '见' to '見', '门' to '門', '鸟' to '鳥', '马' to '馬',
+
+            // Other common characters
+            '这' to '這', '那' to '那', '什' to '什', '么' to '麼', '没' to '沒',
+            '能' to '能', '该' to '該', '与' to '與', '为' to '為', '从' to '從',
+            '来' to '來', '去' to '去', '到' to '到', '在' to '在', '有' to '有',
+            '无' to '無', '不' to '不', '是' to '是', '都' to '都', '也' to '也',
+            '只' to '只', '后' to '後', '前' to '前', '里' to '裏', '面' to '面',
+            '种' to '種', '样' to '樣', '经' to '經', '济' to '濟', '发' to '發',
+            '现' to '現', '业' to '業', '产' to '產', '点' to '點', '机' to '機',
+            '实' to '實', '际' to '際', '务' to '務', '系' to '係', '统' to '統',
+            '总' to '總', '数' to '數', '设' to '設', '计' to '計', '术' to '術',
+            '艺' to '藝', '医' to '醫', '药' to '藥', '体' to '體', '运' to '運',
+            '场' to '場', '团' to '團', '组' to '組', '织' to '織', '军' to '軍',
+            '战' to '戰', '将' to '將', '华' to '華', '区' to '區', '县' to '縣'
         )
     }
 
@@ -320,6 +422,28 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
+     * Convert Simplified Chinese characters to Traditional Chinese.
+     * The model may output simplified characters, so we convert them.
+     */
+    private fun convertToTraditional(text: String): String {
+        val result = StringBuilder()
+        for (char in text) {
+            result.append(SIMPLIFIED_TO_TRADITIONAL[char] ?: char)
+        }
+        return result.toString()
+    }
+
+    /**
+     * Process recognized text: convert to traditional Chinese and replace punctuation.
+     */
+    private fun processRecognizedText(text: String): String {
+        // First convert simplified to traditional Chinese
+        val traditional = convertToTraditional(text)
+        // Then convert spoken punctuation to symbols
+        return convertPunctuation(traditional)
+    }
+
+    /**
      * Get the last recognized text (for committing when manually stopped).
      */
     fun getLastRecognizedText(): String = lastRecognizedText
@@ -360,8 +484,8 @@ class VoiceInputManager(private val context: Context) {
                         text = rec.getResult(stream).text
                     }
 
-                    // Convert spoken punctuation to symbols
-                    val processedText = convertPunctuation(text)
+                    // Process text: convert to traditional Chinese and replace punctuation
+                    val processedText = processRecognizedText(text)
 
                     // Only notify if text changed
                     if (processedText != lastText && processedText.isNotEmpty()) {

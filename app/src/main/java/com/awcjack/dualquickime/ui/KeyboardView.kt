@@ -11,6 +11,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.awcjack.dualquickime.BuildConfig
 import com.awcjack.dualquickime.theme.KeyboardColors
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.util.KeyMapping
@@ -538,10 +539,12 @@ class KeyboardView @JvmOverloads constructor(
                 onKeyPress?.invoke(KeyEvent.Symbol(','))
             })
 
-            // Voice input button
-            addView(createSpecialKey("🎤", 1f) {
-                onKeyPress?.invoke(KeyEvent.VoiceInput)
-            })
+            // Voice input button (only in full version)
+            if (BuildConfig.VOICE_INPUT_ENABLED && ThemeManager.getVoiceInputEnabled(context)) {
+                addView(createSpecialKey("🎤", 1f) {
+                    onKeyPress?.invoke(KeyEvent.VoiceInput)
+                })
+            }
 
             addView(createSpaceKey())
 
@@ -723,10 +726,12 @@ class KeyboardView @JvmOverloads constructor(
                 buildKeyboard()
             })
 
-            // Voice input button
-            addView(createSpecialKey("🎤", 1f) {
-                onKeyPress?.invoke(KeyEvent.VoiceInput)
-            })
+            // Voice input button (only in full version)
+            if (BuildConfig.VOICE_INPUT_ENABLED && ThemeManager.getVoiceInputEnabled(context)) {
+                addView(createSpecialKey("🎤", 1f) {
+                    onKeyPress?.invoke(KeyEvent.VoiceInput)
+                })
+            }
 
             addView(createSpaceKey())
 

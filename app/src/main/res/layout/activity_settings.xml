@@ -366,7 +366,9 @@
                     android:id="@+id/btnClearClipboard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
                     android:text="@string/settings_clipboard_clear"
+                    android:textSize="15sp"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
             </LinearLayout>
@@ -375,6 +377,7 @@
 
         <!-- Voice Input Section -->
         <TextView
+            android:id="@+id/voiceInputSectionHeader"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/settings_voice_input"
@@ -384,6 +387,7 @@
             android:layout_marginBottom="8dp" />
 
         <androidx.cardview.widget.CardView
+            android:id="@+id/voiceInputSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardCornerRadius="12dp"
@@ -449,7 +453,9 @@
                     android:id="@+id/btnVoiceModel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
                     android:text="@string/settings_voice_download_model"
+                    android:textSize="15sp"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_marginBottom="12dp" />
 
@@ -489,7 +495,9 @@
                         android:id="@+id/btnVoicePermission"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:minHeight="48dp"
                         android:text="@string/settings_voice_permission_grant"
+                        android:textSize="15sp"
                         style="@style/Widget.MaterialComponents.Button.TextButton" />
 
                 </LinearLayout>
