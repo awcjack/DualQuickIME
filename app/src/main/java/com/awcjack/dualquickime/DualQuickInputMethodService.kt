@@ -153,8 +153,10 @@ class DualQuickInputMethodService : InputMethodService() {
                     handleAssociatedPhraseSelected(candidate)
                 } else {
                     // User TAPPED a Chinese candidate pill - commit Chinese
-                    commitChinese(candidate)
+                    // Note: clearComposition is called first to avoid clearing associated phrases
+                    // that get set in commitChinese -> showAssociatedPhrases
                     clearComposition()
+                    commitChinese(candidate)
                 }
             }
             setOnEnglishSelectedListener { _ ->
