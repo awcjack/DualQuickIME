@@ -7,6 +7,8 @@ import android.content.Context
  */
 object ModelDownloadManager {
 
+    const val SENSEVOICE_MODEL_DIR = ""
+    const val VAD_MODEL_FILE = ""
     const val TOTAL_MODEL_SIZE = 0L
 
     interface DownloadCallback {
@@ -16,9 +18,10 @@ object ModelDownloadManager {
     }
 
     fun isModelDownloaded(context: Context): Boolean = false
-    fun getModelSizeOnDisk(context: Context): Long = 0
+    fun getDownloadProgress(context: Context): Pair<Long, Long> = 0L to 0L
     fun downloadModel(context: Context, callback: DownloadCallback) {
         callback.onError("Voice input not available in lite version")
     }
-    fun deleteModel(context: Context): Boolean = true
+    fun deleteModel(context: Context) {}
+    fun getModelSizeString(): String = "0 MB"
 }
