@@ -9,7 +9,7 @@ import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.k2fsa.sherpa.onnx.*
-import io.github.laisuk.opencc.OpenCC
+import openccjava.OpenCC
 import java.io.File
 import kotlin.concurrent.thread
 
