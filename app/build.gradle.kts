@@ -56,6 +56,18 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
+    // Generate separate APKs per ABI to reduce download size
+    // arm64-v8a: Modern 64-bit devices (most common)
+    // armeabi-v7a: Older 32-bit devices
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = true // Also build a universal APK for fallback
+        }
+    }
 }
 
 dependencies {
