@@ -97,7 +97,7 @@ class CandidateGridView @JvmOverloads constructor(
 
     private fun createGridArea(): LinearLayout {
         val container = LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             orientation = VERTICAL
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             setPadding(dpToPx(2), dpToPx(4), dpToPx(2), dpToPx(4))
@@ -109,7 +109,7 @@ class CandidateGridView @JvmOverloads constructor(
 
         for (row in 0 until gridRows) {
             val rowLayout = LinearLayout(context).apply {
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(44))
                 orientation = HORIZONTAL
                 gravity = Gravity.CENTER
             }
