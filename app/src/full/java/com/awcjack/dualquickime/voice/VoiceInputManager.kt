@@ -13,8 +13,12 @@ import java.io.File
 import kotlin.concurrent.thread
 
 /**
- * Manages voice input using Sherpa-ONNX for offline speech recognition.
- * Supports Cantonese, Mandarin Chinese, and English.
+ * Manages voice input using Sherpa-ONNX SenseVoice for offline speech recognition.
+ * Uses Silero VAD for voice activity detection (simulated streaming).
+ * Supports Cantonese, Mandarin Chinese, English, Japanese, and Korean.
+ *
+ * The SenseVoice model is non-streaming but extremely fast (~70ms for 10s audio),
+ * so we use VAD to detect speech segments and transcribe them as they complete.
  */
 class VoiceInputManager(private val context: Context) {
 
@@ -25,12 +29,11 @@ class VoiceInputManager(private val context: Context) {
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
         private const val AUDIO_SOURCE = MediaRecorder.AudioSource.MIC
 
-        // Model directory name
-        const val MODEL_DIR = "sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en"
+        // Model directory name (for compatibility with ModelDownloadManager)
+        const val MODEL_DIR = ModelDownloadManager.SENSEVOICE_MODEL_DIR
 
         // Model files
-        private const val ENCODER_FILE = "encoder.int8.onnx"
-        private const val DECODER_FILE = "decoder.int8.onnx"
+        private const val MODEL_FILE = "model.int8.onnx"
         private const val TOKENS_FILE = "tokens.txt"
 
         // Punctuation conversion map (spoken words to symbols)
@@ -177,26 +180,24 @@ class VoiceInputManager(private val context: Context) {
             // Common nouns
             '个' to '個', '们' to '們', '儿' to '兒', '头' to '頭', '边' to '邊',
             '里' to '裡', '时' to '時', '会' to '會', '国' to '國', '车' to '車',
-            '门' to '門', '书' to '書', '电' to '電', '话' to '話', '钱' to '錢',
-            '东' to '東', '西' to '西', '南' to '南', '北' to '北', '风' to '風',
+            '门' to '門', '书' to '書', '电' to '電', '钱' to '錢',
+            '东' to '東', '风' to '風',
             '马' to '馬', '鸟' to '鳥', '鱼' to '魚', '龙' to '龍', '飞' to '飛',
 
             // Common adjectives
             '长' to '長', '广' to '廣', '乐' to '樂', '难' to '難', '双' to '雙',
-            '红' to '紅', '绿' to '綠', '蓝' to '藍', '黄' to '黃', '黑' to '黑',
-            '热' to '熱', '冷' to '冷', '远' to '遠', '近' to '近', '轻' to '輕',
-            '贵' to '貴', '简' to '簡', '复' to '復', '旧' to '舊', '新' to '新',
+            '红' to '紅', '绿' to '綠', '蓝' to '藍', '黄' to '黃',
+            '热' to '熱', '远' to '遠', '轻' to '輕',
+            '贵' to '貴', '简' to '簡', '复' to '復', '旧' to '舊',
 
             // Common radicals/components
             '讠' to '訁', '钅' to '釒', '饣' to '飠', '纟' to '糹', '贝' to '貝',
-            '车' to '車', '见' to '見', '门' to '門', '鸟' to '鳥', '马' to '馬',
 
             // Other common characters
-            '这' to '這', '那' to '那', '什' to '什', '么' to '麼', '没' to '沒',
-            '能' to '能', '该' to '該', '与' to '與', '为' to '為', '从' to '從',
-            '来' to '來', '去' to '去', '到' to '到', '在' to '在', '有' to '有',
-            '无' to '無', '不' to '不', '是' to '是', '都' to '都', '也' to '也',
-            '只' to '只', '后' to '後', '前' to '前', '里' to '裏', '面' to '面',
+            '这' to '這', '么' to '麼', '没' to '沒',
+            '该' to '該', '与' to '與', '为' to '為', '从' to '從',
+            '来' to '來',
+            '无' to '無', '后' to '後', '里' to '裏',
             '种' to '種', '样' to '樣', '经' to '經', '济' to '濟', '发' to '發',
             '现' to '現', '业' to '業', '产' to '產', '点' to '點', '机' to '機',
             '实' to '實', '际' to '際', '务' to '務', '系' to '係', '统' to '統',
@@ -207,7 +208,12 @@ class VoiceInputManager(private val context: Context) {
         )
     }
 
-    private var recognizer: OnlineRecognizer? = null
+    // SenseVoice offline recognizer
+    private var recognizer: OfflineRecognizer? = null
+
+    // Silero VAD
+    private var vad: Vad? = null
+
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
 
@@ -224,18 +230,14 @@ class VoiceInputManager(private val context: Context) {
     @Volatile
     private var lastRecognizedText: String = ""
 
+    // Accumulated text from all segments in current session
+    private var accumulatedText = StringBuilder()
+
     /**
      * Check if the model files are downloaded and available.
      */
     fun isModelAvailable(): Boolean {
-        val modelDir = File(context.filesDir, MODEL_DIR)
-        if (!modelDir.exists()) return false
-
-        val encoder = File(modelDir, ENCODER_FILE)
-        val decoder = File(modelDir, DECODER_FILE)
-        val tokens = File(modelDir, TOKENS_FILE)
-
-        return encoder.exists() && decoder.exists() && tokens.exists()
+        return ModelDownloadManager.isModelDownloaded(context)
     }
 
     /**
@@ -261,40 +263,45 @@ class VoiceInputManager(private val context: Context) {
 
         try {
             val modelDir = File(context.filesDir, MODEL_DIR).absolutePath
+            val vadModelPath = File(context.filesDir, ModelDownloadManager.VAD_MODEL_FILE).absolutePath
 
-            val featConfig = FeatureConfig(
+            // Initialize Silero VAD
+            val vadConfig = VadModelConfig(
+                sileroVad = SileroVadModelConfig(
+                    model = vadModelPath,
+                    threshold = 0.5f,
+                    minSilenceDuration = 0.5f,  // 500ms silence to detect endpoint
+                    minSpeechDuration = 0.25f,  // Minimum 250ms speech
+                    maxSpeechDuration = 30.0f   // Maximum 30s per segment
+                ),
                 sampleRate = SAMPLE_RATE,
-                featureDim = 80
+                numThreads = 1
             )
 
-            val modelConfig = OnlineModelConfig(
-                paraformer = OnlineParaformerModelConfig(
-                    encoder = "$modelDir/$ENCODER_FILE",
-                    decoder = "$modelDir/$DECODER_FILE"
-                ),
+            vad = Vad(vadConfig)
+
+            // Initialize SenseVoice recognizer
+            val senseVoiceConfig = OfflineSenseVoiceModelConfig(
+                model = "$modelDir/$MODEL_FILE",
+                language = "auto",  // Auto-detect language (zh/yue/en/ja/ko)
+                useInverseTextNormalization = false  // 2025-09-09 model doesn't support ITN
+            )
+
+            val modelConfig = OfflineModelConfig(
+                senseVoice = senseVoiceConfig,
                 tokens = "$modelDir/$TOKENS_FILE",
                 numThreads = 2,
                 debug = false
             )
 
-            val endpointConfig = EndpointConfig(
-                rule1 = EndpointRule(false, 2.4f, 0f),
-                rule2 = EndpointRule(true, 1.4f, 0f),
-                rule3 = EndpointRule(false, 0f, 20f)
-            )
-
-            val config = OnlineRecognizerConfig(
-                featConfig = featConfig,
+            val config = OfflineRecognizerConfig(
                 modelConfig = modelConfig,
-                endpointConfig = endpointConfig,
-                enableEndpoint = true,
-                decodingMethod = "greedy_search",
-                maxActivePaths = 4
+                decodingMethod = "greedy_search"
             )
 
-            recognizer = OnlineRecognizer(config = config)
+            recognizer = OfflineRecognizer(config = config)
             isInitialized = true
-            Log.i(TAG, "Recognizer initialized successfully")
+            Log.i(TAG, "SenseVoice recognizer initialized successfully")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize recognizer: ${e.message}", e)
@@ -304,7 +311,7 @@ class VoiceInputManager(private val context: Context) {
 
     /**
      * Set callback for recognition results.
-     * @param callback Called with (text, isFinal) - isFinal is true when endpoint detected
+     * @param callback Called with (text, isFinal) - isFinal is true when segment completed
      */
     fun setOnResultListener(callback: (String, Boolean) -> Unit) {
         onResultCallback = callback
@@ -358,10 +365,11 @@ class VoiceInputManager(private val context: Context) {
 
             isRecording = true
             lastRecognizedText = ""
+            accumulatedText.clear()
             audioRecord?.startRecording()
 
             recordingThread = thread(name = "VoiceInputThread") {
-                processAudio()
+                processAudioWithVad()
             }
 
             Log.i(TAG, "Recording started")
@@ -406,6 +414,8 @@ class VoiceInputManager(private val context: Context) {
         stopRecording()
         recognizer?.release()
         recognizer = null
+        vad?.release()
+        vad = null
         isInitialized = false
     }
 
@@ -448,15 +458,15 @@ class VoiceInputManager(private val context: Context) {
      */
     fun getLastRecognizedText(): String = lastRecognizedText
 
-    private fun processAudio() {
+    /**
+     * Process audio using VAD for endpoint detection and SenseVoice for transcription.
+     */
+    private fun processAudioWithVad() {
         val rec = recognizer ?: return
-        val stream = rec.createStream()
+        val vadInstance = vad ?: return
 
-        val interval = 0.1 // 100ms chunks
-        val bufferSize = (interval * SAMPLE_RATE).toInt()
+        val bufferSize = 512  // Process in small chunks for responsive VAD
         val buffer = ShortArray(bufferSize)
-
-        var lastText = ""
 
         try {
             while (isRecording) {
@@ -465,46 +475,79 @@ class VoiceInputManager(private val context: Context) {
                 if (ret > 0) {
                     // Convert 16-bit PCM to float
                     val samples = FloatArray(ret) { buffer[it] / 32768.0f }
-                    stream.acceptWaveform(samples, sampleRate = SAMPLE_RATE)
 
-                    while (rec.isReady(stream)) {
-                        rec.decode(stream)
-                    }
+                    // Feed samples to VAD
+                    vadInstance.acceptWaveform(samples)
 
-                    val isEndpoint = rec.isEndpoint(stream)
-                    var text = rec.getResult(stream).text
+                    // Check if VAD detected speech segments
+                    while (!vadInstance.isEmpty()) {
+                        val segment = vadInstance.front()
+                        vadInstance.pop()
 
-                    // Add tail padding for paraformer at endpoint
-                    if (isEndpoint) {
-                        val tailPaddings = FloatArray((0.8 * SAMPLE_RATE).toInt())
-                        stream.acceptWaveform(tailPaddings, sampleRate = SAMPLE_RATE)
-                        while (rec.isReady(stream)) {
+                        // Transcribe the speech segment using SenseVoice
+                        val segmentSamples = segment.samples
+                        if (segmentSamples.isNotEmpty()) {
+                            val stream = rec.createStream()
+                            stream.acceptWaveform(segmentSamples, SAMPLE_RATE)
                             rec.decode(stream)
+
+                            val result = rec.getResult(stream)
+                            var text = result.text.trim()
+
+                            if (text.isNotEmpty()) {
+                                // Process text: convert to traditional Chinese and replace punctuation
+                                text = processRecognizedText(text)
+
+                                // Append to accumulated text
+                                if (accumulatedText.isNotEmpty()) {
+                                    accumulatedText.append(" ")
+                                }
+                                accumulatedText.append(text)
+
+                                lastRecognizedText = accumulatedText.toString()
+                                onResultCallback?.invoke(lastRecognizedText, true)
+                            }
+
+                            stream.release()
                         }
-                        text = rec.getResult(stream).text
-                    }
-
-                    // Process text: convert to traditional Chinese and replace punctuation
-                    val processedText = processRecognizedText(text)
-
-                    // Only notify if text changed
-                    if (processedText != lastText && processedText.isNotEmpty()) {
-                        lastText = processedText
-                        lastRecognizedText = processedText
-                        onResultCallback?.invoke(processedText, isEndpoint)
-                    }
-
-                    if (isEndpoint) {
-                        rec.reset(stream)
-                        lastText = ""
                     }
                 }
             }
+
+            // Process any remaining audio in VAD buffer when stopping
+            vadInstance.flush()
+            while (!vadInstance.isEmpty()) {
+                val segment = vadInstance.front()
+                vadInstance.pop()
+
+                val segmentSamples = segment.samples
+                if (segmentSamples.isNotEmpty()) {
+                    val stream = rec.createStream()
+                    stream.acceptWaveform(segmentSamples, SAMPLE_RATE)
+                    rec.decode(stream)
+
+                    val result = rec.getResult(stream)
+                    var text = result.text.trim()
+
+                    if (text.isNotEmpty()) {
+                        text = processRecognizedText(text)
+
+                        if (accumulatedText.isNotEmpty()) {
+                            accumulatedText.append(" ")
+                        }
+                        accumulatedText.append(text)
+
+                        lastRecognizedText = accumulatedText.toString()
+                        onResultCallback?.invoke(lastRecognizedText, true)
+                    }
+
+                    stream.release()
+                }
+            }
+
         } catch (e: Exception) {
             Log.e(TAG, "Error processing audio: ${e.message}", e)
             onErrorCallback?.invoke("Error processing audio: ${e.message}")
-        } finally {
-            stream.release()
         }
     }
 }
