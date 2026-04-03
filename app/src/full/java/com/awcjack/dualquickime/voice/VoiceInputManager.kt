@@ -460,6 +460,14 @@ class VoiceInputManager(private val context: Context) {
     fun getLastRecognizedText(): String = lastRecognizedText
 
     /**
+     * Clear the accumulated text buffer (for reset functionality).
+     */
+    fun clearAccumulatedText() {
+        accumulatedText.clear()
+        lastRecognizedText = ""
+    }
+
+    /**
      * Process audio using VAD for endpoint detection and SenseVoice for transcription.
      */
     private fun processAudioWithVad() {

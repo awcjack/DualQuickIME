@@ -520,6 +520,7 @@ class DualQuickInputMethodService : InputMethodService() {
      */
     private fun clearVoiceTranscript() {
         voiceInputView?.clearTranscript()
+        voiceInputManager?.clearAccumulatedText()
     }
 
     /**

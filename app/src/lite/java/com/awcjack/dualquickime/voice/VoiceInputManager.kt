@@ -21,4 +21,5 @@ class VoiceInputManager(private val context: Context) {
     fun isRecording(): Boolean = false
     fun release() {}
     fun getLastRecognizedText(): String = ""
+    fun clearAccumulatedText() {}
 }
