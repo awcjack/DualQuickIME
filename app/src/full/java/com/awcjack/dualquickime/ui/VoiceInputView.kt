@@ -18,6 +18,9 @@ import com.awcjack.dualquickime.theme.ThemeManager
 
 /**
  * Voice input overlay UI showing recording status and transcription results.
+ * Has two buttons:
+ * - Reset/Cancel: Clears pending text (Reset) or closes voice input (Cancel)
+ * - Commit: Commits the recognized text to the input field
  */
 class VoiceInputView @JvmOverloads constructor(
     context: Context,
@@ -43,11 +46,19 @@ class VoiceInputView @JvmOverloads constructor(
     private var transcriptText: TextView? = null
     private var progressBar: ProgressBar? = null
     private var progressText: TextView? = null
-    private var cancelButton: TextView? = null
+    private var buttonContainer: LinearLayout? = null
+    private var resetCancelButton: TextView? = null
+    private var commitButton: TextView? = null
 
     private var pulseAnimator: ObjectAnimator? = null
 
+    // Current transcript text
+    private var currentTranscript: String = ""
+
+    // Callbacks
     private var onCancelCallback: (() -> Unit)? = null
+    private var onResetCallback: (() -> Unit)? = null
+    private var onCommitCallback: ((String) -> Unit)? = null
 
     init {
         loadTheme()
@@ -147,28 +158,75 @@ class VoiceInputView @JvmOverloads constructor(
         }
         contentContainer?.addView(transcriptText)
 
-        // Cancel button
-        cancelButton = TextView(context).apply {
+        // Button container (horizontal layout for two buttons)
+        buttonContainer = LinearLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                dpToPx(44)
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 topMargin = dpToPx(24)
             }
-            setPadding(dpToPx(32), 0, dpToPx(32), 0)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        // Reset/Cancel button (left)
+        resetCancelButton = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                dpToPx(44),
+                1f
+            ).apply {
+                marginEnd = dpToPx(8)
+            }
+            setPadding(dpToPx(16), 0, dpToPx(16), 0)
             gravity = Gravity.CENTER
             textSize = 16f
             text = context.getString(R.string.voice_cancel)
-            setTextColor(colors.accentColor)
+            setTextColor(colors.keyTextPrimary)
             background = createButtonBackground()
 
             setOnClickListener {
-                onCancelCallback?.invoke()
+                if (currentTranscript.isNotEmpty()) {
+                    // Reset: clear the pending text
+                    onResetCallback?.invoke()
+                } else {
+                    // Cancel: close voice input
+                    onCancelCallback?.invoke()
+                }
             }
         }
-        contentContainer?.addView(cancelButton)
+        buttonContainer?.addView(resetCancelButton)
 
+        // Commit button (right)
+        commitButton = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                dpToPx(44),
+                1f
+            ).apply {
+                marginStart = dpToPx(8)
+            }
+            setPadding(dpToPx(16), 0, dpToPx(16), 0)
+            gravity = Gravity.CENTER
+            textSize = 16f
+            text = context.getString(R.string.voice_commit)
+            setTextColor(colors.accentColor)
+            background = createAccentButtonBackground()
+
+            setOnClickListener {
+                if (currentTranscript.isNotEmpty()) {
+                    onCommitCallback?.invoke(currentTranscript)
+                }
+            }
+        }
+        buttonContainer?.addView(commitButton)
+
+        contentContainer?.addView(buttonContainer)
         addView(contentContainer)
+
+        // Initial button state
+        updateButtonStates()
     }
 
     private fun createButtonBackground(): GradientDrawable {
@@ -180,8 +238,41 @@ class VoiceInputView @JvmOverloads constructor(
         }
     }
 
+    private fun createAccentButtonBackground(): GradientDrawable {
+        val bgColor = colors.keyBackground
+        val strokeColor = colors.accentColor
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(22).toFloat()
+            setColor(bgColor)
+            setStroke(dpToPx(2), strokeColor)
+        }
+    }
+
+    private fun updateButtonStates() {
+        if (currentTranscript.isNotEmpty()) {
+            // Has pending text: show "Reset" and enable "Commit"
+            resetCancelButton?.text = context.getString(R.string.voice_reset)
+            commitButton?.alpha = 1.0f
+            commitButton?.isEnabled = true
+        } else {
+            // No pending text: show "Cancel" and disable "Commit"
+            resetCancelButton?.text = context.getString(R.string.voice_cancel)
+            commitButton?.alpha = 0.5f
+            commitButton?.isEnabled = false
+        }
+    }
+
     fun setOnCancelListener(callback: () -> Unit) {
         onCancelCallback = callback
+    }
+
+    fun setOnResetListener(callback: () -> Unit) {
+        onResetCallback = callback
+    }
+
+    fun setOnCommitListener(callback: (String) -> Unit) {
+        onCommitCallback = callback
     }
 
     fun setState(state: State) {
@@ -191,6 +282,7 @@ class VoiceInputView @JvmOverloads constructor(
             State.HIDDEN -> {
                 visibility = View.GONE
                 stopPulseAnimation()
+                currentTranscript = ""
             }
             State.DOWNLOADING -> {
                 visibility = View.VISIBLE
@@ -199,6 +291,10 @@ class VoiceInputView @JvmOverloads constructor(
                 progressBar?.visibility = View.VISIBLE
                 progressText?.visibility = View.VISIBLE
                 transcriptText?.visibility = View.GONE
+                buttonContainer?.visibility = View.VISIBLE
+                // During download, only show Cancel button
+                resetCancelButton?.text = context.getString(R.string.voice_cancel)
+                commitButton?.visibility = View.GONE
                 stopPulseAnimation()
             }
             State.LISTENING -> {
@@ -209,6 +305,10 @@ class VoiceInputView @JvmOverloads constructor(
                 progressText?.visibility = View.GONE
                 transcriptText?.visibility = View.VISIBLE
                 transcriptText?.text = ""
+                buttonContainer?.visibility = View.VISIBLE
+                commitButton?.visibility = View.VISIBLE
+                currentTranscript = ""
+                updateButtonStates()
                 startPulseAnimation()
             }
             State.PROCESSING -> {
@@ -222,14 +322,27 @@ class VoiceInputView @JvmOverloads constructor(
                 statusIcon?.text = "❌"
                 progressBar?.visibility = View.GONE
                 progressText?.visibility = View.GONE
+                buttonContainer?.visibility = View.VISIBLE
+                resetCancelButton?.text = context.getString(R.string.voice_cancel)
+                commitButton?.visibility = View.GONE
                 stopPulseAnimation()
             }
         }
     }
 
     fun setTranscript(text: String) {
+        currentTranscript = text
         transcriptText?.text = text
         transcriptText?.visibility = if (text.isNotEmpty()) View.VISIBLE else View.GONE
+        updateButtonStates()
+    }
+
+    fun getTranscript(): String = currentTranscript
+
+    fun clearTranscript() {
+        currentTranscript = ""
+        transcriptText?.text = ""
+        updateButtonStates()
     }
 
     fun setDownloadProgress(progress: Int, statusMessage: String) {
