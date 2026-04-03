@@ -2,6 +2,8 @@ package com.awcjack.dualquickime.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -23,8 +25,16 @@ object RecentCandidateManager {
     /** Maximum number of distinct codes to track. */
     const val MAX_CODES = 500
 
-    // Cached data: code -> ordered list of recent characters (most recent first)
-    private var cachedData: MutableMap<String, MutableList<String>>? = null
+    /** Delay in milliseconds before flushing pending writes to disk. */
+    private const val SAVE_DELAY_MS = 2000L
+
+    // Cached data using LinkedHashMap for insertion-order (LRU eviction)
+    private var cachedData: LinkedHashMap<String, MutableList<String>>? = null
+
+    // Handler for coalescing writes
+    private val saveHandler = Handler(Looper.getMainLooper())
+    private var pendingSave = false
+    private var pendingContext: Context? = null
 
     /**
      * Record that a candidate was selected for a given input code.
@@ -46,15 +56,18 @@ object RecentCandidateManager {
             recentList.removeAt(recentList.lastIndex)
         }
 
-        // Enforce total codes limit (evict least recently updated codes)
-        if (data.size > MAX_CODES) {
-            // Remove the oldest entries (keys added earliest that aren't this one)
-            val keysToRemove = data.keys.toList().dropLast(MAX_CODES)
-            keysToRemove.forEach { data.remove(it) }
+        // Move the accessed code to end of LinkedHashMap (most recently used)
+        data.remove(code)
+        data[code] = recentList
+
+        // Enforce total codes limit by removing oldest entries (first in LinkedHashMap)
+        while (data.size > MAX_CODES) {
+            val oldestKey = data.keys.first()
+            data.remove(oldestKey)
         }
 
-        saveData(context, data)
         cachedData = data
+        scheduleSave(context)
     }
 
     /**
@@ -102,8 +115,9 @@ object RecentCandidateManager {
      * Clear all recent candidate data.
      */
     fun clearAll(context: Context) {
-        saveData(context, mutableMapOf())
-        cachedData = mutableMapOf()
+        cancelPendingSave()
+        saveData(context, linkedMapOf())
+        cachedData = linkedMapOf()
     }
 
     /**
@@ -113,22 +127,47 @@ object RecentCandidateManager {
         cachedData = null
     }
 
+    /**
+     * Schedule a delayed save to coalesce multiple writes.
+     */
+    private fun scheduleSave(context: Context) {
+        pendingContext = context.applicationContext
+        if (!pendingSave) {
+            pendingSave = true
+            saveHandler.postDelayed({
+                pendingSave = false
+                val ctx = pendingContext ?: return@postDelayed
+                cachedData?.let { saveData(ctx, it) }
+                pendingContext = null
+            }, SAVE_DELAY_MS)
+        }
+    }
+
+    /**
+     * Cancel any pending save operation.
+     */
+    private fun cancelPendingSave() {
+        saveHandler.removeCallbacksAndMessages(null)
+        pendingSave = false
+        pendingContext = null
+    }
+
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
-    private fun loadData(context: Context): MutableMap<String, MutableList<String>> {
+    private fun loadData(context: Context): LinkedHashMap<String, MutableList<String>> {
         if (cachedData != null) {
             return cachedData!!
         }
 
         val prefs = getPrefs(context)
         val jsonString = prefs.getString(KEY_RECENT_DATA, null)
-            ?: return mutableMapOf<String, MutableList<String>>().also { cachedData = it }
+            ?: return linkedMapOf<String, MutableList<String>>().also { cachedData = it }
 
         return try {
             val jsonObj = JSONObject(jsonString)
-            val result = mutableMapOf<String, MutableList<String>>()
+            val result = linkedMapOf<String, MutableList<String>>()
             val keys = jsonObj.keys()
             while (keys.hasNext()) {
                 val code = keys.next()
@@ -142,7 +181,7 @@ object RecentCandidateManager {
             cachedData = result
             result
         } catch (e: Exception) {
-            mutableMapOf<String, MutableList<String>>().also { cachedData = it }
+            linkedMapOf<String, MutableList<String>>().also { cachedData = it }
         }
     }
 
