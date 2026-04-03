@@ -5,6 +5,35 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-03
+
+### Added
+- **Full-width Default Punctuation**: Main keyboard comma and period now output full-width `，` and `。` by default
+  - Half-width `,` and `.` remain accessible on the symbol keyboard
+- **View-All Candidates Grid**: Tap page indicator to open full-keyboard-space candidate grid
+  - 7×5 grid layout with internal pagination and ◀/▶ navigation
+  - ABC button to return to normal keyboard
+  - Works with both composition candidates and associated phrases
+- **Continuous Backspace Deletion**: Hold backspace to repeatedly delete characters
+  - 400ms initial delay, 50ms repeat interval
+  - Consistent behavior across letter, emoji, and clipboard keyboards
+- **Recent Candidates Prioritization**: Frequently selected characters appear first
+  - Toggle in Settings to enable/disable
+  - Per-code usage tracking with LRU eviction (20 chars/code, 500 codes max)
+  - Clear history option in Settings
+- **Multi-Character Composition Buffer**: Removed 2-character auto-commit limit
+  - Type multiple keys continuously; first 2 are used for character lookup
+  - After selecting a candidate, remaining keys stay in the buffer for the next lookup
+- **Full-width Punctuation on Symbol Keyboard**: Full-width `！` and `？` added
+  - Placed in the second row of symbol page 1 for optimal layout
+
+### Changed
+- Default punctuation switched from half-width to full-width for Chinese input conventions
+
+### Fixed
+- Candidate grid view not updating after selecting candidate with remaining composition keys
+- Candidate grid view last page expanding to fill entire screen instead of wrapping content
+
 ## [1.3.0] - 2026-04-03
 
 ### Added

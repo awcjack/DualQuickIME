@@ -19,7 +19,10 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 
 ### ⌨️ 速成 (Quick/Simplex) Input
 - **Two-key input** - type first and last Cangjie radicals to find characters
+- **Multi-key buffer** - type continuously; remaining keys carry over after selection
 - **Tap-to-select** - candidates appear instantly, tap to commit
+- **View-all grid** - tap page indicator for full-screen 7×5 candidate grid
+- **Recent candidates** - frequently used characters appear first (toggle in Settings)
 - **Space pagination** - press Space to navigate through candidate pages
 - **OpenVanilla compatible** - same character ordering as macOS
 
@@ -47,9 +50,11 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 
 ### 🎨 Modern Design
 - **Theme support** - System default, Light mode, Dark mode
+- **Full-width punctuation** - `，` `。` `！` `？` default for Chinese input
 - **5 symbol pages** - punctuation, brackets, currency, arrows, shapes
 - **Full emoji keyboard** - 8 categories of emojis
 - **Caps lock** - double-tap shift for continuous uppercase
+- **Hold to delete** - continuous backspace deletion on key hold
 
 ## How It Works
 
