@@ -12,6 +12,8 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
+import com.awcjack.dualquickime.data.AssociatedPhrasesParser
+import com.awcjack.dualquickime.data.AssociatedPhrasesTable
 import com.awcjack.dualquickime.data.CinParser
 import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.CompositionState
@@ -38,9 +40,16 @@ import kotlin.concurrent.thread
 class DualQuickInputMethodService : InputMethodService() {
 
     private lateinit var simplexTable: SimplexTable
+    private lateinit var associatedPhrasesTable: AssociatedPhrasesTable
     private var composition = CompositionState.EMPTY
 
     private var keyboardView: KeyboardView? = null
+
+    // Associated phrases mode: when true, candidate bar shows associated phrases
+    private var isAssociatedPhrasesMode = false
+    private var associatedPhrases = listOf<String>()
+    private var associatedPhrasesPage = 0
+    private var lastCommittedChar = ""
 
     // Track current keyboard mode
     private var isSymbolMode = false
@@ -68,6 +77,8 @@ class DualQuickInputMethodService : InputMethodService() {
         super.onCreate()
         // Load simplex data based on user setting (extended by default)
         loadSimplexTable()
+        // Load associated phrases table
+        loadAssociatedPhrasesTable()
 
         // Register clipboard listener to capture system clipboard changes
         clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -94,6 +105,18 @@ class DualQuickInputMethodService : InputMethodService() {
         loadSimplexTable()
         // Clear current composition since character mappings may have changed
         clearComposition()
+    }
+
+    /**
+     * Load the associated phrases table from assets.
+     */
+    private fun loadAssociatedPhrasesTable() {
+        try {
+            associatedPhrasesTable = AssociatedPhrasesParser().parse(assets.open("associated-phrases.cin"))
+        } catch (e: Exception) {
+            // Fallback to empty table if loading fails
+            associatedPhrasesTable = AssociatedPhrasesTable.EMPTY
+        }
     }
 
     /**
@@ -125,9 +148,14 @@ class DualQuickInputMethodService : InputMethodService() {
                 isSymbolMode = symbolMode
             }
             setOnCandidateSelectedListener { candidate ->
-                // User TAPPED a Chinese candidate pill - commit Chinese
-                commitChinese(candidate)
-                clearComposition()
+                if (isAssociatedPhrasesMode) {
+                    // User TAPPED an associated phrase - commit it
+                    handleAssociatedPhraseSelected(candidate)
+                } else {
+                    // User TAPPED a Chinese candidate pill - commit Chinese
+                    commitChinese(candidate)
+                    clearComposition()
+                }
             }
             setOnEnglishSelectedListener { _ ->
                 // User TAPPED the English pill - commit as English with preserved case
@@ -179,6 +207,8 @@ class DualQuickInputMethodService : InputMethodService() {
         keyboardView?.refreshTheme()
         // Clear composition when starting new input
         clearComposition()
+        // Clear associated phrases mode
+        clearAssociatedPhrases()
         // Reset to letter mode
         isSymbolMode = false
         keyboardView?.setLetterMode()
@@ -199,6 +229,11 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleLetter(char: Char) {
+        // Exit associated phrases mode when typing
+        if (isAssociatedPhrasesMode) {
+            clearAssociatedPhrases()
+        }
+
         val isUpperCase = char.isUpperCase()
         val lowerChar = char.lowercaseChar()
         val newRawKeys = composition.rawKeys + lowerChar
@@ -256,7 +291,10 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleSpace() {
-        if (composition.hasCandidates) {
+        if (isAssociatedPhrasesMode) {
+            // Navigate to next page of associated phrases
+            nextAssociatedPhrasesPage()
+        } else if (composition.hasCandidates) {
             // NEXT PAGE - do NOT commit
             composition = composition.nextPage()
             updateCandidateView()
@@ -271,6 +309,14 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleBackspace() {
+        // Exit associated phrases mode on backspace
+        if (isAssociatedPhrasesMode) {
+            clearAssociatedPhrases()
+            // Also delete the character in text field
+            currentInputConnection?.deleteSurroundingText(1, 0)
+            return
+        }
+
         if (composition.rawKeys.isNotEmpty()) {
             val newKeys = composition.rawKeys.dropLast(1)
             // Also remove the case tracking for the deleted letter
@@ -289,6 +335,11 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleEnter() {
+        // Exit associated phrases mode on enter
+        if (isAssociatedPhrasesMode) {
+            clearAssociatedPhrases()
+        }
+
         if (composition.rawKeys.isNotEmpty()) {
             // Commit composition as English
             commitEnglish(composition.rawKeys)
@@ -300,6 +351,8 @@ class DualQuickInputMethodService : InputMethodService() {
 
     private fun commitChinese(text: String) {
         commitText(text)
+        // Trigger associated phrases lookup based on the last character committed
+        showAssociatedPhrases(text.lastOrNull()?.toString() ?: "")
     }
 
     private fun commitEnglish(text: String) {
@@ -320,6 +373,87 @@ class DualQuickInputMethodService : InputMethodService() {
 
     private fun commitText(text: String) {
         currentInputConnection?.commitText(text, 1)
+    }
+
+    // ==================== ASSOCIATED PHRASES ====================
+
+    /**
+     * Show associated phrases for the given character.
+     * This is called after committing a Chinese character.
+     */
+    private fun showAssociatedPhrases(character: String) {
+        if (character.isEmpty()) {
+            clearAssociatedPhrases()
+            return
+        }
+
+        val phrases = associatedPhrasesTable.lookup(character)
+        if (phrases.isEmpty()) {
+            clearAssociatedPhrases()
+            return
+        }
+
+        // Enter associated phrases mode
+        isAssociatedPhrasesMode = true
+        associatedPhrases = phrases
+        associatedPhrasesPage = 0
+        lastCommittedChar = character
+
+        updateAssociatedPhrasesView()
+    }
+
+    /**
+     * Clear associated phrases mode and return to normal input.
+     */
+    private fun clearAssociatedPhrases() {
+        isAssociatedPhrasesMode = false
+        associatedPhrases = emptyList()
+        associatedPhrasesPage = 0
+        lastCommittedChar = ""
+        keyboardView?.clearCandidates()
+    }
+
+    /**
+     * Update the candidate bar to show associated phrases.
+     */
+    private fun updateAssociatedPhrasesView() {
+        val pageSize = ThemeManager.getCandidatesPerPage(this)
+        val totalPages = (associatedPhrases.size + pageSize - 1) / pageSize
+        val startIndex = associatedPhrasesPage * pageSize
+        val endIndex = minOf(startIndex + pageSize, associatedPhrases.size)
+        val currentPagePhrases = associatedPhrases.subList(startIndex, endIndex)
+
+        keyboardView?.let { view ->
+            // Clear composition display since we're showing associated phrases
+            view.setComposition("", "")
+
+            // Show associated phrases in candidate bar
+            view.setCandidates(
+                candidates = currentPagePhrases,
+                currentPage = associatedPhrasesPage + 1,
+                totalPages = totalPages
+            )
+        }
+    }
+
+    /**
+     * Handle associated phrase selection.
+     */
+    private fun handleAssociatedPhraseSelected(phrase: String) {
+        commitText(phrase)
+        // Show associated phrases for the last character of the selected phrase
+        val lastChar = phrase.lastOrNull()?.toString() ?: ""
+        showAssociatedPhrases(lastChar)
+    }
+
+    /**
+     * Navigate to the next page of associated phrases.
+     */
+    private fun nextAssociatedPhrasesPage() {
+        val pageSize = ThemeManager.getCandidatesPerPage(this)
+        val totalPages = (associatedPhrases.size + pageSize - 1) / pageSize
+        associatedPhrasesPage = (associatedPhrasesPage + 1) % totalPages
+        updateAssociatedPhrasesView()
     }
 
     private fun updateComposition(rawKeys: String) {
