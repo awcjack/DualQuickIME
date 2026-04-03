@@ -12,6 +12,9 @@ local.properties
 *.apk
 *.aab
 
+# Large library files (downloaded during CI/local setup)
+app/libs/*.aar
+
 # Keystore (NEVER commit these)
 *.jks
 *.keystore

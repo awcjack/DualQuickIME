@@ -98,6 +98,7 @@ dependencies {
     implementation("androidx.cardview:cardview:1.0.0")
 
     // Sherpa-ONNX for offline voice recognition (Cantonese/Chinese/English)
+    // Using official k2-fsa AAR which includes VAD support
     // Only included in the full flavor
-    "fullImplementation"("com.bihe0832.android:lib-sherpa-onnx:8.4.2")
+    "fullImplementation"(files("libs/sherpa-onnx-1.12.34.aar"))
 }

@@ -32,6 +32,13 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Download sherpa-onnx AAR
+        run: |
+          mkdir -p app/libs
+          curl -L -o app/libs/sherpa-onnx-1.12.34.aar \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.34/sherpa-onnx-1.12.34.aar"
+          ls -la app/libs/
+
       - name: Clean Gradle caches
         run: |
           rm -rf ~/.gradle/caches/modules-2/files-2.1/
@@ -364,6 +371,13 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+
+      - name: Download sherpa-onnx AAR
+        run: |
+          mkdir -p app/libs
+          curl -L -o app/libs/sherpa-onnx-1.12.34.aar \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.34/sherpa-onnx-1.12.34.aar"
+          ls -la app/libs/
 
       - name: Clean Gradle caches
         run: |
