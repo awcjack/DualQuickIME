@@ -6,16 +6,18 @@ import com.awcjack.dualquickime.util.KeyMapping
  * Tracks the current composition state during input.
  * Supports pagination for candidate selection.
  *
- * @property rawKeys The English letters typed (e.g., "qr")
+ * @property rawKeys The English letters typed (e.g., "qrofvd")
  * @property candidates All matching Chinese characters (ordered by frequency)
  * @property currentPage Current page index (0-based)
  * @property pageSize Number of candidates per page (default: 9)
+ * @property activeKeyLength How many chars from the start of rawKeys are used for the current candidate lookup (1 or 2)
  */
 data class CompositionState(
     val rawKeys: String = "",
     val candidates: List<String> = emptyList(),
     val currentPage: Int = 0,
-    val pageSize: Int = 9
+    val pageSize: Int = 9,
+    val activeKeyLength: Int = 0
 ) {
     /**
      * The radical display string (e.g., "手口" for "qr")
