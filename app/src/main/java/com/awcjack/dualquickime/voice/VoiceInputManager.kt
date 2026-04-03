@@ -85,13 +85,13 @@ class VoiceInputManager(private val context: Context) {
         try {
             val modelDir = File(context.filesDir, MODEL_DIR).absolutePath
 
-            val featConfig = getFeatureConfig(
+            val featConfig = FeatureConfig(
                 sampleRate = SAMPLE_RATE,
                 featureDim = 80
             )
 
-            val modelConfig = getOnlineModelConfig(
-                paraformer = getOnlineParaformerModelConfig(
+            val modelConfig = OnlineModelConfig(
+                paraformer = OnlineParaformerModelConfig(
                     encoder = "$modelDir/$ENCODER_FILE",
                     decoder = "$modelDir/$DECODER_FILE"
                 ),
@@ -100,13 +100,13 @@ class VoiceInputManager(private val context: Context) {
                 debug = false
             )
 
-            val endpointConfig = getEndpointConfig(
-                rule1 = getEndpointRule(false, 2.4f, 0f),
-                rule2 = getEndpointRule(true, 1.4f, 0f),
-                rule3 = getEndpointRule(false, 0f, 20f)
+            val endpointConfig = EndpointConfig(
+                rule1 = EndpointRule(false, 2.4f, 0f),
+                rule2 = EndpointRule(true, 1.4f, 0f),
+                rule3 = EndpointRule(false, 0f, 20f)
             )
 
-            val config = getOnlineRecognizerConfig(
+            val config = OnlineRecognizerConfig(
                 featConfig = featConfig,
                 modelConfig = modelConfig,
                 endpointConfig = endpointConfig,

@@ -172,10 +172,11 @@ class VoiceInputView @JvmOverloads constructor(
     }
 
     private fun createButtonBackground(): GradientDrawable {
+        val bgColor = colors.keyBackground
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dpToPx(22).toFloat()
-            setColor(colors.keyBackground)
+            setColor(bgColor)
         }
     }
 
