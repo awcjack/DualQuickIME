@@ -96,12 +96,13 @@ class CandidateGridView @JvmOverloads constructor(
     }
 
     private fun createGridArea(): LinearLayout {
-        gridContainer = LinearLayout(context).apply {
+        val container = LinearLayout(context).apply {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
             orientation = VERTICAL
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             setPadding(dpToPx(2), dpToPx(4), dpToPx(2), dpToPx(4))
         }
+        gridContainer = container
 
         val candidates = currentPageCandidates
         var candidateIndex = 0
@@ -124,10 +125,10 @@ class CandidateGridView @JvmOverloads constructor(
                 }
             }
 
-            gridContainer?.addView(rowLayout)
+            container.addView(rowLayout)
         }
 
-        return gridContainer!!
+        return container
     }
 
     private fun createCandidateCell(candidate: String): TextView {
