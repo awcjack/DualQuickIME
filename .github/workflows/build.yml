@@ -42,11 +42,17 @@ jobs:
       - name: Clean and Build Debug APKs (all flavors)
         run: ./gradlew clean assembleDebug --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Debug APKs (all flavors and ABIs)
+      - name: Upload Full Debug APKs
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/*/debug/*.apk
+          name: app-full-debug
+          path: app/build/outputs/apk/full/debug/*.apk
+
+      - name: Upload Lite Debug APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-debug
+          path: app/build/outputs/apk/lite/debug/*.apk
 
       # Signed Release Build (only if secrets are configured)
       - name: Decode Keystore
@@ -77,14 +83,23 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: ./gradlew assembleRelease --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Signed Release APKs (all flavors and ABIs)
+      - name: Upload Full Release APKs (signed)
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-signed
-          path: app/build/outputs/apk/*/release/*.apk
+          name: app-full-release
+          path: app/build/outputs/apk/full/release/*.apk
+
+      - name: Upload Lite Release APKs (signed)
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-release
+          path: app/build/outputs/apk/lite/release/*.apk
 
       # Unsigned Release Build (fallback if no secrets)
       - name: Build Unsigned Release APK
@@ -93,14 +108,23 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: ./gradlew assembleRelease --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Unsigned Release APKs (all flavors and ABIs)
+      - name: Upload Full Release APKs (unsigned)
         if: ${{ env.KEYSTORE_BASE64 == '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-unsigned
-          path: app/build/outputs/apk/*/release/*.apk
+          name: app-full-release-unsigned
+          path: app/build/outputs/apk/full/release/*.apk
+
+      - name: Upload Lite Release APKs (unsigned)
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-release-unsigned
+          path: app/build/outputs/apk/lite/release/*.apk
 
       # Create GitHub Release (only on version tags)
       - name: Rename APKs for release
