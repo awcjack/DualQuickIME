@@ -33,6 +33,12 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 - **Cantonese characters** - 嘢, 嚟, 喺, 唔, 咗, 嘅, 噉, 佢, 哋, 啲, 乜, 冇, 睇, 攞, 嬲
 - **Standard option** - switch to standard 13K character set in Settings
 
+### 💬 Associated Phrases
+- **Word suggestions** - after committing a character, shows related phrases
+- **50,000+ entries** - based on OpenVanilla's associated-phrases database
+- **Chain input** - selecting a phrase shows suggestions for its last character
+- **Space pagination** - navigate through phrase pages with Space key
+
 ### 🎤 Offline Voice Input
 - **Fully offline** - No internet required after model download
 - **Trilingual** - Cantonese, Mandarin Chinese, and English
@@ -115,9 +121,16 @@ Result: 我love你
 ```bash
 git clone https://github.com/awcjack/DualQuickIME.git
 cd DualQuickIME
-./gradlew assembleDebug
 
-# APK location: app/build/outputs/apk/debug/app-debug.apk
+# Full version (with voice input)
+./gradlew assembleFullDebug
+
+# Lite version (no voice input, smaller APK)
+./gradlew assembleLiteDebug
+
+# APK locations:
+# Full: app/build/outputs/apk/full/debug/
+# Lite: app/build/outputs/apk/lite/debug/
 ```
 
 ## Data Source
@@ -143,5 +156,7 @@ MIT License - see [LICENSE](LICENSE)
 ## Credits
 
 - Character data: [OpenVanilla Project](https://github.com/openvanilla/openvanilla)
+- Associated phrases: [OpenVanilla Project](https://github.com/openvanilla/openvanilla)
 - Voice recognition: [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)
+- Chinese conversion: [OpenCC](https://github.com/BYVoid/OpenCC)
 - 速成/Quick input method: Based on Cangjie by Chu Bong-Foo (朱邦復)
