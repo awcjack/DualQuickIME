@@ -267,11 +267,12 @@ class VoiceInputManager(private val context: Context) {
 
             // Initialize Silero VAD
             val vadConfig = VadModelConfig(
-                sileroVad = SileroVadModelConfig(
+                sileroVadModelConfig = SileroVadModelConfig(
                     model = vadModelPath,
                     threshold = 0.5f,
                     minSilenceDuration = 0.5f,  // 500ms silence to detect endpoint
                     minSpeechDuration = 0.25f,  // Minimum 250ms speech
+                    windowSize = 512,
                     maxSpeechDuration = 30.0f   // Maximum 30s per segment
                 ),
                 sampleRate = SAMPLE_RATE,
@@ -480,7 +481,7 @@ class VoiceInputManager(private val context: Context) {
                     vadInstance.acceptWaveform(samples)
 
                     // Check if VAD detected speech segments
-                    while (!vadInstance.isEmpty()) {
+                    while (!vadInstance.empty()) {
                         val segment = vadInstance.front()
                         vadInstance.pop()
 
@@ -516,7 +517,7 @@ class VoiceInputManager(private val context: Context) {
 
             // Process any remaining audio in VAD buffer when stopping
             vadInstance.flush()
-            while (!vadInstance.isEmpty()) {
+            while (!vadInstance.empty()) {
                 val segment = vadInstance.front()
                 vadInstance.pop()
 
