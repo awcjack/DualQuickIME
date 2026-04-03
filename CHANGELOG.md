@@ -5,6 +5,15 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-03
+
+### Added
+- **Associated Phrases**: Word suggestions based on last committed character
+  - After committing a Chinese character, shows related phrases/words
+  - Based on OpenVanilla's associated-phrases.cin database (~50,000 entries)
+  - Press space to navigate pages, tap to select and continue chain
+  - Automatically chains: selecting a phrase shows suggestions for its last character
+
 ## [1.2.0] - 2026-04-03
 
 ### Added
