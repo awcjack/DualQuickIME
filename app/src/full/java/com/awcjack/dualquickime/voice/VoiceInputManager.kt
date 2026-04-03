@@ -9,6 +9,7 @@ import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.k2fsa.sherpa.onnx.*
+import io.github.laisuk.opencc.OpenCC
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -166,46 +167,6 @@ class VoiceInputManager(private val context: Context) {
             "new line" to "\n",
             "newline" to "\n"
         )
-
-        // Simplified to Traditional Chinese conversion map (common characters)
-        // This covers the most frequently used characters that differ between S and T
-        private val SIMPLIFIED_TO_TRADITIONAL = mapOf(
-            // Common verbs
-            '说' to '說', '话' to '話', '请' to '請', '让' to '讓', '给' to '給',
-            '对' to '對', '过' to '過', '进' to '進', '还' to '還', '着' to '著',
-            '动' to '動', '开' to '開', '关' to '關', '问' to '問', '听' to '聽',
-            '见' to '見', '写' to '寫', '读' to '讀', '学' to '學', '认' to '認',
-            '识' to '識', '记' to '記', '买' to '買', '卖' to '賣', '办' to '辦',
-
-            // Common nouns
-            '个' to '個', '们' to '們', '儿' to '兒', '头' to '頭', '边' to '邊',
-            '里' to '裡', '时' to '時', '会' to '會', '国' to '國', '车' to '車',
-            '门' to '門', '书' to '書', '电' to '電', '钱' to '錢',
-            '东' to '東', '风' to '風',
-            '马' to '馬', '鸟' to '鳥', '鱼' to '魚', '龙' to '龍', '飞' to '飛',
-
-            // Common adjectives
-            '长' to '長', '广' to '廣', '乐' to '樂', '难' to '難', '双' to '雙',
-            '红' to '紅', '绿' to '綠', '蓝' to '藍', '黄' to '黃',
-            '热' to '熱', '远' to '遠', '轻' to '輕',
-            '贵' to '貴', '简' to '簡', '复' to '復', '旧' to '舊',
-
-            // Common radicals/components
-            '讠' to '訁', '钅' to '釒', '饣' to '飠', '纟' to '糹', '贝' to '貝',
-
-            // Other common characters
-            '这' to '這', '么' to '麼', '没' to '沒',
-            '该' to '該', '与' to '與', '为' to '為', '从' to '從',
-            '来' to '來',
-            '无' to '無', '后' to '後', '里' to '裏',
-            '种' to '種', '样' to '樣', '经' to '經', '济' to '濟', '发' to '發',
-            '现' to '現', '业' to '業', '产' to '產', '点' to '點', '机' to '機',
-            '实' to '實', '际' to '際', '务' to '務', '系' to '係', '统' to '統',
-            '总' to '總', '数' to '數', '设' to '設', '计' to '計', '术' to '術',
-            '艺' to '藝', '医' to '醫', '药' to '藥', '体' to '體', '运' to '運',
-            '场' to '場', '团' to '團', '组' to '組', '织' to '織', '军' to '軍',
-            '战' to '戰', '将' to '將', '华' to '華', '区' to '區', '县' to '縣'
-        )
     }
 
     // SenseVoice offline recognizer
@@ -213,6 +174,10 @@ class VoiceInputManager(private val context: Context) {
 
     // Silero VAD
     private var vad: Vad? = null
+
+    // OpenCC converter for Simplified to Traditional Chinese (Hong Kong variant)
+    // Cached instance for performance - initialization has overhead
+    private var openccConverter: OpenCC? = null
 
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
@@ -264,6 +229,11 @@ class VoiceInputManager(private val context: Context) {
         try {
             val modelDir = File(context.filesDir, MODEL_DIR).absolutePath
             val vadModelPath = File(context.filesDir, ModelDownloadManager.VAD_MODEL_FILE).absolutePath
+
+            // Initialize OpenCC converter (Simplified to Hong Kong Traditional)
+            // s2hk: Simplified Chinese to Hong Kong Traditional Chinese
+            openccConverter = OpenCC("s2hk")
+            Log.i(TAG, "OpenCC converter initialized for s2hk conversion")
 
             // Initialize Silero VAD
             val vadConfig = VadModelConfig(
@@ -417,6 +387,7 @@ class VoiceInputManager(private val context: Context) {
         recognizer = null
         vad?.release()
         vad = null
+        openccConverter = null
         isInitialized = false
     }
 
@@ -433,22 +404,24 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Convert Simplified Chinese characters to Traditional Chinese.
-     * The model may output simplified characters, so we convert them.
+     * Convert Simplified Chinese to Traditional Chinese using OpenCC.
+     * Uses s2hk (Simplified to Hong Kong Traditional) for best Cantonese support.
+     * This is phrase-aware and handles context-dependent conversions.
      */
     private fun convertToTraditional(text: String): String {
-        val result = StringBuilder()
-        for (char in text) {
-            result.append(SIMPLIFIED_TO_TRADITIONAL[char] ?: char)
+        return try {
+            openccConverter?.convert(text) ?: text
+        } catch (e: Exception) {
+            Log.w(TAG, "OpenCC conversion failed, returning original text: ${e.message}")
+            text
         }
-        return result.toString()
     }
 
     /**
      * Process recognized text: convert to traditional Chinese and replace punctuation.
      */
     private fun processRecognizedText(text: String): String {
-        // First convert simplified to traditional Chinese
+        // First convert simplified to traditional Chinese using OpenCC
         val traditional = convertToTraditional(text)
         // Then convert spoken punctuation to symbols
         return convertPunctuation(traditional)

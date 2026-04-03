@@ -101,4 +101,8 @@ dependencies {
     // Using official k2-fsa AAR which includes VAD support
     // Only included in the full flavor
     "fullImplementation"(files("libs/sherpa-onnx-1.12.34.aar"))
+
+    // OpenCC for Simplified to Traditional Chinese conversion
+    // Pure Java library, no JNI needed - used for voice input post-processing
+    "fullImplementation"("io.github.laisuk:openccjava:1.2.0")
 }
