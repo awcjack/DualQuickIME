@@ -84,6 +84,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         setupGitHubLink()
+        setupVersionInfo()
         updatePreview()
 
         // Handle permission request from IME
@@ -139,6 +140,11 @@ class SettingsActivity : AppCompatActivity() {
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         }
+    }
+
+    private fun setupVersionInfo() {
+        findViewById<TextView>(R.id.textVersionInfo).text =
+            getString(R.string.version_info, BuildConfig.VERSION_NAME)
     }
 
     private fun setupGitHubLink() {
