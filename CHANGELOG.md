@@ -5,6 +5,39 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-04-03
+
+### Added
+- **Offline Voice Input with SenseVoice**: High-accuracy speech recognition for Cantonese, Mandarin, and English
+  - Uses SenseVoice model fine-tuned on 21.8k hours of Cantonese data
+  - Silero VAD for voice activity detection and endpoint detection
+  - Works completely offline after model download (~227 MB)
+  - Two-button UI: Reset/Cancel and Commit for manual control
+  - No auto-commit - text is only committed when user presses Commit button
+- **OpenCC Integration**: Comprehensive Simplified to Traditional Chinese conversion
+  - Phrase-aware conversion with 2,500+ character mappings
+  - Uses Hong Kong Traditional variant (s2hk) for best Cantonese support
+- **Punctuation Conversion**: Speak punctuation names to insert symbols
+  - Supports Cantonese (逗號, 句號, etc.), Mandarin (逗号, 句号, etc.), and English (comma, period, etc.)
+- **Build Flavors**: Two APK variants
+  - Full: With voice input support (~30 MB per ABI)
+  - Lite: Without voice input, no network permissions (~3 MB)
+- **ABI Splits**: Separate APKs for arm64-v8a, armeabi-v7a, and universal
+
+### Changed
+- Voice input uses official k2-fsa sherpa-onnx AAR with full VAD support
+- Voice model switched from streaming Paraformer to non-streaming SenseVoice for better accuracy
+- CI now produces separate artifacts by flavor AND architecture (12 total APKs)
+
+### Fixed
+- Reset button now properly clears accumulated voice text
+- Voice input API compatibility with sherpa-onnx library
+
+### Technical
+- Official sherpa-onnx AAR v1.12.34 with VAD support
+- OpenccJava v1.2.0 for S2T conversion
+- Model files downloaded during CI build to avoid large git commits
+
 ## [1.1.0] - 2025-04-03
 
 ### Added
