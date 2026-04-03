@@ -140,7 +140,16 @@ class DualQuickInputMethodService : InputMethodService() {
         // Create voice input overlay (initially hidden)
         voiceInputView = VoiceInputView(this).apply {
             setOnCancelListener {
-                cancelVoiceInput()
+                // Cancel: close voice input without committing
+                closeVoiceInput()
+            }
+            setOnResetListener {
+                // Reset: clear the pending text but keep listening
+                clearVoiceTranscript()
+            }
+            setOnCommitListener { text ->
+                // Commit: commit the text and close voice input
+                commitVoiceText(text)
             }
         }
         rootContainer?.addView(voiceInputView)
@@ -473,13 +482,10 @@ class DualQuickInputMethodService : InputMethodService() {
                 }
 
                 // Set up callbacks
-                manager.setOnResultListener { text, isFinal ->
+                manager.setOnResultListener { text, _ ->
                     mainHandler.post {
+                        // Only update the transcript display, don't auto-commit
                         voiceInputView?.setTranscript(text)
-                        if (isFinal && text.isNotEmpty()) {
-                            // Commit the recognized text
-                            commitText(text)
-                        }
                     }
                 }
 
@@ -501,17 +507,29 @@ class DualQuickInputMethodService : InputMethodService() {
         }
     }
 
-    private fun cancelVoiceInput() {
-        // Get any uncommitted text before stopping
-        val lastText = voiceInputManager?.getLastRecognizedText() ?: ""
+    /**
+     * Close voice input without committing any pending text.
+     */
+    private fun closeVoiceInput() {
         voiceInputManager?.stopRecording()
-
-        // Commit any remaining recognized text when user stops voice input
-        if (lastText.isNotEmpty()) {
-            commitText(lastText)
-        }
-
         voiceInputView?.setState(VoiceInputView.State.HIDDEN)
+    }
+
+    /**
+     * Clear the pending transcript but keep listening.
+     */
+    private fun clearVoiceTranscript() {
+        voiceInputView?.clearTranscript()
+    }
+
+    /**
+     * Commit the recognized voice text and close voice input.
+     */
+    private fun commitVoiceText(text: String) {
+        if (text.isNotEmpty()) {
+            commitText(text)
+        }
+        closeVoiceInput()
     }
 
     override fun onDestroy() {
