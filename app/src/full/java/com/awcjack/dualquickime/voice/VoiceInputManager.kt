@@ -279,7 +279,7 @@ class VoiceInputManager(private val context: Context) {
                 numThreads = 1
             )
 
-            vad = Vad(vadConfig)
+            vad = Vad(config = vadConfig)
 
             // Initialize SenseVoice recognizer
             val senseVoiceConfig = OfflineSenseVoiceModelConfig(
