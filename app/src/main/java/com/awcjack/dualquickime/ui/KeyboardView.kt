@@ -1,12 +1,16 @@
 package com.awcjack.dualquickime.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -40,6 +44,10 @@ class KeyboardView @JvmOverloads constructor(
     private var symbolPage = 0  // 0 = numbers, 1 = symbols, 2 = emoji
     private var shiftKey: TextView? = null
     private var modeToggleKey: TextView? = null
+
+    // Backspace repeat handling
+    private val backspaceHandler = Handler(Looper.getMainLooper())
+    private var backspaceRepeatRunnable: Runnable? = null
 
     // Current theme colors
     private lateinit var colors: KeyboardColors
@@ -513,9 +521,8 @@ class KeyboardView @JvmOverloads constructor(
             addView(createSpecialKey("⌫", 1.5f) {
                 onKeyPress?.invoke(KeyEvent.Backspace)
             }.apply {
-                setOnLongClickListener {
+                setupKeyRepeat(this) {
                     onKeyPress?.invoke(KeyEvent.Backspace)
-                    true
                 }
             })
         }
@@ -693,9 +700,8 @@ class KeyboardView @JvmOverloads constructor(
             addView(createSpecialKey("⌫", 1.5f) {
                 onKeyPress?.invoke(KeyEvent.Backspace)
             }.apply {
-                setOnLongClickListener {
+                setupKeyRepeat(this) {
                     onKeyPress?.invoke(KeyEvent.Backspace)
-                    true
                 }
             })
         }
@@ -793,6 +799,45 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Set up touch-based key repeat for a key (used for backspace).
+     * When held down, the action fires immediately on press, then repeats after an initial delay.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupKeyRepeat(view: View, action: () -> Unit) {
+        view.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    action()
+                    backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+                    val runnable = object : Runnable {
+                        override fun run() {
+                            action()
+                            backspaceHandler.postDelayed(this, BACKSPACE_REPEAT_INTERVAL)
+                        }
+                    }
+                    backspaceRepeatRunnable = runnable
+                    backspaceHandler.postDelayed(runnable, BACKSPACE_INITIAL_DELAY)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+                    backspaceRepeatRunnable = null
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+        backspaceRepeatRunnable = null
+    }
+
     private fun dpToPx(dp: Int): Int {
         return TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
@@ -811,5 +856,10 @@ class KeyboardView @JvmOverloads constructor(
         object Backspace : KeyEvent()
         object Enter : KeyEvent()
         object VoiceInput : KeyEvent()
+    }
+
+    companion object {
+        private const val BACKSPACE_INITIAL_DELAY = 400L  // ms before first repeat
+        private const val BACKSPACE_REPEAT_INTERVAL = 50L  // ms between subsequent repeats
     }
 }
