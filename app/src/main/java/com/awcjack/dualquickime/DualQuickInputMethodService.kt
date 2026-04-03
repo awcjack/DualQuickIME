@@ -481,7 +481,7 @@ class DualQuickInputMethodService : InputMethodService() {
             candidates = candidates,
             currentPage = 0,
             pageSize = pageSize,
-            activeKeyLength = if (candidates.isNotEmpty()) lookupKeys.length else rawKeys.take(2).length
+            activeKeyLength = if (candidates.isNotEmpty()) lookupKeys.length else minOf(rawKeys.length, 2)
         )
         updateUI()
     }
