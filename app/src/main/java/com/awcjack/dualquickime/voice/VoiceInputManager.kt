@@ -32,6 +32,77 @@ class VoiceInputManager(private val context: Context) {
         private const val ENCODER_FILE = "encoder.int8.onnx"
         private const val DECODER_FILE = "decoder.int8.onnx"
         private const val TOKENS_FILE = "tokens.txt"
+
+        // Punctuation conversion map (spoken words to symbols)
+        // Supports Cantonese, Mandarin and English
+        private val PUNCTUATION_MAP = mapOf(
+            // Chinese punctuation - Mandarin
+            "逗号" to "，",
+            "句号" to "。",
+            "问号" to "？",
+            "感叹号" to "！",
+            "叹号" to "！",
+            "冒号" to "：",
+            "分号" to "；",
+            "顿号" to "、",
+            "省略号" to "……",
+            "破折号" to "——",
+            "左括号" to "（",
+            "右括号" to "）",
+            "引号" to "「",
+            "左引号" to "「",
+            "右引号" to "」",
+            "书名号" to "《",
+            "左书名号" to "《",
+            "右书名号" to "》",
+
+            // Chinese punctuation - Cantonese/Traditional
+            "逗號" to "，",
+            "句號" to "。",
+            "問號" to "？",
+            "感嘆號" to "！",
+            "感歎號" to "！",
+            "嘆號" to "！",
+            "歎號" to "！",
+            "冒號" to "：",
+            "分號" to "；",
+            "頓號" to "、",
+            "省略號" to "……",
+            "破折號" to "——",
+            "左括號" to "（",
+            "右括號" to "）",
+            "引號" to "「",
+            "左引號" to "「",
+            "右引號" to "」",
+            "書名號" to "《",
+            "左書名號" to "《",
+            "右書名號" to "》",
+
+            // English punctuation
+            "comma" to ",",
+            "period" to ".",
+            "full stop" to ".",
+            "question mark" to "?",
+            "exclamation mark" to "!",
+            "exclamation point" to "!",
+            "colon" to ":",
+            "semicolon" to ";",
+            "ellipsis" to "...",
+            "dash" to "-",
+            "hyphen" to "-",
+            "left parenthesis" to "(",
+            "right parenthesis" to ")",
+            "open parenthesis" to "(",
+            "close parenthesis" to ")",
+            "quotation mark" to "\"",
+            "quote" to "\"",
+            "apostrophe" to "'",
+
+            // Common variations
+            "dot" to "。",
+            "點" to "。",
+            "点" to "。"
+        )
     }
 
     private var recognizer: OnlineRecognizer? = null
@@ -46,6 +117,10 @@ class VoiceInputManager(private val context: Context) {
 
     private var onResultCallback: ((String, Boolean) -> Unit)? = null
     private var onErrorCallback: ((String) -> Unit)? = null
+
+    // Track the last recognized text for committing when stopped manually
+    @Volatile
+    private var lastRecognizedText: String = ""
 
     /**
      * Check if the model files are downloaded and available.
@@ -180,6 +255,7 @@ class VoiceInputManager(private val context: Context) {
             }
 
             isRecording = true
+            lastRecognizedText = ""
             audioRecord?.startRecording()
 
             recordingThread = thread(name = "VoiceInputThread") {
@@ -231,6 +307,23 @@ class VoiceInputManager(private val context: Context) {
         isInitialized = false
     }
 
+    /**
+     * Convert spoken punctuation words to actual punctuation marks.
+     */
+    private fun convertPunctuation(text: String): String {
+        var result = text
+        for ((spoken, symbol) in PUNCTUATION_MAP) {
+            // Replace whole word matches (case-insensitive for English)
+            result = result.replace(spoken, symbol, ignoreCase = true)
+        }
+        return result
+    }
+
+    /**
+     * Get the last recognized text (for committing when manually stopped).
+     */
+    fun getLastRecognizedText(): String = lastRecognizedText
+
     private fun processAudio() {
         val rec = recognizer ?: return
         val stream = rec.createStream()
@@ -267,10 +360,14 @@ class VoiceInputManager(private val context: Context) {
                         text = rec.getResult(stream).text
                     }
 
+                    // Convert spoken punctuation to symbols
+                    val processedText = convertPunctuation(text)
+
                     // Only notify if text changed
-                    if (text != lastText && text.isNotEmpty()) {
-                        lastText = text
-                        onResultCallback?.invoke(text, isEndpoint)
+                    if (processedText != lastText && processedText.isNotEmpty()) {
+                        lastText = processedText
+                        lastRecognizedText = processedText
+                        onResultCallback?.invoke(processedText, isEndpoint)
                     }
 
                     if (isEndpoint) {

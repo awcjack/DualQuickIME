@@ -502,7 +502,15 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun cancelVoiceInput() {
+        // Get any uncommitted text before stopping
+        val lastText = voiceInputManager?.getLastRecognizedText() ?: ""
         voiceInputManager?.stopRecording()
+
+        // Commit any remaining recognized text when user stops voice input
+        if (lastText.isNotEmpty()) {
+            commitText(lastText)
+        }
+
         voiceInputView?.setState(VoiceInputView.State.HIDDEN)
     }
 
