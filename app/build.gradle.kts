@@ -65,5 +65,5 @@ dependencies {
     implementation("androidx.cardview:cardview:1.0.0")
 
     // Sherpa-ONNX for offline voice recognition (Cantonese/Chinese/English)
-    implementation("com.github.k2-fsa:sherpa-onnx:1.10.31")
+    implementation("com.github.k2-fsa:sherpa-onnx-android:v1.12.34")
 }
