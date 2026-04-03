@@ -5,6 +5,18 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-04-03
+
+### Changed
+- **R8 Minification**: Enabled R8 code minification and resource shrinking for release builds to reduce APK size
+  - Added ProGuard keep rules for voice package, Sherpa-ONNX JNI, OpenCC, and enums
+
+### Fixed
+- Settings page now shows the correct IME version dynamically using BuildConfig.VERSION_NAME
+- Recent candidate usage now recorded correctly before composition state changes
+  - Fixed lookup code being cleared before recording when `clearComposition()` ran before `commitChinese()`
+  - Fixed candidate selection with remaining buffer keys bypassing usage recording entirely
+
 ## [1.4.0] - 2026-04-03
 
 ### Added
