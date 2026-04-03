@@ -58,4 +58,28 @@
     <string name="clipboard_pinned_empty">冇釘選嘅項目</string>
     <string name="clipboard_tab_all">全部</string>
     <string name="clipboard_tab_pinned">已釘選</string>
+
+    <!-- Voice Input -->
+    <string name="settings_voice_input">語音輸入</string>
+    <string name="settings_voice_enable">啟用語音輸入</string>
+    <string name="settings_voice_enable_desc">使用離線語音辨識（粵語/中文/英文）</string>
+    <string name="settings_voice_download_model">下載語音模型</string>
+    <string name="settings_voice_model_size">模型大小：228 MB</string>
+    <string name="settings_voice_model_downloaded">語音模型已下載</string>
+    <string name="settings_voice_delete_model">刪除語音模型</string>
+    <string name="settings_voice_delete_confirm_title">刪除語音模型？</string>
+    <string name="settings_voice_delete_confirm_message">呢個會刪除 228 MB 嘅語音模型。你可以之後再下載返。</string>
+    <string name="settings_voice_delete_confirm_yes">刪除</string>
+    <string name="settings_voice_permission">錄音權限</string>
+    <string name="settings_voice_permission_desc">語音輸入需要呢個權限</string>
+    <string name="settings_voice_permission_grant">授予權限</string>
+    <string name="settings_voice_permission_granted">已授予權限</string>
+    <string name="voice_listening">聽緊...</string>
+    <string name="voice_processing">處理緊...</string>
+    <string name="voice_cancel">取消</string>
+    <string name="voice_downloading_model">下載緊語音模型...</string>
+    <string name="voice_download_starting">開始下載...</string>
+    <string name="voice_permission_required">語音輸入需要錄音權限</string>
+    <string name="voice_init_failed">語音辨識初始化失敗</string>
+    <string name="voice_start_failed">無法開始錄音</string>
 </resources>

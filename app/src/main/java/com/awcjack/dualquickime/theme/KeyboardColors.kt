@@ -32,4 +32,7 @@ data class KeyboardColors(
     val clipboardPinnedIcon: Int,
     val clipboardDeleteIcon: Int,
     val clipboardEmptyText: Int
-)
+) {
+    // Convenience property for accent color (same as compositionText)
+    val accentColor: Int get() = compositionText
+}

@@ -33,6 +33,12 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 - **Cantonese characters** - 嘢, 嚟, 喺, 唔, 咗, 嘅, 噉, 佢, 哋, 啲, 乜, 冇, 睇, 攞, 嬲
 - **Standard option** - switch to standard 13K character set in Settings
 
+### 🎤 Offline Voice Input
+- **Fully offline** - No internet required after model download
+- **Trilingual** - Cantonese, Mandarin Chinese, and English
+- **On-demand download** - 228 MB model downloaded only when needed
+- **Privacy-first** - Voice processed entirely on-device
+
 ### 🎨 Modern Design
 - **Theme support** - System default, Light mode, Dark mode
 - **5 symbol pages** - punctuation, brackets, currency, arrows, shapes
@@ -123,9 +129,9 @@ Character data from [OpenVanilla](https://github.com/openvanilla/openvanilla):
 ## Privacy
 
 This keyboard:
-- Does **NOT** collect or transmit any data
-- Does **NOT** require internet permission
 - Processes all input **locally on device**
+- Internet only used for **one-time** voice model download (optional)
+- Voice recognition happens **entirely offline**
 - Clipboard history stored locally, never uploaded
 
 See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for details.
@@ -137,4 +143,5 @@ MIT License - see [LICENSE](LICENSE)
 ## Credits
 
 - Character data: [OpenVanilla Project](https://github.com/openvanilla/openvanilla)
+- Voice recognition: [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx)
 - 速成/Quick input method: Based on Cangjie by Chu Bong-Foo (朱邦復)

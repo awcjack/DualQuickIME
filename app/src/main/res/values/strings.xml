@@ -60,4 +60,28 @@
     <string name="clipboard_pinned_empty">No pinned items</string>
     <string name="clipboard_tab_all">All</string>
     <string name="clipboard_tab_pinned">Pinned</string>
+
+    <!-- Voice Input -->
+    <string name="settings_voice_input">Voice Input</string>
+    <string name="settings_voice_enable">Enable voice input</string>
+    <string name="settings_voice_enable_desc">Speak to type using offline recognition (Cantonese/Chinese/English)</string>
+    <string name="settings_voice_download_model">Download voice model</string>
+    <string name="settings_voice_model_size">Model size: 228 MB</string>
+    <string name="settings_voice_model_downloaded">Voice model downloaded</string>
+    <string name="settings_voice_delete_model">Delete voice model</string>
+    <string name="settings_voice_delete_confirm_title">Delete Voice Model?</string>
+    <string name="settings_voice_delete_confirm_message">This will delete the 228 MB voice model. You can download it again later.</string>
+    <string name="settings_voice_delete_confirm_yes">Delete</string>
+    <string name="settings_voice_permission">Audio permission</string>
+    <string name="settings_voice_permission_desc">Required for voice input</string>
+    <string name="settings_voice_permission_grant">Grant permission</string>
+    <string name="settings_voice_permission_granted">Permission granted</string>
+    <string name="voice_listening">Listening...</string>
+    <string name="voice_processing">Processing...</string>
+    <string name="voice_cancel">Cancel</string>
+    <string name="voice_downloading_model">Downloading voice model...</string>
+    <string name="voice_download_starting">Starting download...</string>
+    <string name="voice_permission_required">Audio permission required for voice input</string>
+    <string name="voice_init_failed">Failed to initialize voice recognition</string>
+    <string name="voice_start_failed">Failed to start voice recording</string>
 </resources>

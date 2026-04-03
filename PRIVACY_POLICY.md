@@ -20,14 +20,14 @@ Specifically:
 
 ## Permissions
 
-DualQuickIME only requires the minimum permissions necessary for an input method:
+DualQuickIME only requires the minimum permissions necessary for its features:
 
 - **Input Method Service**: Required to function as a keyboard (system permission)
+- **Internet** (optional): Only used to download the voice recognition model (~228 MB). No other network activity occurs.
+- **Record Audio** (optional): Only used for voice input feature. Audio is processed entirely on-device.
 
 The app does NOT request:
-- Internet access
 - Location access
-- Camera or microphone access
 - Access to contacts or files
 - Any other sensitive permissions
 
@@ -45,7 +45,7 @@ This data never leaves your device.
 
 DualQuickIME includes an optional clipboard history feature that allows you to access recently typed or pasted text:
 
-- **Disabled by default**: Clipboard history is turned off by default and must be explicitly enabled in Settings
+- **Enabled by default**: Clipboard history captures text you copy from any app
 - **Local storage only**: All clipboard data is stored locally on your device using SharedPreferences
 - **No transmission**: Clipboard data is never sent to any server or third party
 - **User control**: You can:
@@ -55,9 +55,29 @@ DualQuickIME includes an optional clipboard history feature that allows you to a
   - Delete individual items
 - **Limited retention**: Maximum of 50 items are stored, with oldest items automatically removed
 
+## Voice Input Feature
+
+DualQuickIME includes an optional offline voice recognition feature:
+
+- **Fully offline**: All speech recognition happens on your device using Sherpa-ONNX
+- **Model download**: A one-time download of ~228 MB is required for the voice model
+- **No audio transmission**: Your voice is never sent to any server
+- **Languages**: Supports Cantonese, Mandarin Chinese, and English
+- **User control**: You can:
+  - Enable or disable voice input in Settings
+  - Download or delete the voice model at any time
+  - Grant or revoke audio recording permission
+
 ## Third-Party Services
 
-DualQuickIME does not integrate with any third-party services, APIs, or SDKs that collect user data.
+DualQuickIME uses the following open-source components:
+
+- **Sherpa-ONNX**: Offline speech recognition library (https://github.com/k2-fsa/sherpa-onnx)
+  - Models are downloaded from HuggingFace (one-time download)
+  - All processing is done locally on your device
+  - No data is sent to any server
+
+No third-party analytics, advertising, or tracking services are used.
 
 ## Open Source
 
@@ -79,4 +99,4 @@ https://github.com/awcjack/DualQuickIME/issues
 
 ## Summary
 
-**Your privacy is fully protected. DualQuickIME operates entirely offline and does not collect, store, or transmit any of your data.**
+**Your privacy is fully protected. DualQuickIME processes all input locally on your device. The only network access is an optional one-time download of the voice recognition model. No personal data, keystrokes, or voice recordings are ever transmitted.**

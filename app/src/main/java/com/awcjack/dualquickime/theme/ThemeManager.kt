@@ -14,6 +14,7 @@ object ThemeManager {
     private const val KEY_SHOW_COMPOSITION = "show_composition"
     private const val KEY_CANDIDATES_PER_PAGE = "candidates_per_page"
     private const val KEY_USE_EXTENDED_CHARSET = "use_extended_charset"
+    private const val KEY_VOICE_INPUT_ENABLED = "voice_input_enabled"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
@@ -28,6 +29,7 @@ object ThemeManager {
     private var cachedShowComposition: Boolean? = null
     private var cachedCandidatesPerPage: Int = -1
     private var cachedUseExtendedCharset: Boolean? = null
+    private var cachedVoiceInputEnabled: Boolean? = null
 
     fun getThemeMode(context: Context): Int {
         if (cachedTheme == -1) {
@@ -87,6 +89,19 @@ object ThemeManager {
         return if (getUseExtendedCharset(context)) "simplex-ext.cin" else "simplex.cin"
     }
 
+    // Voice input settings (default: true to enable)
+    fun getVoiceInputEnabled(context: Context): Boolean {
+        if (cachedVoiceInputEnabled == null) {
+            cachedVoiceInputEnabled = getPrefs(context).getBoolean(KEY_VOICE_INPUT_ENABLED, true)
+        }
+        return cachedVoiceInputEnabled!!
+    }
+
+    fun setVoiceInputEnabled(context: Context, enabled: Boolean) {
+        cachedVoiceInputEnabled = enabled
+        getPrefs(context).edit().putBoolean(KEY_VOICE_INPUT_ENABLED, enabled).apply()
+    }
+
     /**
      * Returns true if dark theme should be used based on current settings.
      */
@@ -109,6 +124,18 @@ object ThemeManager {
         return if (isDarkTheme(context)) darkColors else lightColors
     }
 
+    /**
+     * Alias for getColors() for consistency.
+     */
+    fun getKeyboardColors(context: Context): KeyboardColors = getColors(context)
+
+    /**
+     * Get the accent color for the current theme.
+     */
+    fun getAccentColor(context: Context): Int {
+        return if (isDarkTheme(context)) darkColors.compositionText else lightColors.compositionText
+    }
+
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
@@ -121,6 +148,7 @@ object ThemeManager {
         cachedShowComposition = null
         cachedCandidatesPerPage = -1
         cachedUseExtendedCharset = null
+        cachedVoiceInputEnabled = null
     }
 
     // Modern Dark Theme Colors (Material You inspired)

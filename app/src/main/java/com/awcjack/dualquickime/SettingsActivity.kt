@@ -1,6 +1,8 @@
 package com.awcjack.dualquickime
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -16,8 +18,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.theme.ThemeManager
+import com.awcjack.dualquickime.voice.ModelDownloadManager
 
 /**
  * Settings activity for the DualQuick IME.
@@ -25,12 +30,23 @@ import com.awcjack.dualquickime.theme.ThemeManager
  */
 class SettingsActivity : AppCompatActivity() {
 
+    companion object {
+        private const val REQUEST_RECORD_AUDIO_PERMISSION = 200
+    }
+
     private lateinit var themeRadioGroup: RadioGroup
     private lateinit var previewContainer: LinearLayout
     private lateinit var previewKeyRow: LinearLayout
     private lateinit var switchShowComposition: SwitchCompat
     private lateinit var seekBarCandidates: SeekBar
     private lateinit var textCandidatesValue: TextView
+
+    // Voice input settings
+    private lateinit var switchVoiceEnabled: SwitchCompat
+    private lateinit var btnVoiceModel: Button
+    private lateinit var textVoiceModelStatus: TextView
+    private lateinit var btnVoicePermission: Button
+    private lateinit var textVoicePermissionStatus: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,13 +59,32 @@ class SettingsActivity : AppCompatActivity() {
         seekBarCandidates = findViewById(R.id.seekBarCandidates)
         textCandidatesValue = findViewById(R.id.textCandidatesValue)
 
+        // Voice input settings
+        switchVoiceEnabled = findViewById(R.id.switchVoiceEnabled)
+        btnVoiceModel = findViewById(R.id.btnVoiceModel)
+        textVoiceModelStatus = findViewById(R.id.textVoiceModelStatus)
+        btnVoicePermission = findViewById(R.id.btnVoicePermission)
+        textVoicePermissionStatus = findViewById(R.id.textVoicePermissionStatus)
+
         setupThemeSelection()
         setupCompositionToggle()
         setupCandidatesSeekBar()
         setupCharacterSetSettings()
         setupClipboardSettings()
+        setupVoiceInputSettings()
         setupGitHubLink()
         updatePreview()
+
+        // Handle permission request from IME
+        if (intent.getBooleanExtra("request_audio_permission", false)) {
+            requestAudioPermission()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Update voice settings UI when returning to activity
+        updateVoiceSettingsUI()
     }
 
     private fun setupCharacterSetSettings() {
@@ -98,6 +133,127 @@ class SettingsActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.github_url)))
             startActivity(intent)
         }
+    }
+
+    private fun setupVoiceInputSettings() {
+        // Set current value
+        switchVoiceEnabled.isChecked = ThemeManager.getVoiceInputEnabled(this)
+
+        // Listen for changes
+        switchVoiceEnabled.setOnCheckedChangeListener { _, isChecked ->
+            ThemeManager.setVoiceInputEnabled(this, isChecked)
+        }
+
+        // Model download/delete button
+        btnVoiceModel.setOnClickListener {
+            if (ModelDownloadManager.isModelDownloaded(this)) {
+                // Confirm delete
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.settings_voice_delete_confirm_title)
+                    .setMessage(R.string.settings_voice_delete_confirm_message)
+                    .setPositiveButton(R.string.settings_voice_delete_confirm_yes) { _, _ ->
+                        ModelDownloadManager.deleteModel(this)
+                        updateVoiceSettingsUI()
+                        Toast.makeText(this, "Voice model deleted", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            } else {
+                // Start download
+                startModelDownload()
+            }
+        }
+
+        // Permission button
+        btnVoicePermission.setOnClickListener {
+            requestAudioPermission()
+        }
+
+        updateVoiceSettingsUI()
+    }
+
+    private fun updateVoiceSettingsUI() {
+        val modelDownloaded = ModelDownloadManager.isModelDownloaded(this)
+        val hasPermission = hasAudioPermission()
+
+        // Update model button and status
+        if (modelDownloaded) {
+            btnVoiceModel.text = getString(R.string.settings_voice_delete_model)
+            textVoiceModelStatus.text = getString(R.string.settings_voice_model_downloaded)
+        } else {
+            btnVoiceModel.text = getString(R.string.settings_voice_download_model)
+            textVoiceModelStatus.text = getString(R.string.settings_voice_model_size)
+        }
+
+        // Update permission button and status
+        if (hasPermission) {
+            btnVoicePermission.visibility = View.GONE
+            textVoicePermissionStatus.text = getString(R.string.settings_voice_permission_granted)
+        } else {
+            btnVoicePermission.visibility = View.VISIBLE
+            textVoicePermissionStatus.text = getString(R.string.settings_voice_permission_desc)
+        }
+    }
+
+    private fun hasAudioPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestAudioPermission() {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.RECORD_AUDIO),
+            REQUEST_RECORD_AUDIO_PERMISSION
+        )
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_RECORD_AUDIO_PERMISSION) {
+            updateVoiceSettingsUI()
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, R.string.settings_voice_permission_granted, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun startModelDownload() {
+        btnVoiceModel.isEnabled = false
+        btnVoiceModel.text = getString(R.string.voice_downloading_model)
+
+        ModelDownloadManager.downloadModel(this, object : ModelDownloadManager.DownloadCallback {
+            override fun onProgress(bytesDownloaded: Long, totalBytes: Long, currentFile: String) {
+                val progress = ((bytesDownloaded.toFloat() / totalBytes) * 100).toInt()
+                val mbDownloaded = bytesDownloaded / 1_000_000
+                val mbTotal = totalBytes / 1_000_000
+                runOnUiThread {
+                    textVoiceModelStatus.text = "$mbDownloaded / $mbTotal MB ($progress%)"
+                }
+            }
+
+            override fun onComplete() {
+                runOnUiThread {
+                    btnVoiceModel.isEnabled = true
+                    updateVoiceSettingsUI()
+                    Toast.makeText(this@SettingsActivity, R.string.settings_voice_model_downloaded, Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onError(message: String) {
+                runOnUiThread {
+                    btnVoiceModel.isEnabled = true
+                    btnVoiceModel.text = getString(R.string.settings_voice_download_model)
+                    Toast.makeText(this@SettingsActivity, "Download failed: $message", Toast.LENGTH_LONG).show()
+                }
+            }
+        })
     }
 
     private fun setupThemeSelection() {

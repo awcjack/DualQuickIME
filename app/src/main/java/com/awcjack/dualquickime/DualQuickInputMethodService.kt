@@ -1,16 +1,27 @@
 package com.awcjack.dualquickime
 
+import android.Manifest
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.FrameLayout
+import androidx.core.content.ContextCompat
 import com.awcjack.dualquickime.data.CinParser
 import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.CompositionState
 import com.awcjack.dualquickime.data.SimplexTable
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.ui.KeyboardView
+import com.awcjack.dualquickime.ui.VoiceInputView
+import com.awcjack.dualquickime.voice.ModelDownloadManager
+import com.awcjack.dualquickime.voice.VoiceInputManager
+import kotlin.concurrent.thread
 
 /**
  * Quick (速成) Input Method Service for Android.
@@ -43,6 +54,12 @@ class DualQuickInputMethodService : InputMethodService() {
 
     // System clipboard manager and listener
     private var clipboardManager: ClipboardManager? = null
+
+    // Voice input components
+    private var voiceInputManager: VoiceInputManager? = null
+    private var voiceInputView: VoiceInputView? = null
+    private var rootContainer: FrameLayout? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
         handleSystemClipboardChange()
     }
@@ -79,12 +96,6 @@ class DualQuickInputMethodService : InputMethodService() {
         clearComposition()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        // Unregister clipboard listener to avoid memory leaks
-        clipboardManager?.removePrimaryClipChangedListener(clipboardListener)
-    }
-
     /**
      * Handle system clipboard changes (text copied from other apps).
      */
@@ -103,6 +114,9 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
+        // Create root container to hold keyboard and voice input overlay
+        rootContainer = FrameLayout(this)
+
         keyboardView = KeyboardView(this).apply {
             setOnKeyPressListener { event ->
                 handleKeyEvent(event)
@@ -121,7 +135,17 @@ class DualQuickInputMethodService : InputMethodService() {
                 clearComposition()
             }
         }
-        return keyboardView!!
+        rootContainer?.addView(keyboardView)
+
+        // Create voice input overlay (initially hidden)
+        voiceInputView = VoiceInputView(this).apply {
+            setOnCancelListener {
+                cancelVoiceInput()
+            }
+        }
+        rootContainer?.addView(voiceInputView)
+
+        return rootContainer!!
     }
 
     /**
@@ -161,6 +185,7 @@ class DualQuickInputMethodService : InputMethodService() {
             KeyboardView.KeyEvent.Space -> handleSpace()
             KeyboardView.KeyEvent.Backspace -> handleBackspace()
             KeyboardView.KeyEvent.Enter -> handleEnter()
+            KeyboardView.KeyEvent.VoiceInput -> handleVoiceInput()
         }
     }
 
@@ -341,5 +366,152 @@ class DualQuickInputMethodService : InputMethodService() {
                 view.clearCandidates()
             }
         }
+    }
+
+    // ==================== VOICE INPUT ====================
+
+    private fun handleVoiceInput() {
+        // Check if voice input is enabled in settings
+        if (!ThemeManager.getVoiceInputEnabled(this)) {
+            return
+        }
+
+        // Check if model is downloaded
+        if (!ModelDownloadManager.isModelDownloaded(this)) {
+            // Start model download
+            startModelDownload()
+            return
+        }
+
+        // Check audio permission
+        if (!hasAudioPermission()) {
+            // Open settings to request permission (IME can't directly request permissions)
+            requestAudioPermission()
+            return
+        }
+
+        // Start voice recognition
+        startVoiceRecognition()
+    }
+
+    private fun hasAudioPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestAudioPermission() {
+        // IME services cannot directly request runtime permissions
+        // Open the app settings activity which can request the permission
+        try {
+            val intent = Intent(this, SettingsActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra("request_audio_permission", true)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            voiceInputView?.setState(VoiceInputView.State.ERROR)
+            voiceInputView?.setErrorMessage(getString(R.string.voice_permission_required))
+        }
+    }
+
+    private fun startModelDownload() {
+        voiceInputView?.setState(VoiceInputView.State.DOWNLOADING)
+        voiceInputView?.setDownloadProgress(0, getString(R.string.voice_download_starting))
+
+        ModelDownloadManager.downloadModel(this, object : ModelDownloadManager.DownloadCallback {
+            override fun onProgress(bytesDownloaded: Long, totalBytes: Long, currentFile: String) {
+                val progress = ((bytesDownloaded.toFloat() / totalBytes) * 100).toInt()
+                val mbDownloaded = bytesDownloaded / 1_000_000
+                val mbTotal = totalBytes / 1_000_000
+                val message = "$mbDownloaded / $mbTotal MB"
+
+                mainHandler.post {
+                    voiceInputView?.setDownloadProgress(progress, message)
+                }
+            }
+
+            override fun onComplete() {
+                mainHandler.post {
+                    voiceInputView?.setState(VoiceInputView.State.HIDDEN)
+                    // After download complete, check permission and start
+                    if (hasAudioPermission()) {
+                        startVoiceRecognition()
+                    } else {
+                        requestAudioPermission()
+                    }
+                }
+            }
+
+            override fun onError(message: String) {
+                mainHandler.post {
+                    voiceInputView?.setState(VoiceInputView.State.ERROR)
+                    voiceInputView?.setErrorMessage(message)
+                }
+            }
+        })
+    }
+
+    private fun startVoiceRecognition() {
+        // Initialize voice input manager if needed
+        if (voiceInputManager == null) {
+            voiceInputManager = VoiceInputManager(this)
+        }
+
+        val manager = voiceInputManager ?: return
+
+        // Initialize recognizer on background thread
+        thread {
+            val initialized = manager.initialize()
+
+            mainHandler.post {
+                if (!initialized) {
+                    voiceInputView?.setState(VoiceInputView.State.ERROR)
+                    voiceInputView?.setErrorMessage(getString(R.string.voice_init_failed))
+                    return@post
+                }
+
+                // Set up callbacks
+                manager.setOnResultListener { text, isFinal ->
+                    mainHandler.post {
+                        voiceInputView?.setTranscript(text)
+                        if (isFinal && text.isNotEmpty()) {
+                            // Commit the recognized text
+                            commitText(text)
+                        }
+                    }
+                }
+
+                manager.setOnErrorListener { error ->
+                    mainHandler.post {
+                        voiceInputView?.setState(VoiceInputView.State.ERROR)
+                        voiceInputView?.setErrorMessage(error)
+                    }
+                }
+
+                // Start recording
+                if (manager.startRecording()) {
+                    voiceInputView?.setState(VoiceInputView.State.LISTENING)
+                } else {
+                    voiceInputView?.setState(VoiceInputView.State.ERROR)
+                    voiceInputView?.setErrorMessage(getString(R.string.voice_start_failed))
+                }
+            }
+        }
+    }
+
+    private fun cancelVoiceInput() {
+        voiceInputManager?.stopRecording()
+        voiceInputView?.setState(VoiceInputView.State.HIDDEN)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Release voice input resources
+        voiceInputManager?.release()
+        voiceInputManager = null
+        // Unregister clipboard listener to avoid memory leaks
+        clipboardManager?.removePrimaryClipChangedListener(clipboardListener)
     }
 }

@@ -58,4 +58,28 @@
     <string name="clipboard_pinned_empty">没有固定的项目</string>
     <string name="clipboard_tab_all">全部</string>
     <string name="clipboard_tab_pinned">已固定</string>
+
+    <!-- Voice Input -->
+    <string name="settings_voice_input">语音输入</string>
+    <string name="settings_voice_enable">启用语音输入</string>
+    <string name="settings_voice_enable_desc">使用离线语音识别（粤语/中文/英文）</string>
+    <string name="settings_voice_download_model">下载语音模型</string>
+    <string name="settings_voice_model_size">模型大小：228 MB</string>
+    <string name="settings_voice_model_downloaded">语音模型已下载</string>
+    <string name="settings_voice_delete_model">删除语音模型</string>
+    <string name="settings_voice_delete_confirm_title">删除语音模型？</string>
+    <string name="settings_voice_delete_confirm_message">这将删除 228 MB 的语音模型。您可以之后再次下载。</string>
+    <string name="settings_voice_delete_confirm_yes">删除</string>
+    <string name="settings_voice_permission">录音权限</string>
+    <string name="settings_voice_permission_desc">语音输入需要此权限</string>
+    <string name="settings_voice_permission_grant">授予权限</string>
+    <string name="settings_voice_permission_granted">已授予权限</string>
+    <string name="voice_listening">正在聆听...</string>
+    <string name="voice_processing">处理中...</string>
+    <string name="voice_cancel">取消</string>
+    <string name="voice_downloading_model">正在下载语音模型...</string>
+    <string name="voice_download_starting">开始下载...</string>
+    <string name="voice_permission_required">语音输入需要录音权限</string>
+    <string name="voice_init_failed">语音识别初始化失败</string>
+    <string name="voice_start_failed">无法开始录音</string>
 </resources>

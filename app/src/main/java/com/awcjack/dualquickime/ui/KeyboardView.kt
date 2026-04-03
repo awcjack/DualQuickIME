@@ -538,6 +538,11 @@ class KeyboardView @JvmOverloads constructor(
                 onKeyPress?.invoke(KeyEvent.Symbol(','))
             })
 
+            // Voice input button
+            addView(createSpecialKey("🎤", 1f) {
+                onKeyPress?.invoke(KeyEvent.VoiceInput)
+            })
+
             addView(createSpaceKey())
 
             addView(createSpecialKey(".", 1f) {
@@ -718,6 +723,11 @@ class KeyboardView @JvmOverloads constructor(
                 buildKeyboard()
             })
 
+            // Voice input button
+            addView(createSpecialKey("🎤", 1f) {
+                onKeyPress?.invoke(KeyEvent.VoiceInput)
+            })
+
             addView(createSpaceKey())
 
             addView(createSpecialKey("↵", 1.2f) {
@@ -795,5 +805,6 @@ class KeyboardView @JvmOverloads constructor(
         object Space : KeyEvent()
         object Backspace : KeyEvent()
         object Enter : KeyEvent()
+        object VoiceInput : KeyEvent()
     }
 }
