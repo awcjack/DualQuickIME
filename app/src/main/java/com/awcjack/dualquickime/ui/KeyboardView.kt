@@ -1,12 +1,16 @@
 package com.awcjack.dualquickime.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -31,6 +35,7 @@ class KeyboardView @JvmOverloads constructor(
     private var onModeChange: ((Boolean) -> Unit)? = null
     private var onCandidateSelected: ((String) -> Unit)? = null
     private var onEnglishSelected: ((String) -> Unit)? = null
+    private var onPageIndicatorClicked: (() -> Unit)? = null
     private var currentRawKeys: String = ""
     private var isShiftOn = false
     private var isCapsLock = false
@@ -40,6 +45,10 @@ class KeyboardView @JvmOverloads constructor(
     private var symbolPage = 0  // 0 = numbers, 1 = symbols, 2 = emoji
     private var shiftKey: TextView? = null
     private var modeToggleKey: TextView? = null
+
+    // Backspace repeat handling
+    private val backspaceHandler = Handler(Looper.getMainLooper())
+    private var backspaceRepeatRunnable: Runnable? = null
 
     // Current theme colors
     private lateinit var colors: KeyboardColors
@@ -61,6 +70,10 @@ class KeyboardView @JvmOverloads constructor(
     private var clipboardKeyboardView: ClipboardKeyboardView? = null
     private var mainKeyboardContainer: LinearLayout? = null
 
+    // Candidate grid view (view all candidates)
+    private var candidateGridView: CandidateGridView? = null
+    private var isCandidateGridMode = false
+
     // QWERTY layout rows
     private val row1 = listOf('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p')
     private val row2 = listOf('a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l')
@@ -69,7 +82,7 @@ class KeyboardView @JvmOverloads constructor(
     // Number/Symbol rows (page 1) - Common punctuation
     private val numRow1 = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
     private val symRow2Page1 = listOf('@', '#', '$', '%', '&', '-', '+', '(', ')')
-    private val symRow3Page1 = listOf('*', '"', '\'', ':', ';', '!', '?')
+    private val symRow3Page1 = listOf('*', '"', '\'', ':', ';', '!', '?', ',', '.')
 
     // Symbol rows (page 2) - Brackets and math
     private val symRow1Page2 = listOf('~', '`', '|', '\\', '/', '<', '>', '{', '}', '^')
@@ -118,6 +131,24 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun buildKeyboard() {
         removeAllViews()
+
+        // Check if we're in candidate grid mode (view all candidates)
+        if (isCandidateGridMode) {
+            if (candidateGridView == null) {
+                candidateGridView = CandidateGridView(context).apply {
+                    setOnCandidateSelectedListener { candidate ->
+                        onCandidateSelected?.invoke(candidate)
+                    }
+                    setOnBackPressedListener {
+                        isCandidateGridMode = false
+                        buildKeyboard()
+                    }
+                }
+            }
+            candidateGridView?.refreshTheme()
+            addView(candidateGridView)
+            return
+        }
 
         // Check if we're in full emoji mode (page 99 is emoji mode)
         if (isSymbolMode && symbolPage == 99) {
@@ -252,7 +283,7 @@ class KeyboardView @JvmOverloads constructor(
         }
         candidateContainer?.addView(candidateRow)
 
-        // Page indicator
+        // Page indicator (clickable to view all candidates)
         pageIndicator = TextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
             gravity = Gravity.CENTER_VERTICAL
@@ -260,6 +291,11 @@ class KeyboardView @JvmOverloads constructor(
             setTextColor(colors.pageIndicatorText)
             textSize = 11f
             visibility = View.GONE
+            background = createPillBackground(colors.candidateBarBackground, colors.candidatePillBackgroundPressed)
+
+            setOnClickListener {
+                onPageIndicatorClicked?.invoke()
+            }
         }
         candidateContainer?.addView(pageIndicator)
 
@@ -395,6 +431,12 @@ class KeyboardView @JvmOverloads constructor(
     fun clearCandidates() {
         currentRawKeys = ""
 
+        // Close candidate grid if open
+        if (isCandidateGridMode) {
+            isCandidateGridMode = false
+            buildKeyboard()
+        }
+
         // Hide composition
         compositionText?.visibility = View.GONE
 
@@ -513,9 +555,8 @@ class KeyboardView @JvmOverloads constructor(
             addView(createSpecialKey("⌫", 1.5f) {
                 onKeyPress?.invoke(KeyEvent.Backspace)
             }.apply {
-                setOnLongClickListener {
+                setupKeyRepeat(this) {
                     onKeyPress?.invoke(KeyEvent.Backspace)
-                    true
                 }
             })
         }
@@ -535,8 +576,8 @@ class KeyboardView @JvmOverloads constructor(
             }
             addView(modeToggleKey)
 
-            addView(createSpecialKey(",", 1f) {
-                onKeyPress?.invoke(KeyEvent.Symbol(','))
+            addView(createSpecialKey("，", 1f) {
+                onKeyPress?.invoke(KeyEvent.Symbol('，'))
             })
 
             // Voice input button (only in full version)
@@ -548,8 +589,8 @@ class KeyboardView @JvmOverloads constructor(
 
             addView(createSpaceKey())
 
-            addView(createSpecialKey(".", 1f) {
-                onKeyPress?.invoke(KeyEvent.Symbol('.'))
+            addView(createSpecialKey("。", 1f) {
+                onKeyPress?.invoke(KeyEvent.Symbol('。'))
             })
 
             addView(createSpecialKey("↵", 1.2f) {
@@ -693,9 +734,8 @@ class KeyboardView @JvmOverloads constructor(
             addView(createSpecialKey("⌫", 1.5f) {
                 onKeyPress?.invoke(KeyEvent.Backspace)
             }.apply {
-                setOnLongClickListener {
+                setupKeyRepeat(this) {
                     onKeyPress?.invoke(KeyEvent.Backspace)
-                    true
                 }
             })
         }
@@ -785,12 +825,77 @@ class KeyboardView @JvmOverloads constructor(
         onEnglishSelected = listener
     }
 
-    fun setLetterMode() {
-        if (isSymbolMode) {
-            isSymbolMode = false
-            symbolPage = 0
+    fun setOnPageIndicatorClickedListener(listener: () -> Unit) {
+        onPageIndicatorClicked = listener
+    }
+
+    /**
+     * Show the full-screen candidate grid view with all candidates.
+     * @param allCandidates The full list of candidates.
+     * @param initialPage The page to display initially (0-based, in terms of grid pages).
+     */
+    fun showCandidateGrid(allCandidates: List<String>, initialPage: Int = 0) {
+        isCandidateGridMode = true
+        buildKeyboard()
+        candidateGridView?.setCandidates(allCandidates, initialPage)
+    }
+
+    /**
+     * Close the candidate grid and return to normal keyboard view.
+     */
+    fun closeCandidateGrid() {
+        if (isCandidateGridMode) {
+            isCandidateGridMode = false
             buildKeyboard()
         }
+    }
+
+    fun setLetterMode() {
+        if (isSymbolMode || isCandidateGridMode) {
+            isSymbolMode = false
+            symbolPage = 0
+            isCandidateGridMode = false
+            buildKeyboard()
+        }
+    }
+
+    /**
+     * Set up touch-based key repeat for a key (used for backspace).
+     * When held down, the action fires immediately on press, then repeats after an initial delay.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupKeyRepeat(view: View, action: () -> Unit) {
+        view.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    action()
+                    backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+                    val runnable = object : Runnable {
+                        override fun run() {
+                            action()
+                            backspaceHandler.postDelayed(this, BACKSPACE_REPEAT_INTERVAL)
+                        }
+                    }
+                    backspaceRepeatRunnable = runnable
+                    backspaceHandler.postDelayed(runnable, BACKSPACE_INITIAL_DELAY)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+                    backspaceRepeatRunnable = null
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+        backspaceRepeatRunnable = null
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -811,5 +916,10 @@ class KeyboardView @JvmOverloads constructor(
         object Backspace : KeyEvent()
         object Enter : KeyEvent()
         object VoiceInput : KeyEvent()
+    }
+
+    companion object {
+        private const val BACKSPACE_INITIAL_DELAY = 400L  // ms before first repeat
+        private const val BACKSPACE_REPEAT_INTERVAL = 50L  // ms between subsequent repeats
     }
 }

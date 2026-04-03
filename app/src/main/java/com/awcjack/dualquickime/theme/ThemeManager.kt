@@ -15,6 +15,7 @@ object ThemeManager {
     private const val KEY_CANDIDATES_PER_PAGE = "candidates_per_page"
     private const val KEY_USE_EXTENDED_CHARSET = "use_extended_charset"
     private const val KEY_VOICE_INPUT_ENABLED = "voice_input_enabled"
+    private const val KEY_RECENT_CANDIDATES_ENABLED = "recent_candidates_enabled"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
@@ -30,6 +31,7 @@ object ThemeManager {
     private var cachedCandidatesPerPage: Int = -1
     private var cachedUseExtendedCharset: Boolean? = null
     private var cachedVoiceInputEnabled: Boolean? = null
+    private var cachedRecentCandidatesEnabled: Boolean? = null
 
     fun getThemeMode(context: Context): Int {
         if (cachedTheme == -1) {
@@ -102,6 +104,19 @@ object ThemeManager {
         getPrefs(context).edit().putBoolean(KEY_VOICE_INPUT_ENABLED, enabled).apply()
     }
 
+    // Recent candidates settings (default: false to disable)
+    fun getRecentCandidatesEnabled(context: Context): Boolean {
+        if (cachedRecentCandidatesEnabled == null) {
+            cachedRecentCandidatesEnabled = getPrefs(context).getBoolean(KEY_RECENT_CANDIDATES_ENABLED, false)
+        }
+        return cachedRecentCandidatesEnabled!!
+    }
+
+    fun setRecentCandidatesEnabled(context: Context, enabled: Boolean) {
+        cachedRecentCandidatesEnabled = enabled
+        getPrefs(context).edit().putBoolean(KEY_RECENT_CANDIDATES_ENABLED, enabled).apply()
+    }
+
     /**
      * Returns true if dark theme should be used based on current settings.
      */
@@ -149,6 +164,7 @@ object ThemeManager {
         cachedCandidatesPerPage = -1
         cachedUseExtendedCharset = null
         cachedVoiceInputEnabled = null
+        cachedRecentCandidatesEnabled = null
     }
 
     // Modern Dark Theme Colors (Material You inspired)

@@ -17,6 +17,7 @@ import com.awcjack.dualquickime.data.AssociatedPhrasesTable
 import com.awcjack.dualquickime.data.CinParser
 import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.CompositionState
+import com.awcjack.dualquickime.data.RecentCandidateManager
 import com.awcjack.dualquickime.data.SimplexTable
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.ui.KeyboardView
@@ -175,6 +176,9 @@ class DualQuickInputMethodService : InputMethodService() {
                 commitEnglishPreservingCase(composition.rawKeys, letterCases)
                 clearComposition()
             }
+            setOnPageIndicatorClickedListener {
+                handlePageIndicatorClicked()
+            }
         }
         rootContainer?.addView(keyboardView)
 
@@ -208,6 +212,7 @@ class DualQuickInputMethodService : InputMethodService() {
         // Invalidate caches to pick up any settings changes
         ThemeManager.invalidateCache()
         ClipboardHistoryManager.invalidateCache()
+        RecentCandidateManager.invalidateCache()
 
         // Check if character set setting changed - reload if needed
         val useExtended = ThemeManager.getUseExtendedCharset(this)
@@ -357,6 +362,10 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun commitChinese(text: String) {
+        // Record usage for recent candidates feature
+        if (ThemeManager.getRecentCandidatesEnabled(this) && composition.rawKeys.isNotEmpty()) {
+            RecentCandidateManager.recordUsage(this, composition.rawKeys, text)
+        }
         commitText(text)
         // Trigger associated phrases lookup based on the last character committed
         showAssociatedPhrases(text.lastOrNull()?.toString() ?: "")
@@ -476,6 +485,11 @@ class DualQuickInputMethodService : InputMethodService() {
             candidates = simplexTable.lookup(lookupKeys)
         }
 
+        // Reorder candidates based on recent usage if enabled
+        if (ThemeManager.getRecentCandidatesEnabled(this)) {
+            candidates = RecentCandidateManager.reorderCandidates(this, lookupKeys, candidates)
+        }
+
         composition = CompositionState(
             rawKeys = rawKeys,
             candidates = candidates,
@@ -527,6 +541,23 @@ class DualQuickInputMethodService : InputMethodService() {
                 view.clearCandidates()
             }
         }
+    }
+
+    // ==================== VIEW ALL CANDIDATES ====================
+
+    /**
+     * Handle clicking the page indicator to show all candidates in a full grid view.
+     */
+    private fun handlePageIndicatorClicked() {
+        val allCandidates = if (isAssociatedPhrasesMode) {
+            associatedPhrases
+        } else {
+            composition.candidates
+        }
+
+        if (allCandidates.isEmpty()) return
+
+        keyboardView?.showCandidateGrid(allCandidates)
     }
 
     // ==================== VOICE INPUT ====================

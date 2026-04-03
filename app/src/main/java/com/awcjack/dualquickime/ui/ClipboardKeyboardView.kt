@@ -1,13 +1,17 @@
 package com.awcjack.dualquickime.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
+import android.os.Handler
+import android.os.Looper
 import android.text.TextUtils
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
@@ -33,6 +37,10 @@ class ClipboardKeyboardView @JvmOverloads constructor(
     private var onClipboardItemSelected: ((String) -> Unit)? = null
     private var onBackspacePressed: (() -> Unit)? = null
     private var onAbcPressed: (() -> Unit)? = null
+
+    // Backspace repeat handling
+    private val backspaceHandler = Handler(Looper.getMainLooper())
+    private var backspaceRepeatRunnable: Runnable? = null
 
     private lateinit var colors: KeyboardColors
     private var currentTab = 0  // 0 = All, 1 = Pinned
@@ -315,6 +323,10 @@ class ClipboardKeyboardView @JvmOverloads constructor(
             // Backspace
             addView(createSpecialKey("⌫", 1.2f) {
                 onBackspacePressed?.invoke()
+            }.apply {
+                setupKeyRepeat(this) {
+                    onBackspacePressed?.invoke()
+                }
             })
         }
     }
@@ -397,11 +409,51 @@ class ClipboardKeyboardView @JvmOverloads constructor(
         onAbcPressed = listener
     }
 
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupKeyRepeat(view: View, action: () -> Unit) {
+        view.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    action()
+                    backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+                    val runnable = object : Runnable {
+                        override fun run() {
+                            action()
+                            backspaceHandler.postDelayed(this, BACKSPACE_REPEAT_INTERVAL)
+                        }
+                    }
+                    backspaceRepeatRunnable = runnable
+                    backspaceHandler.postDelayed(runnable, BACKSPACE_INITIAL_DELAY)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+                    backspaceRepeatRunnable = null
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
+        backspaceRepeatRunnable = null
+    }
+
     private fun dpToPx(dp: Int): Int {
         return TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
             dp.toFloat(),
             resources.displayMetrics
         ).toInt()
+    }
+
+    companion object {
+        private const val BACKSPACE_INITIAL_DELAY = 400L
+        private const val BACKSPACE_REPEAT_INTERVAL = 50L
     }
 }
