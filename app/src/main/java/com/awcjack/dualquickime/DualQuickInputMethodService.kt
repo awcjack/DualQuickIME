@@ -163,6 +163,8 @@ class DualQuickInputMethodService : InputMethodService() {
                         // Commit character and continue with remaining buffer
                         commitText(candidate)
                         letterCases = remainingCases
+                        // Close candidate grid if open so it doesn't show stale candidates
+                        keyboardView?.closeCandidateGrid()
                         updateComposition(remaining)
                     } else {
                         // Buffer fully consumed - commit and show associated phrases
