@@ -42,17 +42,41 @@ jobs:
       - name: Clean and Build Debug APKs (all flavors)
         run: ./gradlew clean assembleDebug --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Full Debug APKs
+      - name: Upload Full Debug APKs (arm64-v8a)
         uses: actions/upload-artifact@v4
         with:
-          name: app-full-debug
-          path: app/build/outputs/apk/full/debug/*.apk
+          name: app-full-debug-arm64-v8a
+          path: app/build/outputs/apk/full/debug/app-full-arm64-v8a-debug.apk
 
-      - name: Upload Lite Debug APKs
+      - name: Upload Full Debug APKs (armeabi-v7a)
         uses: actions/upload-artifact@v4
         with:
-          name: app-lite-debug
-          path: app/build/outputs/apk/lite/debug/*.apk
+          name: app-full-debug-armeabi-v7a
+          path: app/build/outputs/apk/full/debug/app-full-armeabi-v7a-debug.apk
+
+      - name: Upload Full Debug APKs (universal)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-full-debug-universal
+          path: app/build/outputs/apk/full/debug/app-full-universal-debug.apk
+
+      - name: Upload Lite Debug APKs (arm64-v8a)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-debug-arm64-v8a
+          path: app/build/outputs/apk/lite/debug/app-lite-arm64-v8a-debug.apk
+
+      - name: Upload Lite Debug APKs (armeabi-v7a)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-debug-armeabi-v7a
+          path: app/build/outputs/apk/lite/debug/app-lite-armeabi-v7a-debug.apk
+
+      - name: Upload Lite Debug APKs (universal)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-debug-universal
+          path: app/build/outputs/apk/lite/debug/app-lite-universal-debug.apk
 
       # Signed Release Build (only if secrets are configured)
       - name: Decode Keystore
@@ -83,23 +107,59 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: ./gradlew assembleRelease --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Full Release APKs (signed)
+      - name: Upload Full Release APK (arm64-v8a)
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-full-release
-          path: app/build/outputs/apk/full/release/*.apk
+          name: app-full-release-arm64-v8a
+          path: app/build/outputs/apk/full/release/app-full-arm64-v8a-release.apk
 
-      - name: Upload Lite Release APKs (signed)
+      - name: Upload Full Release APK (armeabi-v7a)
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-lite-release
-          path: app/build/outputs/apk/lite/release/*.apk
+          name: app-full-release-armeabi-v7a
+          path: app/build/outputs/apk/full/release/app-full-armeabi-v7a-release.apk
+
+      - name: Upload Full Release APK (universal)
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-full-release-universal
+          path: app/build/outputs/apk/full/release/app-full-universal-release.apk
+
+      - name: Upload Lite Release APK (arm64-v8a)
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-release-arm64-v8a
+          path: app/build/outputs/apk/lite/release/app-lite-arm64-v8a-release.apk
+
+      - name: Upload Lite Release APK (armeabi-v7a)
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-release-armeabi-v7a
+          path: app/build/outputs/apk/lite/release/app-lite-armeabi-v7a-release.apk
+
+      - name: Upload Lite Release APK (universal)
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-release-universal
+          path: app/build/outputs/apk/lite/release/app-lite-universal-release.apk
 
       # Unsigned Release Build (fallback if no secrets)
       - name: Build Unsigned Release APK
@@ -108,23 +168,59 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: ./gradlew assembleRelease --no-build-cache --no-daemon --no-configuration-cache
 
-      - name: Upload Full Release APKs (unsigned)
+      - name: Upload Full Release APK unsigned (arm64-v8a)
         if: ${{ env.KEYSTORE_BASE64 == '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-full-release-unsigned
-          path: app/build/outputs/apk/full/release/*.apk
+          name: app-full-release-unsigned-arm64-v8a
+          path: app/build/outputs/apk/full/release/app-full-arm64-v8a-release-unsigned.apk
 
-      - name: Upload Lite Release APKs (unsigned)
+      - name: Upload Full Release APK unsigned (armeabi-v7a)
         if: ${{ env.KEYSTORE_BASE64 == '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: app-lite-release-unsigned
-          path: app/build/outputs/apk/lite/release/*.apk
+          name: app-full-release-unsigned-armeabi-v7a
+          path: app/build/outputs/apk/full/release/app-full-armeabi-v7a-release-unsigned.apk
+
+      - name: Upload Full Release APK unsigned (universal)
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-full-release-unsigned-universal
+          path: app/build/outputs/apk/full/release/app-full-universal-release-unsigned.apk
+
+      - name: Upload Lite Release APK unsigned (arm64-v8a)
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-release-unsigned-arm64-v8a
+          path: app/build/outputs/apk/lite/release/app-lite-arm64-v8a-release-unsigned.apk
+
+      - name: Upload Lite Release APK unsigned (armeabi-v7a)
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-release-unsigned-armeabi-v7a
+          path: app/build/outputs/apk/lite/release/app-lite-armeabi-v7a-release-unsigned.apk
+
+      - name: Upload Lite Release APK unsigned (universal)
+        if: ${{ env.KEYSTORE_BASE64 == '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-lite-release-unsigned-universal
+          path: app/build/outputs/apk/lite/release/app-lite-universal-release-unsigned.apk
 
       # Create GitHub Release (only on version tags)
       - name: Rename APKs for release
