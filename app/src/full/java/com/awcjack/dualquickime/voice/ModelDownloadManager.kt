@@ -5,33 +5,39 @@ import android.util.Log
 import java.io.*
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.zip.ZipInputStream
 import kotlin.concurrent.thread
 
 /**
  * Manages downloading and extracting voice recognition models.
+ * Now uses SenseVoice model for better Cantonese accuracy.
  */
 object ModelDownloadManager {
 
     private const val TAG = "ModelDownloadManager"
 
-    // Model download URL (GitHub releases)
-    private const val MODEL_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en.tar.bz2"
+    // SenseVoice model directory name
+    const val SENSEVOICE_MODEL_DIR = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09"
 
-    // Alternative: HuggingFace URL
-    private const val MODEL_URL_HF = "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en/resolve/main/encoder.int8.onnx"
+    // Silero VAD model filename
+    const val VAD_MODEL_FILE = "silero_vad.onnx"
 
-    // Individual file URLs from HuggingFace (more reliable for mobile)
-    private const val BASE_HF_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en/resolve/main"
+    // HuggingFace base URL for SenseVoice model
+    private const val SENSEVOICE_BASE_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09/resolve/main"
 
-    private val MODEL_FILES = listOf(
-        "encoder.int8.onnx" to 159_000_000L,  // ~159 MB
-        "decoder.int8.onnx" to 69_000_000L,   // ~69 MB
-        "tokens.txt" to 100_000L              // ~100 KB
+    // GitHub URL for Silero VAD
+    private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+
+    // SenseVoice model files
+    private val SENSEVOICE_FILES = listOf(
+        "model.int8.onnx" to 226_000_000L,  // ~226 MB
+        "tokens.txt" to 320_000L             // ~320 KB
     )
 
-    // Total expected size in bytes (~228 MB)
-    const val TOTAL_MODEL_SIZE = 228_000_000L
+    // VAD model file
+    private val VAD_FILE = VAD_MODEL_FILE to 630_000L  // ~630 KB
+
+    // Total expected size in bytes (~227 MB)
+    const val TOTAL_MODEL_SIZE = 227_000_000L
 
     /**
      * Download status callback
@@ -46,12 +52,18 @@ object ModelDownloadManager {
      * Check if all model files exist.
      */
     fun isModelDownloaded(context: Context): Boolean {
-        val modelDir = File(context.filesDir, VoiceInputManager.MODEL_DIR)
+        val modelDir = File(context.filesDir, SENSEVOICE_MODEL_DIR)
         if (!modelDir.exists()) return false
 
-        return MODEL_FILES.all { (filename, _) ->
+        // Check SenseVoice model files
+        val senseVoiceReady = SENSEVOICE_FILES.all { (filename, _) ->
             File(modelDir, filename).exists()
         }
+
+        // Check VAD model file
+        val vadFile = File(context.filesDir, VAD_MODEL_FILE)
+
+        return senseVoiceReady && vadFile.exists()
     }
 
     /**
@@ -59,15 +71,21 @@ object ModelDownloadManager {
      * @return Pair of (downloaded bytes, total bytes)
      */
     fun getDownloadProgress(context: Context): Pair<Long, Long> {
-        val modelDir = File(context.filesDir, VoiceInputManager.MODEL_DIR)
-        if (!modelDir.exists()) return 0L to TOTAL_MODEL_SIZE
-
+        val modelDir = File(context.filesDir, SENSEVOICE_MODEL_DIR)
         var downloaded = 0L
-        MODEL_FILES.forEach { (filename, expectedSize) ->
-            val file = File(modelDir, filename)
-            if (file.exists()) {
-                downloaded += file.length()
+
+        if (modelDir.exists()) {
+            SENSEVOICE_FILES.forEach { (filename, _) ->
+                val file = File(modelDir, filename)
+                if (file.exists()) {
+                    downloaded += file.length()
+                }
             }
+        }
+
+        val vadFile = File(context.filesDir, VAD_MODEL_FILE)
+        if (vadFile.exists()) {
+            downloaded += vadFile.length()
         }
 
         return downloaded to TOTAL_MODEL_SIZE
@@ -79,14 +97,15 @@ object ModelDownloadManager {
     fun downloadModel(context: Context, callback: DownloadCallback) {
         thread(name = "ModelDownloadThread") {
             try {
-                val modelDir = File(context.filesDir, VoiceInputManager.MODEL_DIR)
+                val modelDir = File(context.filesDir, SENSEVOICE_MODEL_DIR)
                 if (!modelDir.exists()) {
                     modelDir.mkdirs()
                 }
 
                 var totalDownloaded = 0L
 
-                for ((filename, expectedSize) in MODEL_FILES) {
+                // Download SenseVoice model files
+                for ((filename, expectedSize) in SENSEVOICE_FILES) {
                     val targetFile = File(modelDir, filename)
 
                     // Skip if already downloaded
@@ -96,47 +115,30 @@ object ModelDownloadManager {
                         continue
                     }
 
-                    Log.i(TAG, "Downloading $filename...")
+                    Log.i(TAG, "Downloading SenseVoice $filename...")
+                    totalDownloaded = downloadFile(
+                        "$SENSEVOICE_BASE_URL/$filename",
+                        targetFile,
+                        totalDownloaded,
+                        filename,
+                        callback
+                    )
+                }
 
-                    val url = URL("$BASE_HF_URL/$filename")
-                    val connection = url.openConnection() as HttpURLConnection
-                    connection.connectTimeout = 30000
-                    connection.readTimeout = 60000
-                    connection.requestMethod = "GET"
-                    connection.setRequestProperty("User-Agent", "DualQuickIME/1.0")
-
-                    // Handle redirects
-                    connection.instanceFollowRedirects = true
-
-                    val responseCode = connection.responseCode
-                    if (responseCode != HttpURLConnection.HTTP_OK) {
-                        throw IOException("HTTP error: $responseCode for $filename")
-                    }
-
-                    val fileSize = connection.contentLengthLong
-
-                    // Download to temp file first
-                    val tempFile = File(modelDir, "$filename.tmp")
-
-                    connection.inputStream.use { input ->
-                        FileOutputStream(tempFile).use { output ->
-                            val buffer = ByteArray(8192)
-                            var bytesRead: Int
-                            var fileDownloaded = 0L
-
-                            while (input.read(buffer).also { bytesRead = it } != -1) {
-                                output.write(buffer, 0, bytesRead)
-                                fileDownloaded += bytesRead
-                                totalDownloaded += bytesRead
-
-                                callback.onProgress(totalDownloaded, TOTAL_MODEL_SIZE, filename)
-                            }
-                        }
-                    }
-
-                    // Rename temp file to final name
-                    tempFile.renameTo(targetFile)
-                    Log.i(TAG, "Downloaded $filename (${targetFile.length()} bytes)")
+                // Download VAD model file
+                val vadFile = File(context.filesDir, VAD_MODEL_FILE)
+                if (!vadFile.exists() || vadFile.length() < VAD_FILE.second * 0.9) {
+                    Log.i(TAG, "Downloading Silero VAD...")
+                    totalDownloaded = downloadFile(
+                        VAD_URL,
+                        vadFile,
+                        totalDownloaded,
+                        VAD_MODEL_FILE,
+                        callback
+                    )
+                } else {
+                    totalDownloaded += vadFile.length()
+                    callback.onProgress(totalDownloaded, TOTAL_MODEL_SIZE, VAD_MODEL_FILE)
                 }
 
                 callback.onComplete()
@@ -149,12 +151,73 @@ object ModelDownloadManager {
     }
 
     /**
+     * Download a single file with progress reporting.
+     */
+    private fun downloadFile(
+        urlString: String,
+        targetFile: File,
+        currentTotal: Long,
+        filename: String,
+        callback: DownloadCallback
+    ): Long {
+        var totalDownloaded = currentTotal
+
+        val url = URL(urlString)
+        val connection = url.openConnection() as HttpURLConnection
+        connection.connectTimeout = 30000
+        connection.readTimeout = 60000
+        connection.requestMethod = "GET"
+        connection.setRequestProperty("User-Agent", "DualQuickIME/1.0")
+        connection.instanceFollowRedirects = true
+
+        val responseCode = connection.responseCode
+        if (responseCode != HttpURLConnection.HTTP_OK) {
+            throw IOException("HTTP error: $responseCode for $filename")
+        }
+
+        // Download to temp file first
+        val tempFile = File(targetFile.parent, "${targetFile.name}.tmp")
+
+        connection.inputStream.use { input ->
+            FileOutputStream(tempFile).use { output ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    totalDownloaded += bytesRead
+                    callback.onProgress(totalDownloaded, TOTAL_MODEL_SIZE, filename)
+                }
+            }
+        }
+
+        // Rename temp file to final name
+        tempFile.renameTo(targetFile)
+        Log.i(TAG, "Downloaded $filename (${targetFile.length()} bytes)")
+
+        return totalDownloaded
+    }
+
+    /**
      * Delete all downloaded model files.
      */
     fun deleteModel(context: Context) {
-        val modelDir = File(context.filesDir, VoiceInputManager.MODEL_DIR)
+        // Delete SenseVoice model directory
+        val modelDir = File(context.filesDir, SENSEVOICE_MODEL_DIR)
         if (modelDir.exists()) {
             modelDir.deleteRecursively()
+        }
+
+        // Delete VAD model
+        val vadFile = File(context.filesDir, VAD_MODEL_FILE)
+        if (vadFile.exists()) {
+            vadFile.delete()
+        }
+
+        // Also delete old Paraformer model if it exists
+        val oldModelDir = File(context.filesDir, "sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en")
+        if (oldModelDir.exists()) {
+            oldModelDir.deleteRecursively()
         }
     }
 
