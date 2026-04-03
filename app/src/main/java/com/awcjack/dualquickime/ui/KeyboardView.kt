@@ -31,6 +31,7 @@ class KeyboardView @JvmOverloads constructor(
     private var onModeChange: ((Boolean) -> Unit)? = null
     private var onCandidateSelected: ((String) -> Unit)? = null
     private var onEnglishSelected: ((String) -> Unit)? = null
+    private var onPageIndicatorClicked: (() -> Unit)? = null
     private var currentRawKeys: String = ""
     private var isShiftOn = false
     private var isCapsLock = false
@@ -60,6 +61,10 @@ class KeyboardView @JvmOverloads constructor(
     private var emojiKeyboardView: EmojiKeyboardView? = null
     private var clipboardKeyboardView: ClipboardKeyboardView? = null
     private var mainKeyboardContainer: LinearLayout? = null
+
+    // Candidate grid view (view all candidates)
+    private var candidateGridView: CandidateGridView? = null
+    private var isCandidateGridMode = false
 
     // QWERTY layout rows
     private val row1 = listOf('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p')
@@ -118,6 +123,24 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun buildKeyboard() {
         removeAllViews()
+
+        // Check if we're in candidate grid mode (view all candidates)
+        if (isCandidateGridMode) {
+            if (candidateGridView == null) {
+                candidateGridView = CandidateGridView(context).apply {
+                    setOnCandidateSelectedListener { candidate ->
+                        onCandidateSelected?.invoke(candidate)
+                    }
+                    setOnBackPressedListener {
+                        isCandidateGridMode = false
+                        buildKeyboard()
+                    }
+                }
+            }
+            candidateGridView?.refreshTheme()
+            addView(candidateGridView)
+            return
+        }
 
         // Check if we're in full emoji mode (page 99 is emoji mode)
         if (isSymbolMode && symbolPage == 99) {
@@ -252,7 +275,7 @@ class KeyboardView @JvmOverloads constructor(
         }
         candidateContainer?.addView(candidateRow)
 
-        // Page indicator
+        // Page indicator (clickable to view all candidates)
         pageIndicator = TextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
             gravity = Gravity.CENTER_VERTICAL
@@ -260,6 +283,11 @@ class KeyboardView @JvmOverloads constructor(
             setTextColor(colors.pageIndicatorText)
             textSize = 11f
             visibility = View.GONE
+            background = createPillBackground(colors.candidateBarBackground, colors.candidatePillBackgroundPressed)
+
+            setOnClickListener {
+                onPageIndicatorClicked?.invoke()
+            }
         }
         candidateContainer?.addView(pageIndicator)
 
@@ -394,6 +422,12 @@ class KeyboardView @JvmOverloads constructor(
 
     fun clearCandidates() {
         currentRawKeys = ""
+
+        // Close candidate grid if open
+        if (isCandidateGridMode) {
+            isCandidateGridMode = false
+            buildKeyboard()
+        }
 
         // Hide composition
         compositionText?.visibility = View.GONE
@@ -785,10 +819,36 @@ class KeyboardView @JvmOverloads constructor(
         onEnglishSelected = listener
     }
 
+    fun setOnPageIndicatorClickedListener(listener: () -> Unit) {
+        onPageIndicatorClicked = listener
+    }
+
+    /**
+     * Show the full-screen candidate grid view with all candidates.
+     * @param allCandidates The full list of candidates.
+     * @param initialPage The page to display initially (0-based, in terms of grid pages).
+     */
+    fun showCandidateGrid(allCandidates: List<String>, initialPage: Int = 0) {
+        isCandidateGridMode = true
+        buildKeyboard()
+        candidateGridView?.setCandidates(allCandidates, initialPage)
+    }
+
+    /**
+     * Close the candidate grid and return to normal keyboard view.
+     */
+    fun closeCandidateGrid() {
+        if (isCandidateGridMode) {
+            isCandidateGridMode = false
+            buildKeyboard()
+        }
+    }
+
     fun setLetterMode() {
-        if (isSymbolMode) {
+        if (isSymbolMode || isCandidateGridMode) {
             isSymbolMode = false
             symbolPage = 0
+            isCandidateGridMode = false
             buildKeyboard()
         }
     }

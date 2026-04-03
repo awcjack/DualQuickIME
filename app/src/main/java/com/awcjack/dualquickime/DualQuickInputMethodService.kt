@@ -164,6 +164,9 @@ class DualQuickInputMethodService : InputMethodService() {
                 commitEnglishPreservingCase(composition.rawKeys, letterCases)
                 clearComposition()
             }
+            setOnPageIndicatorClickedListener {
+                handlePageIndicatorClicked()
+            }
         }
         rootContainer?.addView(keyboardView)
 
@@ -511,6 +514,23 @@ class DualQuickInputMethodService : InputMethodService() {
                 view.clearCandidates()
             }
         }
+    }
+
+    // ==================== VIEW ALL CANDIDATES ====================
+
+    /**
+     * Handle clicking the page indicator to show all candidates in a full grid view.
+     */
+    private fun handlePageIndicatorClicked() {
+        val allCandidates = if (isAssociatedPhrasesMode) {
+            associatedPhrases
+        } else {
+            composition.candidates
+        }
+
+        if (allCandidates.isEmpty()) return
+
+        keyboardView?.showCandidateGrid(allCandidates)
     }
 
     // ==================== VOICE INPUT ====================
