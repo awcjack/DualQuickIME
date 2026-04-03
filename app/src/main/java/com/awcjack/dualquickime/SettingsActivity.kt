@@ -21,6 +21,7 @@ import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.awcjack.dualquickime.data.ClipboardHistoryManager
+import com.awcjack.dualquickime.data.RecentCandidateManager
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.voice.ModelDownloadManager
 
@@ -69,6 +70,7 @@ class SettingsActivity : AppCompatActivity() {
         setupThemeSelection()
         setupCompositionToggle()
         setupCandidatesSeekBar()
+        setupRecentCandidatesSettings()
         setupCharacterSetSettings()
         setupClipboardSettings()
 
@@ -325,6 +327,32 @@ class SettingsActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
+    }
+
+    private fun setupRecentCandidatesSettings() {
+        val switchRecent = findViewById<SwitchCompat>(R.id.switchRecentCandidates)
+        val btnClear = findViewById<Button>(R.id.btnClearRecentCandidates)
+
+        // Set current value
+        switchRecent.isChecked = ThemeManager.getRecentCandidatesEnabled(this)
+
+        // Listen for changes
+        switchRecent.setOnCheckedChangeListener { _, isChecked ->
+            ThemeManager.setRecentCandidatesEnabled(this, isChecked)
+        }
+
+        // Clear recent candidates button
+        btnClear.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.settings_recent_candidates_clear_confirm_title)
+                .setMessage(R.string.settings_recent_candidates_clear_confirm_message)
+                .setPositiveButton(R.string.settings_recent_candidates_clear_confirm_yes) { _, _ ->
+                    RecentCandidateManager.clearAll(this)
+                    Toast.makeText(this, R.string.settings_recent_candidates_cleared, Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
     }
 
     private fun updatePreview() {

@@ -21,6 +21,13 @@
     <string name="settings_show_composition_desc">Display the Quick input code in the candidate bar</string>
     <string name="settings_candidates_per_page">Candidates per page</string>
     <string name="settings_candidates_per_page_desc">Adjust number of candidates displayed (fewer = larger)</string>
+    <string name="settings_recent_candidates">Prioritize recent candidates</string>
+    <string name="settings_recent_candidates_desc">Show recently used characters earlier in the candidate list</string>
+    <string name="settings_recent_candidates_clear">Clear recent candidate history</string>
+    <string name="settings_recent_candidates_clear_confirm_title">Clear Recent Candidates?</string>
+    <string name="settings_recent_candidates_clear_confirm_message">This will clear the recent candidate usage history.</string>
+    <string name="settings_recent_candidates_clear_confirm_yes">Clear</string>
+    <string name="settings_recent_candidates_cleared">Recent candidate history cleared</string>
     <string name="settings_preview">Preview</string>
     <string name="settings_about">About</string>
 
