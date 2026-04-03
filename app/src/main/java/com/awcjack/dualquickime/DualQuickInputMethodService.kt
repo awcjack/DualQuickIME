@@ -152,11 +152,22 @@ class DualQuickInputMethodService : InputMethodService() {
                     // User TAPPED an associated phrase - commit it
                     handleAssociatedPhraseSelected(candidate)
                 } else {
-                    // User TAPPED a Chinese candidate pill - commit Chinese
-                    // Note: clearComposition is called first to avoid clearing associated phrases
-                    // that get set in commitChinese -> showAssociatedPhrases
-                    clearComposition()
-                    commitChinese(candidate)
+                    // User TAPPED a Chinese candidate pill - commit Chinese character
+                    // Consume only the active segment (first 1-2 chars) from the buffer
+                    val consumed = composition.activeKeyLength
+                    val remaining = composition.rawKeys.drop(consumed)
+                    val remainingCases = letterCases.drop(consumed).toMutableList()
+
+                    if (remaining.isNotEmpty()) {
+                        // Commit character and continue with remaining buffer
+                        commitText(candidate)
+                        letterCases = remainingCases
+                        updateComposition(remaining)
+                    } else {
+                        // Buffer fully consumed - commit and show associated phrases
+                        clearComposition()
+                        commitChinese(candidate)
+                    }
                 }
             }
             setOnEnglishSelectedListener { _ ->
@@ -240,16 +251,10 @@ class DualQuickInputMethodService : InputMethodService() {
         val lowerChar = char.lowercaseChar()
         val newRawKeys = composition.rawKeys + lowerChar
 
-        if (newRawKeys.length > 2) {
-            // 3rd key: commit first 2 as English (preserving case), start new composition
-            commitEnglishPreservingCase(composition.rawKeys, letterCases)
-            letterCases.clear()
-            letterCases.add(isUpperCase)
-            updateComposition(lowerChar.toString())
-        } else {
-            letterCases.add(isUpperCase)
-            updateComposition(newRawKeys)
-        }
+        // Accumulate all letters in the buffer without auto-committing.
+        // Candidates are shown for the first 1-2 chars of the buffer.
+        letterCases.add(isUpperCase)
+        updateComposition(newRawKeys)
     }
 
     private fun handleNumber(digit: Int) {
@@ -459,13 +464,24 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun updateComposition(rawKeys: String) {
-        val candidates = simplexTable.lookup(rawKeys)
         val pageSize = ThemeManager.getCandidatesPerPage(this)
+
+        // Look up candidates for the first 1-2 chars of the buffer.
+        // Try 2-char code first, fall back to 1-char if no match.
+        var lookupKeys = rawKeys.take(2)
+        var candidates = simplexTable.lookup(lookupKeys)
+
+        if (candidates.isEmpty() && lookupKeys.length == 2) {
+            lookupKeys = rawKeys.take(1)
+            candidates = simplexTable.lookup(lookupKeys)
+        }
+
         composition = CompositionState(
             rawKeys = rawKeys,
             candidates = candidates,
             currentPage = 0,
-            pageSize = pageSize
+            pageSize = pageSize,
+            activeKeyLength = if (candidates.isNotEmpty()) lookupKeys.length else rawKeys.take(2).length
         )
         updateUI()
     }
