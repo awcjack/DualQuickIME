@@ -1,24 +1,58 @@
 # DualQuickIME - 雙拼速成
 
-A dual-mode Chinese/English Input Method Editor (IME) for Android that supports 速成 (Quick/Simplified Cangjie) input **without switching keyboards**.
+A dual-mode Chinese/English Input Method Editor (IME) for Android that lets you **write Chinese and English concurrently without switching keyboards**.
 
-## Features
+## Why DualQuickIME?
 
-- **Dual-mode input**: Type Chinese (速成) and English seamlessly in one keyboard
-- **Tap-to-select**: Tap candidates directly to select Chinese characters
-- **Space pagination**: Press Space to navigate through candidate pages
-- **OpenVanilla compatible**: Uses the same character ordering as OpenVanilla on macOS
-- **QWERTY layout**: Each key shows both the English letter and Chinese radical
-- **Multi-language UI**: English, Traditional Chinese (TW/HK), Simplified Chinese
-- **Theme support**: System default, Light mode, Dark mode
-- **Extended special characters**: 5 pages of symbols, brackets, currency, arrows, and more
-- **Full emoji keyboard**: 8 categories of emojis
+Traditional IMEs force you to switch between Chinese and English modes. DualQuickIME eliminates this friction:
+
+> **Type "我love你" in one fluid motion** - no mode switching, no interruption.
+
+The keyboard intelligently understands your intent and commits Chinese or English based on your actions, making bilingual typing as natural as thinking in two languages.
+
+## Key Features
+
+### 🔀 Seamless Bilingual Input
+- **No mode switching** - Chinese and English coexist on the same keyboard
+- **Context-aware commitment** - tap for Chinese, type 3rd letter or Enter for English
+- **Natural flow** - compose mixed-language messages without interruption
+
+### ⌨️ 速成 (Quick/Simplex) Input
+- **Two-key input** - type first and last Cangjie radicals to find characters
+- **Tap-to-select** - candidates appear instantly, tap to commit
+- **Space pagination** - press Space to navigate through candidate pages
+- **OpenVanilla compatible** - same character ordering as macOS
+
+### 📋 Clipboard History
+- **Gboard-style clipboard** - access via 📋 button on symbol keyboard
+- **Pin important items** - keep frequently used text for quick access
+- **System-wide capture** - automatically saves text copied from any app
+
+### 🔤 Extended Character Support
+- **63,000+ characters** - Extended character set with full Cantonese support
+- **Cantonese characters** - 嘢, 嚟, 喺, 唔, 咗, 嘅, 噉, 佢, 哋, 啲, 乜, 冇, 睇, 攞, 嬲
+- **Standard option** - switch to standard 13K character set in Settings
+
+### 🎨 Modern Design
+- **Theme support** - System default, Light mode, Dark mode
+- **5 symbol pages** - punctuation, brackets, currency, arrows, shapes
+- **Full emoji keyboard** - 8 categories of emojis
+- **Caps lock** - double-tap shift for continuous uppercase
 
 ## How It Works
 
-### Key Concept
+### The Dual-Mode Concept
 
-The keyboard displays English letters (A-Z), but each key also corresponds to a Chinese radical. **No mode switching required** - the keyboard intelligently commits Chinese or English based on your actions.
+Each key displays an English letter (A-Z) and corresponds to a Chinese radical. Your actions determine which language is committed:
+
+| Action | Result |
+|--------|--------|
+| Type 1-2 keys → **tap candidate** | Chinese character |
+| Type 1-2 keys → **type 3rd letter** | First 2 letters as English |
+| Type any keys → **press Enter** | Commit as English |
+| **Press Space** | Navigate candidate pages |
+
+### Key-to-Radical Mapping
 
 | Key | Radical | Key | Radical | Key | Radical |
 |-----|---------|-----|---------|-----|---------|
@@ -32,32 +66,18 @@ The keyboard displays English letters (A-Z), but each key also corresponds to a 
 | H | 竹 | Q | 手 | Z | 重 |
 | I | 戈 | R | 口 |   |   |
 
-### Input Flow
-
-1. **Type 1-2 letters** → Candidates appear (e.g., `AB` → 明, 晴, 閒...)
-2. **TAP a candidate** → Chinese character is committed
-3. **Press SPACE** → Navigate to next page of candidates
-4. **Type 3rd letter without selecting** → First 2 letters commit as English
-5. **Press ENTER** → Composition commits as English
-
-### Examples
-
-| Input | Action | Result |
-|-------|--------|--------|
-| `A` `B` → tap 明 | Select Chinese | 明 |
-| `H` `E` `L` | 3rd key typed | "he" + new composition |
-| `A` `B` → SPACE → SPACE → tap | Navigate pages | Selected char |
-| `H` `I` → tap 我 | Select Chinese | 我 |
-
 ### Mixed Input Example
 
 To type "我love你":
-1. `H` `I` → tap 我 → **我**
-2. `L` `O` → type `V` (3rd key) → commits "lo"
-3. `V` `E` → press ENTER → commits "ve"
-4. `S` `P` → tap 你 → **你**
 
-Result: **我love你**
+```
+HI → tap 我 → "我"
+LO → type V → commits "lo" (3rd key triggers English)
+VE → Enter → commits "ve"
+SP → tap 你 → "你"
+
+Result: 我love你
+```
 
 ## Installation
 
@@ -65,14 +85,7 @@ Result: **我love你**
 
 1. Download the latest APK from [Releases](https://github.com/awcjack/DualQuickIME/releases)
 2. Install the APK on your Android device
-3. Enable the keyboard in Settings (see below)
-
-### From GitHub Actions
-
-1. Go to [Actions](https://github.com/awcjack/DualQuickIME/actions)
-2. Click on the latest successful build
-3. Download the `app-release-signed` artifact
-4. Unzip and install `app-release.apk`
+3. Enable the keyboard in Settings
 
 ### Enable the Keyboard
 
@@ -94,99 +107,26 @@ Result: **我love你**
 ### Build Steps
 
 ```bash
-# Clone the repository
 git clone https://github.com/awcjack/DualQuickIME.git
 cd DualQuickIME
-
-# Build debug APK
 ./gradlew assembleDebug
 
-# The APK will be at: app/build/outputs/apk/debug/app-debug.apk
+# APK location: app/build/outputs/apk/debug/app-debug.apk
 ```
-
-### Install via ADB
-
-```bash
-# Install the APK
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-
-# Enable the keyboard
-adb shell ime enable com.awcjack.dualquickime/.DualQuickInputMethodService
-
-# Set as default (optional)
-adb shell ime set com.awcjack.dualquickime/.DualQuickInputMethodService
-```
-
-## Project Structure
-
-```
-DualQuickIME/
-├── .github/workflows/build.yml    # CI/CD pipeline
-├── app/src/main/
-│   ├── java/com/awcjack/dualquickime/
-│   │   ├── DualQuickInputMethodService.kt  # Main IME service
-│   │   ├── data/
-│   │   │   ├── CinParser.kt                # .cin file parser
-│   │   │   ├── CompositionState.kt         # State with pagination
-│   │   │   ├── SimplexEntry.kt             # Data entry class
-│   │   │   └── SimplexTable.kt             # Lookup table
-│   │   ├── ui/
-│   │   │   ├── CandidateView.kt            # Tap-to-select candidates
-│   │   │   └── KeyboardView.kt             # QWERTY + radicals
-│   │   └── util/
-│   │       └── KeyMapping.kt               # Key-to-radical mapping
-│   ├── assets/
-│   │   └── simplex.cin                     # OpenVanilla data (13K+ chars)
-│   └── res/
-│       ├── xml/method.xml                  # IME configuration
-│       ├── values/                         # Strings, colors, themes
-│       ├── values-en/                      # English strings
-│       ├── values-zh-rTW/                  # Traditional Chinese (Taiwan)
-│       ├── values-zh-rHK/                  # Traditional Chinese (Hong Kong)
-│       ├── values-zh-rCN/                  # Simplified Chinese
-│       └── drawable/                       # Key backgrounds
-└── build.gradle.kts
-```
-
-## Key Behaviors
-
-| Key | During Composition | IDLE State |
-|-----|-------------------|------------|
-| A-Z | Add to composition / commit English on 3rd key | Start composition |
-| Space | **Next page** of candidates | Insert space |
-| Enter | Commit as English | Send Enter |
-| Backspace | Delete last character | Delete in text field |
-| 0-9 | Commit composition as English, then number | Insert number |
-
-## Special Characters
-
-The symbol keyboard includes 5 pages:
-
-| Page | Content |
-|------|---------|
-| 1 | Numbers (0-9), common punctuation (@#$%&-+etc.) |
-| 2 | Brackets and math symbols ({}[]<>「」『』etc.) |
-| 3 | Currency and units ($¥€£¢ %‰°℃℉±×÷√etc.) |
-| 4 | Miscellaneous symbols (©®™†‡§¶•·…—etc.) |
-| 5 | Arrows and shapes (←→↑↓▲▼◀▶★☆○●etc.) |
 
 ## Data Source
 
-Character data is from [OpenVanilla](https://github.com/openvanilla/openvanilla), specifically the `simplex.cin` file which contains ~13,000 character mappings in Traditional Chinese frequency order.
-
-## CI/CD
-
-This project uses GitHub Actions for continuous integration. On every push:
-- Builds debug and release APKs
-- Runs unit tests
-- Uploads signed release APKs as artifacts (when secrets are configured)
+Character data from [OpenVanilla](https://github.com/openvanilla/openvanilla):
+- **simplex-ext.cin** - Extended set with 63,189 characters (default)
+- **simplex.cin** - Standard set with 13,193 characters
 
 ## Privacy
 
 This keyboard:
-- Does NOT collect or transmit any data
-- Does NOT require internet permission
-- Processes all input locally on device
+- Does **NOT** collect or transmit any data
+- Does **NOT** require internet permission
+- Processes all input **locally on device**
+- Clipboard history stored locally, never uploaded
 
 See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for details.
 
