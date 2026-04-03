@@ -159,6 +159,12 @@ class DualQuickInputMethodService : InputMethodService() {
                     val remaining = composition.rawKeys.drop(consumed)
                     val remainingCases = letterCases.drop(consumed).toMutableList()
 
+                    // Record recent candidate usage before composition state changes
+                    val lookupCode = composition.rawKeys.take(consumed)
+                    if (ThemeManager.getRecentCandidatesEnabled(this@DualQuickInputMethodService) && lookupCode.isNotEmpty()) {
+                        RecentCandidateManager.recordUsage(this@DualQuickInputMethodService, lookupCode, candidate)
+                    }
+
                     if (remaining.isNotEmpty()) {
                         // Commit character and continue with remaining buffer
                         commitText(candidate)
