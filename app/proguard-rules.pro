@@ -42,3 +42,18 @@
 -keepclassmembers class * {
     public void onClick(android.view.View);
 }
+
+# Keep voice input classes (not covered by ui.** or data.**)
+-keep class com.awcjack.dualquickime.voice.** { *; }
+
+# Sherpa-ONNX - offline voice recognition (uses JNI)
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+
+# OpenCC - Chinese character conversion
+-keep class openccjava.** { *; }
+
+# Keep enum values
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
