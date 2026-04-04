@@ -26,10 +26,9 @@ object ModelDownloadManager {
     private const val SENSEVOICE_BASE_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09/resolve/main"
 
     // GitHub Release URL for Whisper Cantonese (converted via CI)
-    // The model files are automatically attached to app releases by the CI workflow
-    // For manual trigger, files are uploaded to the "whisper-cantonese-model" release
+    // Model files are uploaded to a dedicated release by the convert-whisper-model workflow
     // Format: https://github.com/OWNER/REPO/releases/download/TAG/FILE
-    private const val WHISPER_CANTONESE_BASE_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-cantonese-model"
+    private const val WHISPER_CANTONESE_BASE_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-cantonese-v1"
 
     // GitHub URL for Silero VAD
     private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"

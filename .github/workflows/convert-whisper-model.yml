@@ -1,17 +1,18 @@
 name: Convert Whisper Cantonese Model
 
 on:
-  # Run automatically when a new release is published
-  release:
-    types: [published]
-
-  # Also allow manual trigger
+  # Manual trigger only - run once to create the model release
+  # The model files don't change often, so no need to auto-rebuild on each app release
   workflow_dispatch:
     inputs:
       model_id:
         description: 'HuggingFace model ID'
         required: false
         default: 'alvanlii/whisper-small-cantonese'
+      release_tag:
+        description: 'Release tag name (must be unique, e.g., whisper-cantonese-v1)'
+        required: true
+        default: 'whisper-cantonese-v1'
 
 permissions:
   contents: write
@@ -36,7 +37,7 @@ jobs:
 
       - name: Convert model to sherpa-onnx format
         run: |
-          MODEL_ID="${{ github.event.inputs.model_id || 'alvanlii/whisper-small-cantonese' }}"
+          MODEL_ID="${{ github.event.inputs.model_id }}"
           python scripts/convert_whisper_cantonese.py \
             --model-id "$MODEL_ID" \
             --output-dir ./sherpa-onnx-whisper-small-cantonese
@@ -45,19 +46,10 @@ jobs:
         run: |
           ls -lah ./sherpa-onnx-whisper-small-cantonese/
 
-      # For both release trigger and manual trigger, upload to the dedicated whisper model release
-      # This avoids the immutable release problem (can't add files to published releases)
-      - name: Delete existing whisper-cantonese-model release
-        run: |
-          # Delete the existing release and tag if they exist
-          gh release delete whisper-cantonese-model --yes --cleanup-tag || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create whisper-cantonese-model release
+      - name: Create release with model files
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: whisper-cantonese-model
+          tag_name: ${{ github.event.inputs.release_tag }}
           name: Whisper Cantonese Model (sherpa-onnx)
           body: |
             ## Whisper Small Cantonese - sherpa-onnx Format
@@ -77,8 +69,11 @@ jobs:
             ### Total Size
             ~274 MB (int8 quantized)
 
-            ---
-            *This release is automatically updated when a new app version is released.*
+            ### Usage
+            The DualQuickIME app downloads these files from:
+            ```
+            https://github.com/awcjack/DualQuickIME/releases/download/${{ github.event.inputs.release_tag }}/
+            ```
           files: |
             ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx
             ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
@@ -98,3 +93,18 @@ jobs:
             ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
             ./sherpa-onnx-whisper-small-cantonese/small-tokens.txt
           retention-days: 7
+
+      - name: Print download URLs
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          echo "============================================"
+          echo "Model files uploaded to release: $TAG"
+          echo "============================================"
+          echo ""
+          echo "Download URLs:"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/small-encoder.int8.onnx"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/small-decoder.int8.onnx"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/small-tokens.txt"
+          echo ""
+          echo "Update WHISPER_CANTONESE_BASE_URL in ModelDownloadManager.kt if needed:"
+          echo "  private const val WHISPER_CANTONESE_BASE_URL = \"https://github.com/awcjack/DualQuickIME/releases/download/${TAG}\""
