@@ -658,12 +658,18 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun startVoiceRecognition() {
+        // Get the user's selected model type
+        val selectedModelType = VoiceModelType.fromId(ThemeManager.getVoiceModelType(this))
+
         // Initialize voice input manager if needed
         if (voiceInputManager == null) {
             voiceInputManager = VoiceInputManager(this)
         }
 
         val manager = voiceInputManager ?: return
+
+        // Set the model type before initializing
+        manager.setModelType(selectedModelType)
 
         // Initialize recognizer on background thread
         thread {
