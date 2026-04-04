@@ -192,8 +192,8 @@ def export_sherpa_onnx(model_id: str, output_dir: str, quantize: bool = True):
 
             # Pass through transformer layers
             for layer in self.layers:
-                # The layer returns a tensor directly (not a tuple)
-                x = layer(x, attention_mask=None)
+                # Call layer with all required arguments for compatibility across transformers versions
+                x = layer(x, attention_mask=None, layer_head_mask=None)[0]
 
             # Final layer norm
             x = self.layer_norm(x)
