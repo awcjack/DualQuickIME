@@ -1,0 +1,98 @@
+name: Convert Whisper Cantonese Model
+
+on:
+  # Run automatically when a new release is published
+  release:
+    types: [published]
+
+  # Also allow manual trigger
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: 'HuggingFace model ID'
+        required: false
+        default: 'alvanlii/whisper-small-cantonese'
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch transformers onnx onnxruntime optimum[onnxruntime]
+
+      - name: Convert model to sherpa-onnx format
+        run: |
+          MODEL_ID="${{ github.event.inputs.model_id || 'alvanlii/whisper-small-cantonese' }}"
+          python scripts/convert_whisper_cantonese.py \
+            --model-id "$MODEL_ID" \
+            --output-dir ./sherpa-onnx-whisper-small-cantonese
+
+      - name: List output files
+        run: |
+          ls -lah ./sherpa-onnx-whisper-small-cantonese/
+
+      - name: Upload individual model files to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          # Append to the existing release that triggered this workflow
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx
+            ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
+            ./sherpa-onnx-whisper-small-cantonese/small-tokens.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create standalone release (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: whisper-cantonese-model
+          name: Whisper Cantonese Model (sherpa-onnx)
+          body: |
+            ## Whisper Small Cantonese - sherpa-onnx Format
+
+            Converted from [alvanlii/whisper-small-cantonese](https://huggingface.co/alvanlii/whisper-small-cantonese)
+
+            ### Performance
+            - **CER (without punctuation)**: 7.93%
+            - **CER (with punctuation)**: 9.72%
+            - **Languages**: Cantonese (primary), English (HK accent)
+
+            ### Files
+            - `small-encoder.int8.onnx` - Encoder model (~112 MB)
+            - `small-decoder.int8.onnx` - Decoder model (~262 MB)
+            - `small-tokens.txt` - Token vocabulary (~820 KB)
+
+            ### Total Size
+            ~375 MB
+          files: |
+            ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx
+            ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
+            ./sherpa-onnx-whisper-small-cantonese/small-tokens.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-onnx-whisper-small-cantonese
+          path: |
+            ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx
+            ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
+            ./sherpa-onnx-whisper-small-cantonese/small-tokens.txt
+          retention-days: 7
