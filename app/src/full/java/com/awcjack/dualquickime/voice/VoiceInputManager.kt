@@ -553,14 +553,26 @@ class VoiceInputManager(private val context: Context) {
      * OpenCC conversion is applied only to CJK characters to avoid affecting English text.
      */
     private fun processRecognizedText(text: String): String {
+        // Strip Whisper special tokens (e.g., <|transcribe|>, <|notimestamps|>, <|en|>, etc.)
+        val cleaned = stripWhisperTokens(text)
+
         // Lowercase Latin characters first (voice models often output uppercase English)
-        val lowered = lowercaseLatinCharacters(text)
+        val lowered = lowercaseLatinCharacters(cleaned)
 
         // Apply OpenCC conversion (only affects CJK characters)
         val processed = convertToTraditional(lowered)
 
         // Then convert spoken punctuation to symbols
         return convertPunctuation(processed)
+    }
+
+    /**
+     * Strip Whisper special tokens from text.
+     * Whisper outputs tokens like <|transcribe|>, <|notimestamps|>, <|zh|>, <|en|>, etc.
+     */
+    private fun stripWhisperTokens(text: String): String {
+        // Remove all <|...|> tokens
+        return text.replace(Regex("<\\|[^|]+\\|>"), "").trim()
     }
 
     /**
