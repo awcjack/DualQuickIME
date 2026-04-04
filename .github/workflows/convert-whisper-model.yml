@@ -13,6 +13,9 @@ on:
         required: false
         default: 'alvanlii/whisper-small-cantonese'
 
+permissions:
+  contents: write
+
 jobs:
   convert:
     runs-on: ubuntu-latest
