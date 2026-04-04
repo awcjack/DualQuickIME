@@ -477,13 +477,55 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
+     * Check if a character belongs to a CJK Unicode block that OpenCC should process.
+     * Covers the main CJK ranges:
+     * - 0x2E80..0x2FDF: CJK Radicals Supplement, Kangxi Radicals
+     * - 0x3000..0x303F: CJK Symbols and Punctuation
+     * - 0x3400..0x4DBF: CJK Unified Ideographs Extension A
+     * - 0x4E00..0x9FFF: CJK Unified Ideographs (main block)
+     * - 0xF900..0xFAFF: CJK Compatibility Ideographs
+     * - 0xFE30..0xFE4F: CJK Compatibility Forms
+     * - 0xFF00..0xFFEF: Halfwidth and Fullwidth Forms
+     */
+    private fun isCjkCharacter(ch: Char): Boolean {
+        return ch.code in 0x4E00..0x9FFF || ch.code in 0x3400..0x4DBF ||
+                ch.code in 0x2E80..0x2FDF || ch.code in 0x3000..0x303F ||
+                ch.code in 0xF900..0xFAFF || ch.code in 0xFE30..0xFE4F ||
+                ch.code in 0xFF00..0xFFEF
+    }
+
+    /**
      * Convert Simplified Chinese to Traditional Chinese using OpenCC.
      * Uses s2hk (Simplified to Hong Kong Traditional) for best Cantonese support.
      * This is phrase-aware and handles context-dependent conversions.
+     * Only CJK characters are passed to OpenCC; non-CJK segments are preserved as-is.
      */
     private fun convertToTraditional(text: String): String {
         return try {
-            openccConverter?.convert(text) ?: text
+            val converter = openccConverter ?: return text
+            // Split text into CJK and non-CJK segments, apply OpenCC only to CJK portions
+            val result = StringBuilder()
+            val segment = StringBuilder()
+            var inCjk = false
+
+            for (ch in text) {
+                if (isCjkCharacter(ch) == inCjk) {
+                    segment.append(ch)
+                } else {
+                    // Flush the previous segment
+                    if (segment.isNotEmpty()) {
+                        result.append(if (inCjk) converter.convert(segment.toString()) else segment)
+                        segment.clear()
+                    }
+                    segment.append(ch)
+                    inCjk = !inCjk
+                }
+            }
+            // Flush remaining segment
+            if (segment.isNotEmpty()) {
+                result.append(if (inCjk) converter.convert(segment.toString()) else segment)
+            }
+            result.toString()
         } catch (e: Exception) {
             Log.w(TAG, "OpenCC conversion failed, returning original text: ${e.message}")
             text
@@ -491,41 +533,29 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Detect the dominant language from text content.
-     * Used for deciding whether to apply OpenCC conversion.
+     * Lowercase Latin characters in text while preserving non-Latin characters.
+     * Voice recognition models often output English in uppercase; this normalizes it.
+     * Handles full Unicode Latin character set including accented characters.
      */
-    private fun detectTextLanguage(text: String): String {
-        val latinChars = text.count { it in 'A'..'Z' || it in 'a'..'z' }
-        val cjkChars = text.count { it.code in 0x4E00..0x9FFF || it.code in 0x3400..0x4DBF }
-        val total = latinChars + cjkChars
-
-        return when {
-            total == 0 -> "unknown"
-            latinChars.toFloat() / total > 0.8 -> "en"
-            cjkChars.toFloat() / total > 0.8 -> "zh"
-            else -> "mixed"
+    private fun lowercaseLatinCharacters(text: String): String {
+        val result = StringBuilder(text.length)
+        for (ch in text) {
+            result.append(if (ch.isUpperCase() && ch.isLetter() && !isCjkCharacter(ch)) ch.lowercaseChar() else ch)
         }
+        return result.toString()
     }
 
     /**
      * Process recognized text: convert to traditional Chinese and replace punctuation.
-     * For Whisper Cantonese model, it already outputs Traditional Chinese,
-     * so we skip OpenCC conversion for pure Chinese text.
+     * English portions are lowercased since voice models tend to output uppercase English.
+     * OpenCC conversion is applied only to CJK characters to avoid affecting English text.
      */
     private fun processRecognizedText(text: String): String {
-        val detectedLang = detectTextLanguage(text)
+        // Lowercase Latin characters first (voice models often output uppercase English)
+        val lowered = lowercaseLatinCharacters(text)
 
-        // For SenseVoice, always apply OpenCC as it outputs Simplified Chinese
-        // For Whisper Cantonese, it already outputs Traditional, but we apply OpenCC
-        // for any Simplified characters that might slip through
-        val processed = when {
-            detectedLang == "en" -> text  // Pure English, no conversion needed
-            currentModelType == VoiceModelType.WHISPER_CANTONESE -> {
-                // Whisper Cantonese outputs Traditional, but apply OpenCC for safety
-                convertToTraditional(text)
-            }
-            else -> convertToTraditional(text)
-        }
+        // Apply OpenCC conversion (only affects CJK characters)
+        val processed = convertToTraditional(lowered)
 
         // Then convert spoken punctuation to symbols
         return convertPunctuation(processed)
