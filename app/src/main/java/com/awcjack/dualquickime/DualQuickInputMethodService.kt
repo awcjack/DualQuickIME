@@ -24,6 +24,7 @@ import com.awcjack.dualquickime.ui.KeyboardView
 import com.awcjack.dualquickime.ui.VoiceInputView
 import com.awcjack.dualquickime.voice.ModelDownloadManager
 import com.awcjack.dualquickime.voice.VoiceInputManager
+import com.awcjack.dualquickime.voice.VoiceModelType
 import kotlin.concurrent.thread
 
 /**
@@ -576,10 +577,13 @@ class DualQuickInputMethodService : InputMethodService() {
             return
         }
 
-        // Check if model is downloaded
-        if (!ModelDownloadManager.isModelDownloaded(this)) {
-            // Start model download
-            startModelDownload()
+        // Get the user's selected model type
+        val selectedModelType = VoiceModelType.fromId(ThemeManager.getVoiceModelType(this))
+
+        // Check if the selected model is downloaded
+        if (!ModelDownloadManager.isModelDownloaded(this, selectedModelType)) {
+            // Start model download for the selected model
+            startModelDownload(selectedModelType)
             return
         }
 
@@ -616,11 +620,11 @@ class DualQuickInputMethodService : InputMethodService() {
         }
     }
 
-    private fun startModelDownload() {
+    private fun startModelDownload(modelType: VoiceModelType) {
         voiceInputView?.setState(VoiceInputView.State.DOWNLOADING)
         voiceInputView?.setDownloadProgress(0, getString(R.string.voice_download_starting))
 
-        ModelDownloadManager.downloadModel(this, object : ModelDownloadManager.DownloadCallback {
+        ModelDownloadManager.downloadModel(this, modelType, object : ModelDownloadManager.DownloadCallback {
             override fun onProgress(bytesDownloaded: Long, totalBytes: Long, currentFile: String) {
                 val progress = ((bytesDownloaded.toFloat() / totalBytes) * 100).toInt()
                 val mbDownloaded = bytesDownloaded / 1_000_000
