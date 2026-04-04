@@ -26,23 +26,22 @@ enum class VoiceModelType(
         sizeBytes = 227_000_000L,
         sizeDisplayMB = 228,
         isAvailable = true
-    );
+    ),
 
-    // TODO: Whisper Cantonese is temporarily disabled because the model conversion
-    // from HuggingFace format to sherpa-onnx format is not yet working correctly.
-    // sherpa-onnx requires a specific ONNX format with KV-cache outputs that differs
-    // from standard HuggingFace/optimum ONNX export.
-    // See: https://github.com/k2-fsa/sherpa-onnx/blob/master/scripts/whisper/export-onnx.py
-    //
-    // WHISPER_CANTONESE(
-    //     id = "whisper_cantonese",
-    //     displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_name,
-    //     descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_desc,
-    //     modelDir = "sherpa-onnx-whisper-small-cantonese",
-    //     sizeBytes = 288_000_000L,
-    //     sizeDisplayMB = 274,
-    //     isAvailable = false
-    // );
+    /**
+     * Whisper Cantonese - Fine-tuned Whisper model optimized for Cantonese.
+     * Best accuracy for Cantonese-only input (7.93% CER).
+     * Based on alvanlii/whisper-small-cantonese from HuggingFace.
+     */
+    WHISPER_CANTONESE(
+        id = "whisper_cantonese",
+        displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_name,
+        descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_desc,
+        modelDir = "sherpa-onnx-whisper-small-cantonese",
+        sizeBytes = 395_000_000L,  // ~107 MB encoder + ~287 MB decoder + ~1 MB tokens
+        sizeDisplayMB = 395,
+        isAvailable = true
+    );
 
     companion object {
         /**
