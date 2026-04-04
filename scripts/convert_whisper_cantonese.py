@@ -14,152 +14,104 @@ Requirements:
 
 import argparse
 import os
-import warnings
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 
 def export_to_onnx(model_id: str, output_dir: str, quantize: bool = True):
     """Export HuggingFace Whisper model to sherpa-onnx compatible ONNX format."""
 
-    print(f"Loading model: {model_id}")
-
-    # Import here to allow --help without dependencies
-    import torch
-    from transformers import WhisperForConditionalGeneration, WhisperProcessor
+    print(f"Converting model: {model_id}")
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Load the model and processor
-    model = WhisperForConditionalGeneration.from_pretrained(model_id)
-    processor = WhisperProcessor.from_pretrained(model_id)
+    # Use optimum-cli for reliable Whisper ONNX export
+    temp_dir = output_path / "temp_optimum"
 
-    model.eval()
+    print("Step 1: Exporting with optimum-cli...")
+    cmd = [
+        sys.executable, "-m", "optimum.exporters.onnx",
+        "--model", model_id,
+        "--task", "automatic-speech-recognition",
+        str(temp_dir)
+    ]
 
-    # Export encoder
-    print("Exporting encoder...")
-    export_encoder(model, output_path)
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Error during optimum export:\n{result.stderr}")
+        raise RuntimeError("optimum export failed")
 
-    # Export decoder
-    print("Exporting decoder...")
-    export_decoder(model, output_path)
+    print("  Export complete")
+
+    # List what was exported
+    print("\n  Exported files:")
+    for f in sorted(temp_dir.glob("*.onnx")):
+        size_mb = f.stat().st_size / (1024 * 1024)
+        print(f"    {f.name}: {size_mb:.1f} MB")
+
+    # Rename/copy files to sherpa-onnx naming convention
+    print("\nStep 2: Preparing sherpa-onnx format...")
+
+    encoder_src = temp_dir / "encoder_model.onnx"
+    decoder_src = temp_dir / "decoder_model.onnx"
+
+    # Check for merged decoder (some models have this)
+    if not decoder_src.exists():
+        decoder_src = temp_dir / "decoder_model_merged.onnx"
+    if not decoder_src.exists():
+        decoder_src = temp_dir / "decoder_with_past_model.onnx"
+
+    encoder_dst = output_path / "small-encoder.onnx"
+    decoder_dst = output_path / "small-decoder.onnx"
+
+    if encoder_src.exists():
+        shutil.copy(encoder_src, encoder_dst)
+        print(f"  Copied encoder: {encoder_dst}")
+    else:
+        print(f"  Warning: encoder not found at {encoder_src}")
+        # List available files
+        print("  Available files:", list(temp_dir.glob("*.onnx")))
+
+    if decoder_src.exists():
+        shutil.copy(decoder_src, decoder_dst)
+        print(f"  Copied decoder: {decoder_dst}")
+    else:
+        print(f"  Warning: decoder not found, checking alternatives...")
+        for f in temp_dir.glob("*decoder*.onnx"):
+            shutil.copy(f, decoder_dst)
+            print(f"  Copied {f.name} as decoder: {decoder_dst}")
+            break
 
     # Export tokens
-    print("Exporting tokens...")
-    export_tokens(processor, output_path)
+    print("\nStep 3: Exporting tokens...")
+    export_tokens(model_id, output_path)
 
     # Quantize if requested
     if quantize:
-        print("Quantizing models to int8...")
+        print("\nStep 4: Quantizing models to int8...")
         quantize_models(output_path)
 
-    print(f"\nConversion complete! Output files in: {output_path}")
-    print("\nFiles created:")
+    # Cleanup temp directory
+    print("\nStep 5: Cleaning up...")
+    shutil.rmtree(temp_dir)
+    print("  Removed temporary files")
+
+    print(f"\n✓ Conversion complete! Output files in: {output_path}")
+    print("\nFinal files:")
     for f in sorted(output_path.glob("*")):
         if f.is_file():
             size_mb = f.stat().st_size / (1024 * 1024)
             print(f"  {f.name}: {size_mb:.1f} MB")
 
 
-def export_encoder(model, output_path: Path):
-    """Export the Whisper encoder to ONNX."""
-    import torch
-
-    encoder = model.get_encoder()
-
-    # Create dummy input (batch_size=1, 80 mel bins, 3000 frames = 30 seconds)
-    # Note: Whisper encoder expects fixed 3000 frames (30 seconds of audio)
-    dummy_input = torch.randn(1, 80, 3000)
-
-    encoder_path = output_path / "small-encoder.onnx"
-
-    # Use legacy exporter to avoid dynamic shape issues with newer PyTorch
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        torch.onnx.export(
-            encoder,
-            dummy_input,
-            str(encoder_path),
-            input_names=["mel"],
-            output_names=["encoder_out"],
-            # Only batch_size is dynamic; mel_length is fixed at 3000 for Whisper
-            dynamic_axes={
-                "mel": {0: "batch_size"},
-                "encoder_out": {0: "batch_size"},
-            },
-            opset_version=14,
-            do_constant_folding=True,
-            export_params=True,
-            dynamo=False,  # Use legacy exporter
-        )
-
-    print(f"  Saved: {encoder_path}")
-
-
-def export_decoder(model, output_path: Path):
-    """Export the Whisper decoder to ONNX."""
-    import torch
-
-    # For sherpa-onnx, we need to export the decoder with cross-attention
-    # This is more complex and requires custom wrapper
-
-    class DecoderWrapper(torch.nn.Module):
-        def __init__(self, decoder, proj_out):
-            super().__init__()
-            self.decoder = decoder
-            self.proj_out = proj_out
-
-        def forward(self, input_ids, encoder_hidden_states):
-            # Get decoder outputs
-            decoder_outputs = self.decoder(
-                input_ids=input_ids,
-                encoder_hidden_states=encoder_hidden_states,
-                return_dict=True,
-            )
-            # Project to vocabulary
-            lm_logits = self.proj_out(decoder_outputs.last_hidden_state)
-            return lm_logits
-
-    decoder_wrapper = DecoderWrapper(model.model.decoder, model.proj_out)
-    decoder_wrapper.eval()
-
-    # Dummy inputs
-    batch_size = 1
-    seq_len = 4
-    encoder_len = 1500
-    d_model = model.config.d_model
-
-    dummy_input_ids = torch.zeros(batch_size, seq_len, dtype=torch.long)
-    dummy_encoder_out = torch.randn(batch_size, encoder_len, d_model)
-
-    decoder_path = output_path / "small-decoder.onnx"
-
-    # Use legacy exporter
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        torch.onnx.export(
-            decoder_wrapper,
-            (dummy_input_ids, dummy_encoder_out),
-            str(decoder_path),
-            input_names=["input_ids", "encoder_out"],
-            output_names=["logits"],
-            dynamic_axes={
-                "input_ids": {0: "batch_size", 1: "seq_len"},
-                "encoder_out": {0: "batch_size", 1: "encoder_len"},
-                "logits": {0: "batch_size", 1: "seq_len"},
-            },
-            opset_version=14,
-            do_constant_folding=True,
-            export_params=True,
-            dynamo=False,  # Use legacy exporter
-        )
-
-    print(f"  Saved: {decoder_path}")
-
-
-def export_tokens(processor, output_path: Path):
+def export_tokens(model_id: str, output_path: Path):
     """Export the tokenizer vocabulary to tokens.txt format."""
+    from transformers import WhisperProcessor
 
+    processor = WhisperProcessor.from_pretrained(model_id)
     tokenizer = processor.tokenizer
     tokens_path = output_path / "small-tokens.txt"
 
@@ -168,7 +120,7 @@ def export_tokens(processor, output_path: Path):
             token = tokenizer.convert_ids_to_tokens(i)
             if token is None:
                 token = f"<unk_{i}>"
-            # Escape special characters
+            # Escape special characters for sherpa-onnx
             token = token.replace(" ", "▁")  # Use SentencePiece convention
             f.write(f"{token} {i}\n")
 
@@ -184,16 +136,19 @@ def quantize_models(output_path: Path):
         output_path_q = output_path / f"{name}.int8.onnx"
 
         if input_path.exists():
+            print(f"  Quantizing {name}...")
             quantize_dynamic(
                 str(input_path),
                 str(output_path_q),
                 weight_type=QuantType.QInt8,
             )
-            print(f"  Quantized: {output_path_q}")
+            print(f"    Created: {output_path_q}")
 
             # Remove original to save space
             input_path.unlink()
-            print(f"  Removed: {input_path}")
+            print(f"    Removed: {input_path}")
+        else:
+            print(f"  Warning: {input_path} not found, skipping quantization")
 
 
 def main():
