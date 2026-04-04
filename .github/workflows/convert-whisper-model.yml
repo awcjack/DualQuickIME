@@ -45,29 +45,16 @@ jobs:
         run: |
           ls -lah ./sherpa-onnx-whisper-small-cantonese/
 
-      - name: Upload individual model files to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
-          # Append to the existing release that triggered this workflow
-          tag_name: ${{ github.event.release.tag_name }}
-          files: |
-            ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx
-            ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
-            ./sherpa-onnx-whisper-small-cantonese/small-tokens.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Delete existing whisper-cantonese-model release (manual trigger)
-        if: github.event_name == 'workflow_dispatch'
+      # For both release trigger and manual trigger, upload to the dedicated whisper model release
+      # This avoids the immutable release problem (can't add files to published releases)
+      - name: Delete existing whisper-cantonese-model release
         run: |
           # Delete the existing release and tag if they exist
           gh release delete whisper-cantonese-model --yes --cleanup-tag || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create whisper-cantonese-model release (manual trigger)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Create whisper-cantonese-model release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: whisper-cantonese-model
@@ -89,6 +76,9 @@ jobs:
 
             ### Total Size
             ~274 MB (int8 quantized)
+
+            ---
+            *This release is automatically updated when a new app version is released.*
           files: |
             ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx
             ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
