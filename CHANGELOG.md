@@ -5,13 +5,28 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2026-04-04
+
+### Added
+- **Whisper Cantonese Voice Model**: Fine-tuned Whisper model optimized for Cantonese
+  - 7.93% CER (Character Error Rate) - best accuracy for Cantonese-only input
+  - ~395 MB download size (int8 quantized)
+  - Select in Settings > Voice Input > Voice Model
+
+### Fixed
+- Whisper Cantonese model now works correctly with sherpa-onnx runtime
+- Fixed model conversion to use proper KV-cache architecture
+
+### Technical
+- Custom HuggingFace to sherpa-onnx ONNX conversion with dynamic positional embeddings
+- CI workflow for automated model conversion (convert-whisper-model.yml)
+
 ## [1.5.0] - 2026-04-04
 
 ### Added
 - **Voice Model Architecture**: Extensible voice model type system for multiple speech recognition models
   - VoiceModelType enum for managing different models
   - SenseVoice (~228 MB): Multilingual auto language detection (Cantonese, Mandarin, English, Japanese, Korean)
-  - Whisper Cantonese (~395 MB): Fine-tuned for Cantonese with 7.93% CER
 
 ### Changed
 - Voice input now properly respects model type preference from settings
@@ -20,13 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Voice input button now correctly uses the selected model type
 - OpenCC conversion no longer affects English text in mixed-language output
-- Whisper Cantonese model now works correctly with sherpa-onnx
 
 ### Technical
 - Added VoiceModelType enum for extensible model management
 - Refactored VoiceInputManager to support multiple model types
-- Created custom HuggingFace to sherpa-onnx ONNX conversion script with proper KV-cache architecture
-- CI workflow for automated model conversion (convert-whisper-model.yml)
 
 ## [1.4.1] - 2026-04-03
 
