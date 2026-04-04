@@ -288,9 +288,11 @@ class VoiceInputManager(private val context: Context) {
             vad = Vad(config = vadConfig)
 
             // Initialize the appropriate recognizer based on model type
+            // Currently only SenseVoice is supported - Whisper Cantonese requires
+            // sherpa-onnx specific ONNX format which is not yet implemented
             recognizer = when (currentModelType) {
                 VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
-                VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
+                // VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
             }
 
             isInitialized = true

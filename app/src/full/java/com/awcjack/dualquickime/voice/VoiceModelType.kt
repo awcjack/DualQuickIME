@@ -10,7 +10,8 @@ enum class VoiceModelType(
     val descriptionResId: Int,
     val modelDir: String,
     val sizeBytes: Long,
-    val sizeDisplayMB: Int
+    val sizeDisplayMB: Int,
+    val isAvailable: Boolean = true  // Whether this model can be used
 ) {
     /**
      * SenseVoice - Multilingual model supporting auto language detection.
@@ -23,23 +24,25 @@ enum class VoiceModelType(
         descriptionResId = com.awcjack.dualquickime.R.string.voice_model_sensevoice_desc,
         modelDir = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09",
         sizeBytes = 227_000_000L,
-        sizeDisplayMB = 228
-    ),
-
-    /**
-     * Whisper Cantonese - Fine-tuned model optimized for Cantonese.
-     * Achieves 7.93% CER on Common Voice zh-HK dataset.
-     * Best for primarily Cantonese input with some English code-switching.
-     * Converted from alvanlii/whisper-small-cantonese via CI workflow.
-     */
-    WHISPER_CANTONESE(
-        id = "whisper_cantonese",
-        displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_name,
-        descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_desc,
-        modelDir = "sherpa-onnx-whisper-small-cantonese",
-        sizeBytes = 288_000_000L,
-        sizeDisplayMB = 274
+        sizeDisplayMB = 228,
+        isAvailable = true
     );
+
+    // TODO: Whisper Cantonese is temporarily disabled because the model conversion
+    // from HuggingFace format to sherpa-onnx format is not yet working correctly.
+    // sherpa-onnx requires a specific ONNX format with KV-cache outputs that differs
+    // from standard HuggingFace/optimum ONNX export.
+    // See: https://github.com/k2-fsa/sherpa-onnx/blob/master/scripts/whisper/export-onnx.py
+    //
+    // WHISPER_CANTONESE(
+    //     id = "whisper_cantonese",
+    //     displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_name,
+    //     descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_desc,
+    //     modelDir = "sherpa-onnx-whisper-small-cantonese",
+    //     sizeBytes = 288_000_000L,
+    //     sizeDisplayMB = 274,
+    //     isAvailable = false
+    // );
 
     companion object {
         /**

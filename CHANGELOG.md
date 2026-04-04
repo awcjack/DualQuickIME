@@ -8,21 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.5.0] - 2026-04-04
 
 ### Added
-- **Voice Model Selection**: Choose between different voice recognition models in Settings
-  - **SenseVoice** (~228 MB): Multilingual model with auto language detection (Cantonese, Mandarin, English, Japanese, Korean)
-  - **Whisper Cantonese** (~274 MB): Fine-tuned model optimized for Cantonese with 7.93% CER
-- **Whisper Cantonese Model**: High-accuracy Cantonese speech recognition
-  - Converted from [alvanlii/whisper-small-cantonese](https://huggingface.co/alvanlii/whisper-small-cantonese)
-  - Best choice for primarily Cantonese input with English code-switching
+- **Voice Model Architecture**: Extensible voice model type system for future model additions
+  - VoiceModelType enum for managing different speech recognition models
+  - Currently supports SenseVoice (~228 MB) with auto language detection
 
 ### Changed
-- Voice model settings UI redesigned with model selection dialog
-- Model download shows selected model name and size
+- Voice input now properly respects model type preference from settings
+- Improved text processing: lowercase English output, CJK-aware OpenCC conversion
+
+### Fixed
+- Voice input button now correctly uses the selected model type
+- OpenCC conversion no longer affects English text in mixed-language output
 
 ### Technical
 - Added VoiceModelType enum for extensible model management
-- CI workflow automatically converts Whisper model to sherpa-onnx format on release
-- Model files hosted on GitHub Releases for reliable downloads
+- Refactored VoiceInputManager to support multiple model types
+- Note: Whisper Cantonese model integration is pending - requires sherpa-onnx specific ONNX format conversion
 
 ## [1.4.1] - 2026-04-03
 
