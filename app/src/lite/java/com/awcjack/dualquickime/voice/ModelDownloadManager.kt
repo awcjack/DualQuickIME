@@ -18,10 +18,15 @@ object ModelDownloadManager {
     }
 
     fun isModelDownloaded(context: Context): Boolean = false
+    fun isModelDownloaded(context: Context, modelType: VoiceModelType): Boolean = false
     fun getDownloadProgress(context: Context): Pair<Long, Long> = 0L to 0L
     fun downloadModel(context: Context, callback: DownloadCallback) {
         callback.onError("Voice input not available in lite version")
     }
+    fun downloadModel(context: Context, modelType: VoiceModelType, callback: DownloadCallback) {
+        callback.onError("Voice input not available in lite version")
+    }
     fun deleteModel(context: Context) {}
+    fun deleteModel(context: Context, modelType: VoiceModelType) {}
     fun getModelSizeString(): String = "0 MB"
 }
