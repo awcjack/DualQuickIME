@@ -490,22 +490,22 @@ class KeyboardView @JvmOverloads constructor(
             background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
             elevation = dpToPx(2).toFloat()
 
-            // English letter
+            // Chinese radical (primary, larger)
             addView(TextView(context).apply {
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
                 gravity = Gravity.CENTER or Gravity.BOTTOM
-                text = char.uppercaseChar().toString()
+                text = radical
                 textSize = 20f
                 setTextColor(colors.keyTextPrimary)
                 typeface = Typeface.DEFAULT_BOLD
                 includeFontPadding = false
             })
 
-            // Chinese radical
+            // English letter (secondary, smaller)
             addView(TextView(context).apply {
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 0.65f)
                 gravity = Gravity.CENTER or Gravity.TOP
-                text = radical
+                text = char.uppercaseChar().toString()
                 textSize = 12f
                 setTextColor(colors.keyTextSecondary)
                 includeFontPadding = false
