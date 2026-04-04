@@ -13,6 +13,7 @@ class VoiceInputManager(private val context: Context) {
 
     fun isModelAvailable(): Boolean = false
     fun hasAudioPermission(): Boolean = false
+    fun setModelType(modelType: VoiceModelType) {}
     fun initialize(): Boolean = false
     fun setOnResultListener(callback: (String, Boolean) -> Unit) {}
     fun setOnErrorListener(callback: (String) -> Unit) {}
