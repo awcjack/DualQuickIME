@@ -58,10 +58,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create standalone release (manual trigger)
+      - name: Upload to whisper-cantonese-model release (manual trigger)
         if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v1
         with:
+          # Upload to the dedicated whisper model release tag
           tag_name: whisper-cantonese-model
           name: Whisper Cantonese Model (sherpa-onnx)
           body: |
@@ -75,18 +76,19 @@ jobs:
             - **Languages**: Cantonese (primary), English (HK accent)
 
             ### Files
-            - `small-encoder.int8.onnx` - Encoder model (~112 MB)
-            - `small-decoder.int8.onnx` - Decoder model (~262 MB)
-            - `small-tokens.txt` - Token vocabulary (~820 KB)
+            - `small-encoder.int8.onnx` - Encoder model (~88 MB)
+            - `small-decoder.int8.onnx` - Decoder model (~186 MB)
+            - `small-tokens.txt` - Token vocabulary (~0.7 MB)
 
             ### Total Size
-            ~375 MB
+            ~274 MB (int8 quantized)
           files: |
             ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx
             ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
             ./sherpa-onnx-whisper-small-cantonese/small-tokens.txt
           draft: false
           prerelease: false
+          make_latest: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
