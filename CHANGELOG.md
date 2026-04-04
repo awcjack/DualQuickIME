@@ -5,6 +5,25 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-04-04
+
+### Added
+- **Voice Model Selection**: Choose between different voice recognition models in Settings
+  - **SenseVoice** (~228 MB): Multilingual model with auto language detection (Cantonese, Mandarin, English, Japanese, Korean)
+  - **Whisper Cantonese** (~274 MB): Fine-tuned model optimized for Cantonese with 7.93% CER
+- **Whisper Cantonese Model**: High-accuracy Cantonese speech recognition
+  - Converted from [alvanlii/whisper-small-cantonese](https://huggingface.co/alvanlii/whisper-small-cantonese)
+  - Best choice for primarily Cantonese input with English code-switching
+
+### Changed
+- Voice model settings UI redesigned with model selection dialog
+- Model download shows selected model name and size
+
+### Technical
+- Added VoiceModelType enum for extensible model management
+- CI workflow automatically converts Whisper model to sherpa-onnx format on release
+- Model files hosted on GitHub Releases for reliable downloads
+
 ## [1.4.1] - 2026-04-03
 
 ### Changed
