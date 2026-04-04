@@ -46,43 +46,50 @@ jobs:
         run: |
           ls -lah ./sherpa-onnx-whisper-small-cantonese/
 
+      - name: Generate release notes
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          cat > RELEASE_NOTES.md << 'EOF'
+          ## Whisper Small Cantonese - sherpa-onnx Format
+
+          Converted from [alvanlii/whisper-small-cantonese](https://huggingface.co/alvanlii/whisper-small-cantonese)
+
+          ### Performance
+          - **CER (without punctuation)**: 7.93%
+          - **CER (with punctuation)**: 9.72%
+          - **Languages**: Cantonese (primary), English (HK accent)
+
+          ### Files
+          - `small-encoder.int8.onnx` - Encoder model (~88 MB)
+          - `small-decoder.int8.onnx` - Decoder model (~186 MB)
+          - `small-tokens.txt` - Token vocabulary (~0.7 MB)
+
+          ### Total Size
+          ~274 MB (int8 quantized)
+
+          ### Usage
+          The DualQuickIME app downloads these files from:
+          ```
+          https://github.com/awcjack/DualQuickIME/releases/download/TAG/
+          ```
+          EOF
+          sed -i "s|TAG|${TAG}|g" RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      # Use gh release create to upload files atomically with release creation
+      # This avoids the "immutable release" error that occurs when trying to
+      # upload files after the release is already published
       - name: Create release with model files
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: Whisper Cantonese Model (sherpa-onnx)
-          body: |
-            ## Whisper Small Cantonese - sherpa-onnx Format
-
-            Converted from [alvanlii/whisper-small-cantonese](https://huggingface.co/alvanlii/whisper-small-cantonese)
-
-            ### Performance
-            - **CER (without punctuation)**: 7.93%
-            - **CER (with punctuation)**: 9.72%
-            - **Languages**: Cantonese (primary), English (HK accent)
-
-            ### Files
-            - `small-encoder.int8.onnx` - Encoder model (~88 MB)
-            - `small-decoder.int8.onnx` - Decoder model (~186 MB)
-            - `small-tokens.txt` - Token vocabulary (~0.7 MB)
-
-            ### Total Size
-            ~274 MB (int8 quantized)
-
-            ### Usage
-            The DualQuickIME app downloads these files from:
-            ```
-            https://github.com/awcjack/DualQuickIME/releases/download/${{ github.event.inputs.release_tag }}/
-            ```
-          files: |
-            ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx
-            ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx
-            ./sherpa-onnx-whisper-small-cantonese/small-tokens.txt
-          draft: false
-          prerelease: false
-          make_latest: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          gh release create "$TAG" \
+            --title "Whisper Cantonese Model (sherpa-onnx)" \
+            --notes-file RELEASE_NOTES.md \
+            ./sherpa-onnx-whisper-small-cantonese/small-encoder.int8.onnx \
+            ./sherpa-onnx-whisper-small-cantonese/small-decoder.int8.onnx \
+            ./sherpa-onnx-whisper-small-cantonese/small-tokens.txt
 
       - name: Upload artifact (for debugging)
         uses: actions/upload-artifact@v4
