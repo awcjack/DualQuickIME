@@ -331,12 +331,14 @@ class VoiceInputManager(private val context: Context) {
 
     /**
      * Initialize Whisper Cantonese recognizer.
+     * Note: Uses "zh" language code because the fine-tuned model was trained on Cantonese
+     * data using the Chinese (zh) base model. The model doesn't have a native "yue" language token.
      */
     private fun initWhisperRecognizer(modelDir: String): OfflineRecognizer {
         val whisperConfig = OfflineWhisperModelConfig(
             encoder = "$modelDir/$WHISPER_ENCODER_FILE",
             decoder = "$modelDir/$WHISPER_DECODER_FILE",
-            language = "yue",  // Cantonese language code
+            language = "zh",  // Use Chinese - model fine-tuned for Cantonese on zh base
             task = "transcribe"
         )
 
