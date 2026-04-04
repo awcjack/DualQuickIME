@@ -60,12 +60,12 @@ jobs:
           - **Languages**: Cantonese (primary), English (HK accent)
 
           ### Files
-          - `small-encoder.int8.onnx` - Encoder model (~88 MB)
-          - `small-decoder.int8.onnx` - Decoder model (~186 MB)
-          - `small-tokens.txt` - Token vocabulary (~0.7 MB)
+          - `small-encoder.int8.onnx` - Encoder model (~107 MB)
+          - `small-decoder.int8.onnx` - Decoder model (~287 MB)
+          - `small-tokens.txt` - Token vocabulary (~1 MB)
 
           ### Total Size
-          ~274 MB (int8 quantized)
+          ~395 MB (int8 quantized)
 
           ### Usage
           The DualQuickIME app downloads these files from:
