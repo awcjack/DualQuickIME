@@ -37,8 +37,8 @@ enum class VoiceModelType(
         displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_name,
         descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_cantonese_desc,
         modelDir = "sherpa-onnx-whisper-small-cantonese",
-        sizeBytes = 375_000_000L,
-        sizeDisplayMB = 375
+        sizeBytes = 288_000_000L,
+        sizeDisplayMB = 274
     );
 
     companion object {
