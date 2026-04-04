@@ -58,11 +58,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload to whisper-cantonese-model release (manual trigger)
+      - name: Delete existing whisper-cantonese-model release (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # Delete the existing release and tag if they exist
+          gh release delete whisper-cantonese-model --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create whisper-cantonese-model release (manual trigger)
         if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v1
         with:
-          # Upload to the dedicated whisper model release tag
           tag_name: whisper-cantonese-model
           name: Whisper Cantonese Model (sherpa-onnx)
           body: |
