@@ -14,12 +14,12 @@ import java.io.File
 import kotlin.concurrent.thread
 
 /**
- * Manages voice input using Sherpa-ONNX SenseVoice for offline speech recognition.
- * Uses Silero VAD for voice activity detection (simulated streaming).
- * Supports Cantonese, Mandarin Chinese, English, Japanese, and Korean.
+ * Manages voice input using Sherpa-ONNX for offline speech recognition.
+ * Supports multiple model types:
+ * - SenseVoice: Multilingual (Cantonese, Mandarin, English, Japanese, Korean)
+ * - Whisper Cantonese: Optimized for Cantonese with 7.93% CER
  *
- * The SenseVoice model is non-streaming but extremely fast (~70ms for 10s audio),
- * so we use VAD to detect speech segments and transcribe them as they complete.
+ * Uses Silero VAD for voice activity detection (simulated streaming).
  */
 class VoiceInputManager(private val context: Context) {
 
@@ -33,9 +33,14 @@ class VoiceInputManager(private val context: Context) {
         // Model directory name (for compatibility with ModelDownloadManager)
         const val MODEL_DIR = ModelDownloadManager.SENSEVOICE_MODEL_DIR
 
-        // Model files
-        private const val MODEL_FILE = "model.int8.onnx"
-        private const val TOKENS_FILE = "tokens.txt"
+        // SenseVoice model files
+        private const val SENSEVOICE_MODEL_FILE = "model.int8.onnx"
+        private const val SENSEVOICE_TOKENS_FILE = "tokens.txt"
+
+        // Whisper Cantonese model files (converted via CI workflow)
+        private const val WHISPER_ENCODER_FILE = "small-encoder.int8.onnx"
+        private const val WHISPER_DECODER_FILE = "small-decoder.int8.onnx"
+        private const val WHISPER_TOKENS_FILE = "small-tokens.txt"
 
         // Punctuation conversion map (spoken words to symbols)
         // Supports Cantonese, Mandarin and English
@@ -169,7 +174,10 @@ class VoiceInputManager(private val context: Context) {
         )
     }
 
-    // SenseVoice offline recognizer
+    // Current model type
+    private var currentModelType: VoiceModelType = VoiceModelType.DEFAULT
+
+    // Offline recognizer (SenseVoice or Whisper)
     private var recognizer: OfflineRecognizer? = null
 
     // Silero VAD
@@ -199,10 +207,17 @@ class VoiceInputManager(private val context: Context) {
     private var accumulatedText = StringBuilder()
 
     /**
-     * Check if the model files are downloaded and available.
+     * Check if the model files are downloaded and available for the current model type.
      */
     fun isModelAvailable(): Boolean {
-        return ModelDownloadManager.isModelDownloaded(context)
+        return ModelDownloadManager.isModelDownloaded(context, currentModelType)
+    }
+
+    /**
+     * Check if a specific model type is available.
+     */
+    fun isModelAvailable(modelType: VoiceModelType): Boolean {
+        return ModelDownloadManager.isModelDownloaded(context, modelType)
     }
 
     /**
@@ -216,18 +231,39 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
+     * Get the current model type.
+     */
+    fun getCurrentModelType(): VoiceModelType = currentModelType
+
+    /**
+     * Set the model type to use. Will reinitialize if already initialized.
+     */
+    fun setModelType(modelType: VoiceModelType) {
+        if (currentModelType != modelType) {
+            val wasInitialized = isInitialized
+            if (wasInitialized) {
+                release()
+            }
+            currentModelType = modelType
+            if (wasInitialized && isModelAvailable(modelType)) {
+                initialize()
+            }
+        }
+    }
+
+    /**
      * Initialize the recognizer. Must be called on a background thread.
      * @return true if initialization succeeded
      */
     fun initialize(): Boolean {
         if (isInitialized) return true
         if (!isModelAvailable()) {
-            Log.e(TAG, "Model files not available")
+            Log.e(TAG, "Model files not available for ${currentModelType.id}")
             return false
         }
 
         try {
-            val modelDir = File(context.filesDir, MODEL_DIR).absolutePath
+            val modelDir = File(context.filesDir, currentModelType.modelDir).absolutePath
             val vadModelPath = File(context.filesDir, ModelDownloadManager.VAD_MODEL_FILE).absolutePath
 
             // Initialize OpenCC converter (Simplified to Hong Kong Traditional)
@@ -251,33 +287,70 @@ class VoiceInputManager(private val context: Context) {
 
             vad = Vad(config = vadConfig)
 
-            // Initialize SenseVoice recognizer
-            val senseVoiceConfig = OfflineSenseVoiceModelConfig(
-                model = "$modelDir/$MODEL_FILE",
-                language = "auto",  // Auto-detect language (zh/yue/en/ja/ko)
-                useInverseTextNormalization = false  // 2025-09-09 model doesn't support ITN
-            )
+            // Initialize the appropriate recognizer based on model type
+            recognizer = when (currentModelType) {
+                VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
+                VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
+            }
 
-            val modelConfig = OfflineModelConfig(
-                senseVoice = senseVoiceConfig,
-                tokens = "$modelDir/$TOKENS_FILE",
-                numThreads = 2,
-                debug = false
-            )
-
-            val config = OfflineRecognizerConfig(
-                modelConfig = modelConfig,
-                decodingMethod = "greedy_search"
-            )
-
-            recognizer = OfflineRecognizer(config = config)
             isInitialized = true
-            Log.i(TAG, "SenseVoice recognizer initialized successfully")
+            Log.i(TAG, "${currentModelType.id} recognizer initialized successfully")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize recognizer: ${e.message}", e)
             return false
         }
+    }
+
+    /**
+     * Initialize SenseVoice recognizer.
+     */
+    private fun initSenseVoiceRecognizer(modelDir: String): OfflineRecognizer {
+        val senseVoiceConfig = OfflineSenseVoiceModelConfig(
+            model = "$modelDir/$SENSEVOICE_MODEL_FILE",
+            language = "auto",  // Auto-detect language (zh/yue/en/ja/ko)
+            useInverseTextNormalization = false  // 2025-09-09 model doesn't support ITN
+        )
+
+        val modelConfig = OfflineModelConfig(
+            senseVoice = senseVoiceConfig,
+            tokens = "$modelDir/$SENSEVOICE_TOKENS_FILE",
+            numThreads = 2,
+            debug = false
+        )
+
+        val config = OfflineRecognizerConfig(
+            modelConfig = modelConfig,
+            decodingMethod = "greedy_search"
+        )
+
+        return OfflineRecognizer(config = config)
+    }
+
+    /**
+     * Initialize Whisper Cantonese recognizer.
+     */
+    private fun initWhisperRecognizer(modelDir: String): OfflineRecognizer {
+        val whisperConfig = OfflineWhisperModelConfig(
+            encoder = "$modelDir/$WHISPER_ENCODER_FILE",
+            decoder = "$modelDir/$WHISPER_DECODER_FILE",
+            language = "yue",  // Cantonese language code
+            task = "transcribe"
+        )
+
+        val modelConfig = OfflineModelConfig(
+            whisper = whisperConfig,
+            tokens = "$modelDir/$WHISPER_TOKENS_FILE",
+            numThreads = 2,
+            debug = false
+        )
+
+        val config = OfflineRecognizerConfig(
+            modelConfig = modelConfig,
+            decodingMethod = "greedy_search"
+        )
+
+        return OfflineRecognizer(config = config)
     }
 
     /**
@@ -343,7 +416,7 @@ class VoiceInputManager(private val context: Context) {
                 processAudioWithVad()
             }
 
-            Log.i(TAG, "Recording started")
+            Log.i(TAG, "Recording started with ${currentModelType.id}")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start recording: ${e.message}", e)
@@ -418,13 +491,44 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
+     * Detect the dominant language from text content.
+     * Used for deciding whether to apply OpenCC conversion.
+     */
+    private fun detectTextLanguage(text: String): String {
+        val latinChars = text.count { it in 'A'..'Z' || it in 'a'..'z' }
+        val cjkChars = text.count { it.code in 0x4E00..0x9FFF || it.code in 0x3400..0x4DBF }
+        val total = latinChars + cjkChars
+
+        return when {
+            total == 0 -> "unknown"
+            latinChars.toFloat() / total > 0.8 -> "en"
+            cjkChars.toFloat() / total > 0.8 -> "zh"
+            else -> "mixed"
+        }
+    }
+
+    /**
      * Process recognized text: convert to traditional Chinese and replace punctuation.
+     * For Whisper Cantonese model, it already outputs Traditional Chinese,
+     * so we skip OpenCC conversion for pure Chinese text.
      */
     private fun processRecognizedText(text: String): String {
-        // First convert simplified to traditional Chinese using OpenCC
-        val traditional = convertToTraditional(text)
+        val detectedLang = detectTextLanguage(text)
+
+        // For SenseVoice, always apply OpenCC as it outputs Simplified Chinese
+        // For Whisper Cantonese, it already outputs Traditional, but we apply OpenCC
+        // for any Simplified characters that might slip through
+        val processed = when {
+            detectedLang == "en" -> text  // Pure English, no conversion needed
+            currentModelType == VoiceModelType.WHISPER_CANTONESE -> {
+                // Whisper Cantonese outputs Traditional, but apply OpenCC for safety
+                convertToTraditional(text)
+            }
+            else -> convertToTraditional(text)
+        }
+
         // Then convert spoken punctuation to symbols
-        return convertPunctuation(traditional)
+        return convertPunctuation(processed)
     }
 
     /**
@@ -441,7 +545,7 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Process audio using VAD for endpoint detection and SenseVoice for transcription.
+     * Process audio using VAD for endpoint detection and the selected model for transcription.
      */
     private fun processAudioWithVad() {
         val rec = recognizer ?: return
@@ -466,7 +570,7 @@ class VoiceInputManager(private val context: Context) {
                         val segment = vadInstance.front()
                         vadInstance.pop()
 
-                        // Transcribe the speech segment using SenseVoice
+                        // Transcribe the speech segment
                         val segmentSamples = segment.samples
                         if (segmentSamples.isNotEmpty()) {
                             val stream = rec.createStream()
