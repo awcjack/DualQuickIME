@@ -63,12 +63,18 @@
     <string name="settings_voice_input">語音輸入</string>
     <string name="settings_voice_enable">啟用語音輸入</string>
     <string name="settings_voice_enable_desc">使用離線語音辨識（粵語/中文/英文）</string>
+    <string name="settings_voice_select_model">選擇模型</string>
+    <string name="settings_voice_selected_model">已選模型</string>
     <string name="settings_voice_download_model">下載語音模型</string>
+    <string name="settings_voice_download_model_format">下載模型（%d MB）</string>
     <string name="settings_voice_model_size">模型大小：228 MB</string>
     <string name="settings_voice_model_downloaded">語音模型已下載</string>
+    <string name="settings_voice_model_deleted">語音模型已刪除</string>
+    <string name="settings_voice_model_status_downloaded">已下載</string>
     <string name="settings_voice_delete_model">刪除語音模型</string>
     <string name="settings_voice_delete_confirm_title">刪除語音模型？</string>
     <string name="settings_voice_delete_confirm_message">這將刪除 228 MB 的語音模型。您可以之後再次下載。</string>
+    <string name="settings_voice_delete_confirm_message_format">這將刪除 %1$s（%2$d MB）。您可以之後再次下載。</string>
     <string name="settings_voice_delete_confirm_yes">刪除</string>
     <string name="settings_voice_permission">錄音權限</string>
     <string name="settings_voice_permission_desc">語音輸入需要此權限</string>
@@ -82,4 +88,10 @@
     <string name="voice_permission_required">語音輸入需要錄音權限</string>
     <string name="voice_init_failed">語音辨識初始化失敗</string>
     <string name="voice_start_failed">無法開始錄音</string>
+
+    <!-- Voice Model Types -->
+    <string name="voice_model_sensevoice_name">SenseVoice（多語言）</string>
+    <string name="voice_model_sensevoice_desc">自動辨識粵語、普通話、英文、日文、韓文</string>
+    <string name="voice_model_whisper_cantonese_name">Whisper 廣東話</string>
+    <string name="voice_model_whisper_cantonese_desc">針對廣東話優化（7.93% CER），支援香港英語</string>
 </resources>
