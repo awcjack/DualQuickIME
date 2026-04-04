@@ -9,12 +9,12 @@ Usage:
     python convert_whisper_cantonese.py --output-dir ./sherpa-onnx-whisper-small-cantonese
 
 Requirements:
-    pip install torch transformers onnx onnxruntime optimum[onnxruntime]
+    pip install torch transformers onnx onnxruntime onnxscript optimum[onnxruntime]
 """
 
 import argparse
 import os
-import shutil
+import warnings
 from pathlib import Path
 
 
@@ -68,23 +68,30 @@ def export_encoder(model, output_path: Path):
     encoder = model.get_encoder()
 
     # Create dummy input (batch_size=1, 80 mel bins, 3000 frames = 30 seconds)
+    # Note: Whisper encoder expects fixed 3000 frames (30 seconds of audio)
     dummy_input = torch.randn(1, 80, 3000)
 
     encoder_path = output_path / "small-encoder.onnx"
 
-    torch.onnx.export(
-        encoder,
-        dummy_input,
-        str(encoder_path),
-        input_names=["mel"],
-        output_names=["encoder_out"],
-        dynamic_axes={
-            "mel": {0: "batch_size", 2: "mel_length"},
-            "encoder_out": {0: "batch_size", 1: "encoder_length"},
-        },
-        opset_version=14,
-        do_constant_folding=True,
-    )
+    # Use legacy exporter to avoid dynamic shape issues with newer PyTorch
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        torch.onnx.export(
+            encoder,
+            dummy_input,
+            str(encoder_path),
+            input_names=["mel"],
+            output_names=["encoder_out"],
+            # Only batch_size is dynamic; mel_length is fixed at 3000 for Whisper
+            dynamic_axes={
+                "mel": {0: "batch_size"},
+                "encoder_out": {0: "batch_size"},
+            },
+            opset_version=14,
+            do_constant_folding=True,
+            export_params=True,
+            dynamo=False,  # Use legacy exporter
+        )
 
     print(f"  Saved: {encoder_path}")
 
@@ -127,20 +134,25 @@ def export_decoder(model, output_path: Path):
 
     decoder_path = output_path / "small-decoder.onnx"
 
-    torch.onnx.export(
-        decoder_wrapper,
-        (dummy_input_ids, dummy_encoder_out),
-        str(decoder_path),
-        input_names=["input_ids", "encoder_out"],
-        output_names=["logits"],
-        dynamic_axes={
-            "input_ids": {0: "batch_size", 1: "seq_len"},
-            "encoder_out": {0: "batch_size", 1: "encoder_len"},
-            "logits": {0: "batch_size", 1: "seq_len"},
-        },
-        opset_version=14,
-        do_constant_folding=True,
-    )
+    # Use legacy exporter
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        torch.onnx.export(
+            decoder_wrapper,
+            (dummy_input_ids, dummy_encoder_out),
+            str(decoder_path),
+            input_names=["input_ids", "encoder_out"],
+            output_names=["logits"],
+            dynamic_axes={
+                "input_ids": {0: "batch_size", 1: "seq_len"},
+                "encoder_out": {0: "batch_size", 1: "encoder_len"},
+                "logits": {0: "batch_size", 1: "seq_len"},
+            },
+            opset_version=14,
+            do_constant_folding=True,
+            export_params=True,
+            dynamo=False,  # Use legacy exporter
+        )
 
     print(f"  Saved: {decoder_path}")
 
@@ -179,8 +191,9 @@ def quantize_models(output_path: Path):
             )
             print(f"  Quantized: {output_path_q}")
 
-            # Remove original to save space (optional)
-            # input_path.unlink()
+            # Remove original to save space
+            input_path.unlink()
+            print(f"  Removed: {input_path}")
 
 
 def main():
