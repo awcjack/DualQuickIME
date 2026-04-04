@@ -24,6 +24,7 @@ import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.RecentCandidateManager
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.voice.ModelDownloadManager
+import com.awcjack.dualquickime.voice.VoiceModelType
 
 /**
  * Settings activity for the DualQuick IME.
@@ -48,6 +49,11 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var textVoiceModelStatus: TextView
     private lateinit var btnVoicePermission: Button
     private lateinit var textVoicePermissionStatus: TextView
+    private lateinit var btnSelectModel: Button
+    private lateinit var textSelectedModel: TextView
+
+    // Currently selected model type for download
+    private var selectedModelType: VoiceModelType = VoiceModelType.DEFAULT
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +72,8 @@ class SettingsActivity : AppCompatActivity() {
         textVoiceModelStatus = findViewById(R.id.textVoiceModelStatus)
         btnVoicePermission = findViewById(R.id.btnVoicePermission)
         textVoicePermissionStatus = findViewById(R.id.textVoicePermissionStatus)
+        btnSelectModel = findViewById(R.id.btnSelectModel)
+        textSelectedModel = findViewById(R.id.textSelectedModel)
 
         setupThemeSelection()
         setupCompositionToggle()
@@ -155,6 +163,10 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupVoiceInputSettings() {
+        // Load saved model type
+        val savedModelTypeId = ThemeManager.getVoiceModelType(this)
+        selectedModelType = VoiceModelType.fromId(savedModelTypeId)
+
         // Set current value
         switchVoiceEnabled.isChecked = ThemeManager.getVoiceInputEnabled(this)
 
@@ -163,17 +175,24 @@ class SettingsActivity : AppCompatActivity() {
             ThemeManager.setVoiceInputEnabled(this, isChecked)
         }
 
+        // Model selection button
+        btnSelectModel.setOnClickListener {
+            showModelSelectionDialog()
+        }
+
         // Model download/delete button
         btnVoiceModel.setOnClickListener {
-            if (ModelDownloadManager.isModelDownloaded(this)) {
+            if (ModelDownloadManager.isModelDownloaded(this, selectedModelType)) {
                 // Confirm delete
                 AlertDialog.Builder(this)
                     .setTitle(R.string.settings_voice_delete_confirm_title)
-                    .setMessage(R.string.settings_voice_delete_confirm_message)
+                    .setMessage(getString(R.string.settings_voice_delete_confirm_message_format,
+                        getString(selectedModelType.displayNameResId),
+                        selectedModelType.sizeDisplayMB))
                     .setPositiveButton(R.string.settings_voice_delete_confirm_yes) { _, _ ->
-                        ModelDownloadManager.deleteModel(this)
+                        ModelDownloadManager.deleteModel(this, selectedModelType)
                         updateVoiceSettingsUI()
-                        Toast.makeText(this, "Voice model deleted", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, R.string.settings_voice_model_deleted, Toast.LENGTH_SHORT).show()
                     }
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
@@ -191,17 +210,42 @@ class SettingsActivity : AppCompatActivity() {
         updateVoiceSettingsUI()
     }
 
+    private fun showModelSelectionDialog() {
+        val modelTypes = VoiceModelType.entries.toTypedArray()
+        val modelNames = modelTypes.map { modelType ->
+            val downloaded = ModelDownloadManager.isModelDownloaded(this, modelType)
+            val status = if (downloaded) getString(R.string.settings_voice_model_status_downloaded) else "${modelType.sizeDisplayMB} MB"
+            "${getString(modelType.displayNameResId)} ($status)"
+        }.toTypedArray()
+
+        val currentIndex = modelTypes.indexOf(selectedModelType)
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_voice_select_model)
+            .setSingleChoiceItems(modelNames, currentIndex) { dialog, which ->
+                selectedModelType = modelTypes[which]
+                ThemeManager.setVoiceModelType(this, selectedModelType.id)
+                updateVoiceSettingsUI()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun updateVoiceSettingsUI() {
-        val modelDownloaded = ModelDownloadManager.isModelDownloaded(this)
+        val modelDownloaded = ModelDownloadManager.isModelDownloaded(this, selectedModelType)
         val hasPermission = hasAudioPermission()
+
+        // Update selected model display
+        textSelectedModel.text = getString(selectedModelType.displayNameResId)
 
         // Update model button and status
         if (modelDownloaded) {
             btnVoiceModel.text = getString(R.string.settings_voice_delete_model)
             textVoiceModelStatus.text = getString(R.string.settings_voice_model_downloaded)
         } else {
-            btnVoiceModel.text = getString(R.string.settings_voice_download_model)
-            textVoiceModelStatus.text = getString(R.string.settings_voice_model_size)
+            btnVoiceModel.text = getString(R.string.settings_voice_download_model_format, selectedModelType.sizeDisplayMB)
+            textVoiceModelStatus.text = getString(selectedModelType.descriptionResId)
         }
 
         // Update permission button and status
@@ -245,9 +289,10 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun startModelDownload() {
         btnVoiceModel.isEnabled = false
+        btnSelectModel.isEnabled = false
         btnVoiceModel.text = getString(R.string.voice_downloading_model)
 
-        ModelDownloadManager.downloadModel(this, object : ModelDownloadManager.DownloadCallback {
+        ModelDownloadManager.downloadModel(this, selectedModelType, object : ModelDownloadManager.DownloadCallback {
             override fun onProgress(bytesDownloaded: Long, totalBytes: Long, currentFile: String) {
                 val progress = ((bytesDownloaded.toFloat() / totalBytes) * 100).toInt()
                 val mbDownloaded = bytesDownloaded / 1_000_000
@@ -260,6 +305,7 @@ class SettingsActivity : AppCompatActivity() {
             override fun onComplete() {
                 runOnUiThread {
                     btnVoiceModel.isEnabled = true
+                    btnSelectModel.isEnabled = true
                     updateVoiceSettingsUI()
                     Toast.makeText(this@SettingsActivity, R.string.settings_voice_model_downloaded, Toast.LENGTH_SHORT).show()
                 }
@@ -268,7 +314,8 @@ class SettingsActivity : AppCompatActivity() {
             override fun onError(message: String) {
                 runOnUiThread {
                     btnVoiceModel.isEnabled = true
-                    btnVoiceModel.text = getString(R.string.settings_voice_download_model)
+                    btnSelectModel.isEnabled = true
+                    updateVoiceSettingsUI()
                     Toast.makeText(this@SettingsActivity, "Download failed: $message", Toast.LENGTH_LONG).show()
                 }
             }

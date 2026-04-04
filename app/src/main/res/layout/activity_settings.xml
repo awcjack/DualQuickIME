@@ -494,6 +494,49 @@
 
                 </LinearLayout>
 
+                <!-- Model Selection -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_voice_selected_model"
+                            android:textSize="14sp"
+                            android:textColor="?android:textColorPrimary" />
+
+                        <TextView
+                            android:id="@+id/textSelectedModel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/voice_model_sensevoice_name"
+                            android:textSize="12sp"
+                            android:textColor="@color/colorPrimary"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnSelectModel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="36dp"
+                        android:text="@string/settings_voice_select_model"
+                        android:textSize="14sp"
+                        style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                </LinearLayout>
+
                 <!-- Model Status -->
                 <TextView
                     android:id="@+id/textVoiceModelStatus"
