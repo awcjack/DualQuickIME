@@ -477,6 +477,24 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
+     * Check if a character belongs to a CJK Unicode block that OpenCC should process.
+     * Covers the main CJK ranges:
+     * - 0x2E80..0x2FDF: CJK Radicals Supplement, Kangxi Radicals
+     * - 0x3000..0x303F: CJK Symbols and Punctuation
+     * - 0x3400..0x4DBF: CJK Unified Ideographs Extension A
+     * - 0x4E00..0x9FFF: CJK Unified Ideographs (main block)
+     * - 0xF900..0xFAFF: CJK Compatibility Ideographs
+     * - 0xFE30..0xFE4F: CJK Compatibility Forms
+     * - 0xFF00..0xFFEF: Halfwidth and Fullwidth Forms
+     */
+    private fun isCjkCharacter(ch: Char): Boolean {
+        return ch.code in 0x4E00..0x9FFF || ch.code in 0x3400..0x4DBF ||
+                ch.code in 0x2E80..0x2FDF || ch.code in 0x3000..0x303F ||
+                ch.code in 0xF900..0xFAFF || ch.code in 0xFE30..0xFE4F ||
+                ch.code in 0xFF00..0xFFEF
+    }
+
+    /**
      * Convert Simplified Chinese to Traditional Chinese using OpenCC.
      * Uses s2hk (Simplified to Hong Kong Traditional) for best Cantonese support.
      * This is phrase-aware and handles context-dependent conversions.
@@ -491,11 +509,7 @@ class VoiceInputManager(private val context: Context) {
             var inCjk = false
 
             for (ch in text) {
-                val isCjkChar = ch.code in 0x4E00..0x9FFF || ch.code in 0x3400..0x4DBF ||
-                        ch.code in 0x2E80..0x2FDF || ch.code in 0x3000..0x303F ||
-                        ch.code in 0xF900..0xFAFF || ch.code in 0xFE30..0xFE4F ||
-                        ch.code in 0xFF00..0xFFEF
-                if (isCjkChar == inCjk) {
+                if (isCjkCharacter(ch) == inCjk) {
                     segment.append(ch)
                 } else {
                     // Flush the previous segment
@@ -504,7 +518,7 @@ class VoiceInputManager(private val context: Context) {
                         segment.clear()
                     }
                     segment.append(ch)
-                    inCjk = isCjkChar
+                    inCjk = !inCjk
                 }
             }
             // Flush remaining segment
@@ -519,13 +533,14 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Lowercase English (Latin) characters in text while preserving non-Latin characters.
+     * Lowercase Latin characters in text while preserving non-Latin characters.
      * Voice recognition models often output English in uppercase; this normalizes it.
+     * Handles full Unicode Latin character set including accented characters.
      */
-    private fun lowercaseEnglish(text: String): String {
+    private fun lowercaseLatinCharacters(text: String): String {
         val result = StringBuilder(text.length)
         for (ch in text) {
-            result.append(if (ch in 'A'..'Z') ch.lowercaseChar() else ch)
+            result.append(if (ch.isUpperCase() && ch.isLetter() && !isCjkCharacter(ch)) ch.lowercaseChar() else ch)
         }
         return result.toString()
     }
@@ -536,8 +551,8 @@ class VoiceInputManager(private val context: Context) {
      * OpenCC conversion is applied only to CJK characters to avoid affecting English text.
      */
     private fun processRecognizedText(text: String): String {
-        // Lowercase English characters first (voice models often output uppercase English)
-        val lowered = lowercaseEnglish(text)
+        // Lowercase Latin characters first (voice models often output uppercase English)
+        val lowered = lowercaseLatinCharacters(text)
 
         // Apply OpenCC conversion (only affects CJK characters)
         val processed = convertToTraditional(lowered)
