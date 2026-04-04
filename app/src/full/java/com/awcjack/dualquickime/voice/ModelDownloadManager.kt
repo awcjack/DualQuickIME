@@ -28,7 +28,7 @@ object ModelDownloadManager {
     // GitHub Release URL for Whisper Cantonese (converted via CI)
     // Model files are uploaded to a dedicated release by the convert-whisper-model workflow
     // Format: https://github.com/OWNER/REPO/releases/download/TAG/FILE
-    private const val WHISPER_CANTONESE_BASE_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-cantonese-v1"
+    private const val WHISPER_CANTONESE_BASE_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-cantonese-v2"
 
     // GitHub URL for Silero VAD
     private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
