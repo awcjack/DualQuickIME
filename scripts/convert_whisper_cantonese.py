@@ -548,10 +548,32 @@ def add_encoder_metadata(filename: str, config, processor):
 
 
 def export_tokens(processor, output_path: Path):
-    """Export tokenizer vocabulary in sherpa-onnx tiktoken format (base64 encoded)."""
+    """Export tokenizer vocabulary in sherpa-onnx tiktoken format (base64 encoded raw bytes).
+
+    HuggingFace Whisper uses GPT-2 byte-level BPE where bytes 0-255 are mapped to
+    unicode characters. We need to decode this mapping back to raw bytes before
+    base64 encoding for sherpa-onnx compatibility.
+    """
     import base64
 
     tokenizer = processor.tokenizer
+
+    # GPT-2 byte encoder/decoder
+    # Maps bytes 0-255 to unicode characters (and vice versa)
+    def bytes_to_unicode():
+        bs = list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
+        cs = bs[:]
+        n = 0
+        for b in range(2**8):
+            if b not in bs:
+                bs.append(b)
+                cs.append(2**8 + n)
+                n += 1
+        cs = [chr(n) for n in cs]
+        return dict(zip(bs, cs))
+
+    byte_encoder = bytes_to_unicode()
+    byte_decoder = {v: k for k, v in byte_encoder.items()}
 
     with open(output_path, "w", encoding="utf-8") as f:
         # Get the vocabulary
@@ -560,9 +582,15 @@ def export_tokens(processor, output_path: Path):
         sorted_vocab = sorted(vocab.items(), key=lambda x: x[1])
 
         for token, idx in sorted_vocab:
-            # Base64 encode the token bytes (this is the tiktoken format)
-            token_bytes = token.encode("utf-8")
-            token_b64 = base64.b64encode(token_bytes).decode("ascii")
+            # Decode GPT-2 byte encoding back to raw bytes
+            try:
+                raw_bytes = bytes([byte_decoder[c] for c in token])
+            except KeyError:
+                # Fallback for special tokens that aren't byte-encoded
+                raw_bytes = token.encode("utf-8")
+
+            # Base64 encode the raw bytes (this is the tiktoken format)
+            token_b64 = base64.b64encode(raw_bytes).decode("ascii")
             f.write(f"{token_b64} {idx}\n")
 
 
