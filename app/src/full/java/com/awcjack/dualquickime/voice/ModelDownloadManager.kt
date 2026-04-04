@@ -30,6 +30,11 @@ object ModelDownloadManager {
     // Format: https://github.com/OWNER/REPO/releases/download/TAG/FILE
     private const val WHISPER_CANTONESE_BASE_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-cantonese-v4"
 
+    // Model version markers - increment to force re-download of existing files
+    // This handles cases where model format changes but file sizes are similar
+    private const val WHISPER_CANTONESE_VERSION = "v4"
+    private const val VERSION_FILE = ".version"
+
     // GitHub URL for Silero VAD
     private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
 
@@ -67,7 +72,7 @@ object ModelDownloadManager {
     }
 
     /**
-     * Check if the specified model type is downloaded.
+     * Check if the specified model type is downloaded and up to date.
      */
     fun isModelDownloaded(context: Context, modelType: VoiceModelType): Boolean {
         val modelDir = File(context.filesDir, modelType.modelDir)
@@ -82,10 +87,19 @@ object ModelDownloadManager {
             File(modelDir, filename).exists()
         }
 
+        // Check version for models that track it
+        val versionOk = when (modelType) {
+            VoiceModelType.WHISPER_CANTONESE -> {
+                val versionFile = File(modelDir, VERSION_FILE)
+                versionFile.exists() && versionFile.readText().trim() == WHISPER_CANTONESE_VERSION
+            }
+            else -> true
+        }
+
         // Check VAD model file (shared)
         val vadFile = File(context.filesDir, VAD_MODEL_FILE)
 
-        return modelReady && vadFile.exists()
+        return modelReady && versionOk && vadFile.exists()
     }
 
     /**
@@ -162,14 +176,27 @@ object ModelDownloadManager {
                     VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_TOTAL_SIZE
                 }
 
+                // Check if model version is outdated and needs re-download
+                val needsUpdate = when (modelType) {
+                    VoiceModelType.WHISPER_CANTONESE -> {
+                        val versionFile = File(modelDir, VERSION_FILE)
+                        !versionFile.exists() || versionFile.readText().trim() != WHISPER_CANTONESE_VERSION
+                    }
+                    else -> false
+                }
+
+                if (needsUpdate) {
+                    Log.i(TAG, "Model version outdated for ${modelType.id}, will re-download")
+                }
+
                 var totalDownloaded = 0L
 
                 // Download model files
                 for ((filename, expectedSize) in files) {
                     val targetFile = File(modelDir, filename)
 
-                    // Skip if already downloaded
-                    if (targetFile.exists() && targetFile.length() > expectedSize * 0.9) {
+                    // Skip if already downloaded AND version is current
+                    if (!needsUpdate && targetFile.exists() && targetFile.length() > expectedSize * 0.9) {
                         totalDownloaded += targetFile.length()
                         callback.onProgress(totalDownloaded, totalSize, filename)
                         continue
@@ -201,6 +228,16 @@ object ModelDownloadManager {
                 } else {
                     totalDownloaded += vadFile.length()
                     callback.onProgress(totalDownloaded, totalSize, VAD_MODEL_FILE)
+                }
+
+                // Write version file for models that track it
+                when (modelType) {
+                    VoiceModelType.WHISPER_CANTONESE -> {
+                        val versionFile = File(modelDir, VERSION_FILE)
+                        versionFile.writeText(WHISPER_CANTONESE_VERSION)
+                        Log.i(TAG, "Wrote version file: $WHISPER_CANTONESE_VERSION")
+                    }
+                    else -> { /* No version tracking for other models */ }
                 }
 
                 callback.onComplete()
