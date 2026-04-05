@@ -34,6 +34,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch transformers onnx onnxruntime onnxscript optimum[onnxruntime]
+          # Install openai-whisper to get the original tiktoken vocabulary file
+          pip install openai-whisper
 
       - name: Convert model to sherpa-onnx format
         run: |
