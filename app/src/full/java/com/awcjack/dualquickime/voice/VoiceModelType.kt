@@ -44,17 +44,17 @@ enum class VoiceModelType(
     ),
 
     /**
-     * Whisper Large v3 Cantonese - Fine-tuned Whisper Large v3 model for Cantonese.
-     * Higher accuracy for Cantonese (7.26% CER on Common Voice 17 yue).
+     * Whisper Large v2 Cantonese - Fine-tuned Whisper Large v2 model for Cantonese.
+     * Higher accuracy for Cantonese (6.73% CER on Common Voice zh-HK).
      * Larger model but more accurate than whisper-small-cantonese.
-     * Based on khleeloo/whisper-large-v3-cantonese from HuggingFace.
+     * Based on simonl0909/whisper-large-v2-cantonese from HuggingFace.
      * HuggingFace Transformers format - directly convertible to sherpa-onnx.
      */
-    WHISPER_LARGE_V3_CANTONESE(
-        id = "whisper_large_v3_cantonese",
-        displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_large_v3_cantonese_name,
-        descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_large_v3_cantonese_desc,
-        modelDir = "sherpa-onnx-whisper-large-v3-cantonese",
+    WHISPER_LARGE_V2_CANTONESE(
+        id = "whisper_large_v2_cantonese",
+        displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_large_v2_cantonese_name,
+        descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_large_v2_cantonese_desc,
+        modelDir = "sherpa-onnx-whisper-large-v2-cantonese",
         sizeBytes = 3_100_000_000L,  // ~1.5B parameters = ~3.1GB model files (int8)
         sizeDisplayMB = 3100,
         isAvailable = true

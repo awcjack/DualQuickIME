@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Convert khleeloo/whisper-large-v3-cantonese (HuggingFace format) to sherpa-onnx format.
+Convert simonl0909/whisper-large-v2-cantonese (HuggingFace format) to sherpa-onnx format.
 
 This script adapts the whisper-small-cantonese conversion for the larger model.
 The main differences are:
-- Uses large-v3 model dimensions (1280 d_model, 32 heads, 32 encoder layers, 32 decoder layers)
-- Outputs files with "large-v3" prefix instead of "small"
+- Uses large-v2 model dimensions (1280 d_model, 32 heads, 32 encoder layers, 32 decoder layers)
+- Outputs files with "large-v2" prefix instead of "small"
 - Uses "whisper-large" as model_type in metadata
 
-Model source: https://huggingface.co/khleeloo/whisper-large-v3-cantonese
-Performance: 7.26% CER on Common Voice 17 yue test set
+Model source: https://huggingface.co/simonl0909/whisper-large-v2-cantonese
+Performance: 6.73% CER on Common Voice zh-HK test set
 
 Usage:
-    python convert_whisper_large_v3_cantonese.py --output-dir ./sherpa-onnx-whisper-large-v3-cantonese
+    python convert_whisper_large_v3_cantonese.py --output-dir ./sherpa-onnx-whisper-large-v2-cantonese
 
 Requirements:
     pip install torch transformers openai-whisper onnx onnxruntime
@@ -34,7 +34,7 @@ from torch import Tensor
 
 def export_sherpa_onnx(model_id: str, output_dir: str, quantize: bool = True):
     """
-    Export HuggingFace Whisper Large v3 model to sherpa-onnx compatible ONNX format.
+    Export HuggingFace Whisper Large v2 model to sherpa-onnx compatible ONNX format.
 
     This follows the sherpa-onnx export approach but adapts it for HuggingFace models.
     """
@@ -215,13 +215,13 @@ def export_sherpa_onnx(model_id: str, output_dir: str, quantize: bool = True):
             return attn_output
 
     # Export encoder
-    print("\nStep 1: Exporting encoder (this may take a while for large-v3)...")
+    print("\nStep 1: Exporting encoder (this may take a while for large-v2)...")
     encoder_wrapper = AudioEncoderWithCrossKV(hf_model.model.encoder, hf_model.model.decoder)
     encoder_wrapper.eval()
 
     dummy_mel = torch.randn(1, n_mels, 3000)
 
-    encoder_filename = output_path / "large-v3-encoder.onnx"
+    encoder_filename = output_path / "large-v2-encoder.onnx"
 
     with torch.no_grad():
         torch.onnx.export(
@@ -267,7 +267,7 @@ def export_sherpa_onnx(model_id: str, output_dir: str, quantize: bool = True):
     dummy_cross_v = torch.randn(n_text_layer, batch_size, audio_len, n_text_state)
     dummy_offset = torch.tensor([0], dtype=torch.int64)
 
-    decoder_filename = output_path / "large-v3-decoder.onnx"
+    decoder_filename = output_path / "large-v2-decoder.onnx"
 
     with torch.no_grad():
         torch.onnx.export(
@@ -300,15 +300,15 @@ def export_sherpa_onnx(model_id: str, output_dir: str, quantize: bool = True):
 
     # Export tokens
     print("\nStep 3: Exporting tokens...")
-    tokens_filename = output_path / "large-v3-tokens.txt"
+    tokens_filename = output_path / "large-v2-tokens.txt"
     export_tokens(processor, tokens_filename)
     print(f"  Saved: {tokens_filename}")
 
     # Quantize
     if quantize:
-        print("\nStep 4: Quantizing models to int8 (this may take a while for large-v3)...")
+        print("\nStep 4: Quantizing models to int8 (this may take a while for large-v2)...")
 
-        encoder_int8 = output_path / "large-v3-encoder.int8.onnx"
+        encoder_int8 = output_path / "large-v2-encoder.int8.onnx"
         quantize_dynamic(
             model_input=str(encoder_filename),
             model_output=str(encoder_int8),
@@ -318,7 +318,7 @@ def export_sherpa_onnx(model_id: str, output_dir: str, quantize: bool = True):
         print(f"  Created: {encoder_int8}")
         encoder_filename.unlink()
 
-        decoder_int8 = output_path / "large-v3-decoder.int8.onnx"
+        decoder_int8 = output_path / "large-v2-decoder.int8.onnx"
         quantize_dynamic(
             model_input=str(decoder_filename),
             model_output=str(decoder_int8),
@@ -483,16 +483,16 @@ def export_tokens(processor, output_path: Path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert Whisper Large v3 Cantonese model to sherpa-onnx format"
+        description="Convert Whisper Large v2 Cantonese model to sherpa-onnx format"
     )
     parser.add_argument(
         "--model-id",
-        default="khleeloo/whisper-large-v3-cantonese",
+        default="simonl0909/whisper-large-v2-cantonese",
         help="HuggingFace model ID",
     )
     parser.add_argument(
         "--output-dir",
-        default="./sherpa-onnx-whisper-large-v3-cantonese",
+        default="./sherpa-onnx-whisper-large-v2-cantonese",
         help="Output directory for ONNX files",
     )
     parser.add_argument(
