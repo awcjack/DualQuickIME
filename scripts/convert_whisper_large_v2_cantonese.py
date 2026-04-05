@@ -240,8 +240,7 @@ def export_sherpa_onnx(model_id: str, output_dir: str, quantize: bool = True):
             dynamo=False,
         )
 
-    add_encoder_metadata(str(encoder_filename), config, processor)
-    print(f"  Saved: {encoder_filename}")
+    print(f"  Exported raw encoder: {encoder_filename}")
 
     # Export decoder
     print("\nStep 2: Exporting decoder...")
@@ -315,8 +314,13 @@ def export_sherpa_onnx(model_id: str, output_dir: str, quantize: bool = True):
             op_types_to_quantize=["MatMul"],
             weight_type=QuantType.QInt8,
         )
-        print(f"  Created: {encoder_int8}")
+        print(f"  Quantized encoder: {encoder_int8}")
         encoder_filename.unlink()
+
+        # Add metadata to the quantized encoder (which is smaller and fits in protobuf)
+        print("  Adding metadata to quantized encoder...")
+        add_encoder_metadata(str(encoder_int8), config, processor)
+        print(f"  Created: {encoder_int8}")
 
         decoder_int8 = output_path / "large-v2-decoder.int8.onnx"
         quantize_dynamic(
