@@ -50,6 +50,11 @@ class KeyboardView @JvmOverloads constructor(
     private val backspaceHandler = Handler(Looper.getMainLooper())
     private var backspaceRepeatRunnable: Runnable? = null
 
+    // Long-press handler for punctuation keys
+    private val longPressHandler = Handler(Looper.getMainLooper())
+    private var longPressRunnable: Runnable? = null
+    private var longPressTriggered = false
+
     // Current theme colors
     private lateinit var colors: KeyboardColors
 
@@ -576,9 +581,7 @@ class KeyboardView @JvmOverloads constructor(
             }
             addView(modeToggleKey)
 
-            addView(createSpecialKey("，", 1f) {
-                onKeyPress?.invoke(KeyEvent.Symbol('，'))
-            })
+            addView(createSpecialKeyWithLongPress("，", ',', 1f))
 
             // Voice input button (only in full version)
             if (BuildConfig.VOICE_INPUT_ENABLED && ThemeManager.getVoiceInputEnabled(context)) {
@@ -589,9 +592,7 @@ class KeyboardView @JvmOverloads constructor(
 
             addView(createSpaceKey())
 
-            addView(createSpecialKey("。", 1f) {
-                onKeyPress?.invoke(KeyEvent.Symbol('。'))
-            })
+            addView(createSpecialKeyWithLongPress("。", '.', 1f))
 
             addView(createSpecialKey("↵", 1.2f) {
                 onKeyPress?.invoke(KeyEvent.Enter)
@@ -628,6 +629,63 @@ class KeyboardView @JvmOverloads constructor(
             elevation = dpToPx(1).toFloat()
 
             setOnClickListener { onClick() }
+        }
+    }
+
+    /**
+     * Create a special key that outputs full-width on tap and half-width on long-press.
+     * Used for bottom row punctuation (，。).
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createSpecialKeyWithLongPress(fullWidthLabel: String, halfWidthChar: Char, weight: Float): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, weight).apply {
+                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
+            }
+            gravity = Gravity.CENTER
+            text = fullWidthLabel
+            textSize = 18f
+            setTextColor(colors.keyTextPrimary)
+            background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
+            elevation = dpToPx(1).toFloat()
+
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.isPressed = true
+                        longPressTriggered = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+
+                        val runnable = Runnable {
+                            longPressTriggered = true
+                            // Long-press: output half-width character
+                            onKeyPress?.invoke(KeyEvent.Symbol(halfWidthChar))
+                            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        }
+                        longPressRunnable = runnable
+                        longPressHandler.postDelayed(runnable, LONG_PRESS_DELAY)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.isPressed = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+
+                        if (!longPressTriggered) {
+                            // Normal tap: output full-width character
+                            onKeyPress?.invoke(KeyEvent.Symbol(fullWidthLabel[0]))
+                        }
+                        longPressRunnable = null
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.isPressed = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+                        longPressRunnable = null
+                        true
+                    }
+                    else -> false
+                }
+            }
         }
     }
 
@@ -694,22 +752,89 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun createSymbolKey(char: Char): TextView {
+        // Check if this character has a half-width equivalent
+        val halfWidthChar = FULL_TO_HALF_WIDTH[char]
+
+        return if (halfWidthChar != null) {
+            // Use long-press enabled key for full-width punctuation
+            createSymbolKeyWithLongPress(char, halfWidthChar)
+        } else {
+            // Regular symbol key
+            TextView(context).apply {
+                layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
+                    setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
+                }
+                gravity = Gravity.CENTER
+                text = char.toString()
+                textSize = 22f
+                setTextColor(colors.keyTextPrimary)
+                background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
+                elevation = dpToPx(2).toFloat()
+
+                setOnClickListener {
+                    if (char.isDigit()) {
+                        onKeyPress?.invoke(KeyEvent.Number(char.digitToInt()))
+                    } else {
+                        onKeyPress?.invoke(KeyEvent.Symbol(char))
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Create a symbol key that outputs full-width on tap and half-width on long-press.
+     * Used for punctuation like ，。！？ etc.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createSymbolKeyWithLongPress(fullWidthChar: Char, halfWidthChar: Char): TextView {
         return TextView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
                 setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
             }
             gravity = Gravity.CENTER
-            text = char.toString()
+            text = fullWidthChar.toString()
             textSize = 22f
             setTextColor(colors.keyTextPrimary)
             background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
             elevation = dpToPx(2).toFloat()
 
-            setOnClickListener {
-                if (char.isDigit()) {
-                    onKeyPress?.invoke(KeyEvent.Number(char.digitToInt()))
-                } else {
-                    onKeyPress?.invoke(KeyEvent.Symbol(char))
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.isPressed = true
+                        longPressTriggered = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+
+                        val runnable = Runnable {
+                            longPressTriggered = true
+                            // Long-press: output half-width character
+                            onKeyPress?.invoke(KeyEvent.Symbol(halfWidthChar))
+                            // Provide haptic feedback
+                            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        }
+                        longPressRunnable = runnable
+                        longPressHandler.postDelayed(runnable, LONG_PRESS_DELAY)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.isPressed = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+
+                        if (!longPressTriggered) {
+                            // Normal tap: output full-width character
+                            onKeyPress?.invoke(KeyEvent.Symbol(fullWidthChar))
+                        }
+                        longPressRunnable = null
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.isPressed = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+                        longPressRunnable = null
+                        true
+                    }
+                    else -> false
                 }
             }
         }
@@ -896,6 +1021,8 @@ class KeyboardView @JvmOverloads constructor(
         super.onDetachedFromWindow()
         backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
         backspaceRepeatRunnable = null
+        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+        longPressRunnable = null
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -921,5 +1048,29 @@ class KeyboardView @JvmOverloads constructor(
     companion object {
         private const val BACKSPACE_INITIAL_DELAY = 400L  // ms before first repeat
         private const val BACKSPACE_REPEAT_INTERVAL = 50L  // ms between subsequent repeats
+        private const val LONG_PRESS_DELAY = 300L  // ms before long-press triggers
+
+        // Full-width to half-width punctuation mapping
+        // Long-press on full-width outputs half-width equivalent
+        private val FULL_TO_HALF_WIDTH = mapOf(
+            '，' to ',',   // Ideographic comma -> ASCII comma
+            '。' to '.',   // Ideographic period -> ASCII period
+            '！' to '!',   // Fullwidth exclamation -> ASCII exclamation
+            '？' to '?',   // Fullwidth question -> ASCII question
+            '：' to ':',   // Fullwidth colon -> ASCII colon
+            '；' to ';',   // Fullwidth semicolon -> ASCII semicolon
+            '「' to '"',   // Left corner bracket -> ASCII double quote
+            '」' to '"',   // Right corner bracket -> ASCII double quote
+            '『' to '\'',  // Left white corner bracket -> ASCII single quote
+            '』' to '\'',  // Right white corner bracket -> ASCII single quote
+            '【' to '[',   // Left black lenticular bracket -> ASCII left bracket
+            '】' to ']',   // Right black lenticular bracket -> ASCII right bracket
+            '（' to '(',   // Fullwidth left parenthesis -> ASCII left parenthesis
+            '）' to ')',   // Fullwidth right parenthesis -> ASCII right parenthesis
+            '《' to '<',   // Left double angle bracket -> ASCII less-than
+            '》' to '>',   // Right double angle bracket -> ASCII greater-than
+            '〈' to '<',   // Left angle bracket -> ASCII less-than
+            '〉' to '>',   // Right angle bracket -> ASCII greater-than
+        )
     }
 }
