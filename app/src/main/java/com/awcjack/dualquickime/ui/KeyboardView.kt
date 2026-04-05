@@ -85,9 +85,10 @@ class KeyboardView @JvmOverloads constructor(
     private val row3 = listOf('z', 'x', 'c', 'v', 'b', 'n', 'm')
 
     // Number/Symbol rows (page 1) - Common punctuation
+    // Full-width punctuation used by default, long-press for half-width
     private val numRow1 = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
-    private val symRow2Page1 = listOf('@', '#', '$', '%', '&', '-', '+', '(', ')', '！', '？')
-    private val symRow3Page1 = listOf('*', '"', '\'', ':', ';', '!', '?', ',', '.')
+    private val symRow2Page1 = listOf('@', '#', '$', '%', '&', '-', '+', '（', '）', '！', '？')
+    private val symRow3Page1 = listOf('*', '"', '\'', '：', '；', '，', '。')
 
     // Symbol rows (page 2) - Brackets and math
     private val symRow1Page2 = listOf('~', '`', '|', '\\', '/', '<', '>', '{', '}', '^')
