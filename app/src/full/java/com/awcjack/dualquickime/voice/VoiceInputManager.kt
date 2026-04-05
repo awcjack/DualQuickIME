@@ -18,6 +18,8 @@ import kotlin.concurrent.thread
  * Supports multiple model types:
  * - SenseVoice: Multilingual (Cantonese, Mandarin, English, Japanese, Korean)
  * - Whisper Cantonese: Optimized for Cantonese with 7.93% CER
+ * - Whisper Medium Yue: WenetSpeech-Yue fine-tuned with 5.05% MER (larger model)
+ * - U2pp-Conformer-Yue: Best accuracy-to-size ratio (130M params, 5.05% MER)
  *
  * Uses Silero VAD for voice activity detection (simulated streaming).
  */
@@ -41,6 +43,15 @@ class VoiceInputManager(private val context: Context) {
         private const val WHISPER_ENCODER_FILE = "small-encoder.int8.onnx"
         private const val WHISPER_DECODER_FILE = "small-decoder.int8.onnx"
         private const val WHISPER_TOKENS_FILE = "small-tokens.txt"
+
+        // Whisper Medium Yue model files (WenetSpeech-Yue fine-tuned)
+        private const val WHISPER_MEDIUM_ENCODER_FILE = "medium-encoder.int8.onnx"
+        private const val WHISPER_MEDIUM_DECODER_FILE = "medium-decoder.int8.onnx"
+        private const val WHISPER_MEDIUM_TOKENS_FILE = "medium-tokens.txt"
+
+        // U2pp-Conformer-Yue model files (CTC architecture)
+        private const val U2PP_CONFORMER_MODEL_FILE = "model.int8.onnx"
+        private const val U2PP_CONFORMER_TOKENS_FILE = "tokens.txt"
 
         // Punctuation conversion map (spoken words to symbols)
         // Supports Cantonese, Mandarin and English
@@ -294,6 +305,8 @@ class VoiceInputManager(private val context: Context) {
             recognizer = when (currentModelType) {
                 VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
                 VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
+                VoiceModelType.WHISPER_MEDIUM_YUE -> initWhisperMediumYueRecognizer(modelDir)
+                VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
             }
 
             isInitialized = true
@@ -352,6 +365,61 @@ class VoiceInputManager(private val context: Context) {
         val modelConfig = OfflineModelConfig(
             whisper = whisperConfig,
             tokens = "$modelDir/$WHISPER_TOKENS_FILE",
+            numThreads = 2,
+            debug = false
+        )
+
+        val config = OfflineRecognizerConfig(
+            modelConfig = modelConfig,
+            decodingMethod = "greedy_search"
+        )
+
+        return OfflineRecognizer(config = config)
+    }
+
+    /**
+     * Initialize Whisper Medium Yue recognizer.
+     * Larger model trained on WenetSpeech-Yue for better Cantonese accuracy (5.05% MER).
+     * Uses "yue" language code as this model was specifically trained for Cantonese.
+     */
+    private fun initWhisperMediumYueRecognizer(modelDir: String): OfflineRecognizer {
+        val whisperConfig = OfflineWhisperModelConfig(
+            encoder = "$modelDir/$WHISPER_MEDIUM_ENCODER_FILE",
+            decoder = "$modelDir/$WHISPER_MEDIUM_DECODER_FILE",
+            language = "yue",  // Use Cantonese language code for WenetSpeech-Yue fine-tuned model
+            task = "transcribe",
+            tailPaddings = 1000  // Add padding to help with short VAD segments
+        )
+
+        val modelConfig = OfflineModelConfig(
+            whisper = whisperConfig,
+            tokens = "$modelDir/$WHISPER_MEDIUM_TOKENS_FILE",
+            numThreads = 2,
+            debug = false
+        )
+
+        val config = OfflineRecognizerConfig(
+            modelConfig = modelConfig,
+            decodingMethod = "greedy_search"
+        )
+
+        return OfflineRecognizer(config = config)
+    }
+
+    /**
+     * Initialize U2pp-Conformer-Yue recognizer.
+     * CTC-based Conformer model trained on WenetSpeech-Yue.
+     * Best accuracy-to-size ratio for Cantonese (130M params, 5.05% MER).
+     */
+    private fun initU2ppConformerRecognizer(modelDir: String): OfflineRecognizer {
+        // U2pp-Conformer uses WeNet CTC architecture
+        val wenetConfig = OfflineWenetCtcModelConfig(
+            model = "$modelDir/$U2PP_CONFORMER_MODEL_FILE"
+        )
+
+        val modelConfig = OfflineModelConfig(
+            wenetCtc = wenetConfig,
+            tokens = "$modelDir/$U2PP_CONFORMER_TOKENS_FILE",
             numThreads = 2,
             debug = false
         )
@@ -570,8 +638,9 @@ class VoiceInputManager(private val context: Context) {
         // Strip Whisper special tokens (e.g., <|transcribe|>, <|notimestamps|>, <|en|>, etc.)
         var cleaned = stripWhisperTokens(text)
 
-        // For Whisper model, remove repetition patterns (a known Whisper issue)
-        if (currentModelType == VoiceModelType.WHISPER_CANTONESE) {
+        // For Whisper models, remove repetition patterns (a known Whisper issue)
+        if (currentModelType == VoiceModelType.WHISPER_CANTONESE ||
+            currentModelType == VoiceModelType.WHISPER_MEDIUM_YUE) {
             cleaned = removeRepetition(cleaned)
         }
 
