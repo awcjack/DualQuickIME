@@ -412,6 +412,10 @@ class VoiceInputManager(private val context: Context) {
             isRecording = true
             lastRecognizedText = ""
             accumulatedText.clear()
+
+            // Reset VAD state to clear any leftover segments from previous recordings
+            vad?.reset()
+
             audioRecord?.startRecording()
 
             recordingThread = thread(name = "VoiceInputThread") {
