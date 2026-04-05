@@ -56,7 +56,7 @@ jobs:
           MODEL_ID="${{ github.event.inputs.model_id }}"
           echo "Converting $MODEL_ID to sherpa-onnx format..."
           echo "Note: This may take 15-30 minutes for large-v2 model"
-          python scripts/convert_whisper_large_v3_cantonese.py \
+          python scripts/convert_whisper_large_v2_cantonese.py \
             --model-id "$MODEL_ID" \
             --output-dir ./sherpa-onnx-whisper-large-v2-cantonese
 
