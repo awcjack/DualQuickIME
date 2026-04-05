@@ -18,7 +18,6 @@ object ModelDownloadManager {
     // Legacy constants for backward compatibility
     const val SENSEVOICE_MODEL_DIR = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09"
     const val WHISPER_CANTONESE_MODEL_DIR = "sherpa-onnx-whisper-small-cantonese"
-    const val WHISPER_LARGE_V2_CANTONESE_MODEL_DIR = "sherpa-onnx-whisper-large-v2-cantonese"
     const val U2PP_CONFORMER_YUE_MODEL_DIR = "sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10"
 
     // Silero VAD model filename (shared between models)
@@ -42,15 +41,9 @@ object ModelDownloadManager {
     // Original archive: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10.tar.bz2
     private const val U2PP_CONFORMER_YUE_BASE_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10/resolve/main"
 
-    // Whisper Large v2 Cantonese - HuggingFace Transformers format, converted via CI
-    // Source: simonl0909/whisper-large-v2-cantonese (6.73% CER on Common Voice zh-HK)
-    private const val WHISPER_LARGE_V2_CANTONESE_FALLBACK_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-large-v2-cantonese-v1"
-    private const val WHISPER_LARGE_V2_CANTONESE_TAG_PREFIX = "whisper-large-v2-cantonese-"
-
     // Model version markers - increment to force re-download of existing files
     // This handles cases where model format changes but file sizes are similar
     private const val WHISPER_CANTONESE_VERSION = "v5"
-    private const val WHISPER_LARGE_V2_CANTONESE_VERSION = "v1"
     private const val U2PP_CONFORMER_YUE_VERSION = "v1"
 
     /**
@@ -59,7 +52,6 @@ object ModelDownloadManager {
     private fun getModelVersion(modelType: VoiceModelType): String {
         return when (modelType) {
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_VERSION
-            VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> WHISPER_LARGE_V2_CANTONESE_VERSION
             VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_VERSION
             else -> ""
         }
@@ -90,14 +82,6 @@ object ModelDownloadManager {
         "small-tokens.txt" to 944_000L                // ~0.9 MB
     )
 
-    // Whisper Large v2 Cantonese model files (HuggingFace Transformers format, converted)
-    // Based on simonl0909/whisper-large-v2-cantonese (6.73% CER on Common Voice zh-HK)
-    private val WHISPER_LARGE_V2_CANTONESE_FILES = listOf(
-        "large-v2-encoder.int8.onnx" to 1_200_000_000L,   // ~1.2 GB
-        "large-v2-decoder.int8.onnx" to 1_850_000_000L,   // ~1.8 GB
-        "large-v2-tokens.txt" to 944_000L                  // ~0.9 MB
-    )
-
     // U2pp-Conformer-Yue model files (sherpa-onnx pre-converted)
     // CTC model - simpler architecture, fast inference
     private val U2PP_CONFORMER_YUE_FILES = listOf(
@@ -111,7 +95,6 @@ object ModelDownloadManager {
     // Total expected sizes
     const val SENSEVOICE_TOTAL_SIZE = 227_000_000L
     const val WHISPER_CANTONESE_TOTAL_SIZE = 415_000_000L  // ~395 MB (encoder + decoder + tokens + VAD)
-    const val WHISPER_LARGE_V2_CANTONESE_TOTAL_SIZE = 3_052_000_000L  // ~3.0 GB (encoder + decoder + tokens + VAD)
     const val U2PP_CONFORMER_YUE_TOTAL_SIZE = 131_000_000L  // ~130 MB (CTC model + tokens + VAD)
 
     // Legacy constant for backward compatibility
@@ -136,7 +119,6 @@ object ModelDownloadManager {
         val files = when (modelType) {
             VoiceModelType.SENSE_VOICE -> SENSEVOICE_FILES
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_FILES
-            VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> WHISPER_LARGE_V2_CANTONESE_FILES
             VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_FILES
         }
 
@@ -146,8 +128,7 @@ object ModelDownloadManager {
 
         // Check version for models that track it
         val versionOk = when (modelType) {
-            VoiceModelType.WHISPER_CANTONESE,
-            VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> {
+            VoiceModelType.WHISPER_CANTONESE -> {
                 val versionFile = File(modelDir, VERSION_FILE)
                 versionFile.exists() && versionFile.readText().trim() == getModelVersion(modelType)
             }
@@ -177,14 +158,12 @@ object ModelDownloadManager {
         val files = when (modelType) {
             VoiceModelType.SENSE_VOICE -> SENSEVOICE_FILES
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_FILES
-            VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> WHISPER_LARGE_V2_CANTONESE_FILES
             VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_FILES
         }
 
         val totalSize = when (modelType) {
             VoiceModelType.SENSE_VOICE -> SENSEVOICE_TOTAL_SIZE
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_TOTAL_SIZE
-            VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> WHISPER_LARGE_V2_CANTONESE_TOTAL_SIZE
             VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_TOTAL_SIZE
         }
 
@@ -226,21 +205,18 @@ object ModelDownloadManager {
                 val files = when (modelType) {
                     VoiceModelType.SENSE_VOICE -> SENSEVOICE_FILES
                     VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_FILES
-                    VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> WHISPER_LARGE_V2_CANTONESE_FILES
                     VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_FILES
                 }
 
                 val baseUrl = when (modelType) {
                     VoiceModelType.SENSE_VOICE -> SENSEVOICE_BASE_URL
                     VoiceModelType.WHISPER_CANTONESE -> getWhisperCantoneseBaseUrl()
-                    VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> getWhisperLargeV2CantoneseBaseUrl()
                     VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_BASE_URL
                 }
 
                 val totalSize = when (modelType) {
                     VoiceModelType.SENSE_VOICE -> SENSEVOICE_TOTAL_SIZE
                     VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_TOTAL_SIZE
-                    VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> WHISPER_LARGE_V2_CANTONESE_TOTAL_SIZE
                     VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_TOTAL_SIZE
                 }
 
@@ -251,17 +227,12 @@ object ModelDownloadManager {
                         // Extract version from URL (e.g., "whisper-cantonese-v5" -> "v5")
                         baseUrl.substringAfterLast("/").removePrefix(WHISPER_CANTONESE_TAG_PREFIX)
                     }
-                    VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> {
-                        // Extract version from URL (e.g., "whisper-large-v3-cantonese-v1" -> "v1")
-                        baseUrl.substringAfterLast("/").removePrefix(WHISPER_LARGE_V2_CANTONESE_TAG_PREFIX)
-                    }
                     VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_VERSION
                     else -> ""
                 }
 
                 val needsUpdate = when (modelType) {
-                    VoiceModelType.WHISPER_CANTONESE,
-                    VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> {
+                    VoiceModelType.WHISPER_CANTONESE -> {
                         val versionFile = File(modelDir, VERSION_FILE)
                         !versionFile.exists() || versionFile.readText().trim() != currentVersion
                     }
@@ -316,7 +287,6 @@ object ModelDownloadManager {
                 // Write version file for models that track it
                 when (modelType) {
                     VoiceModelType.WHISPER_CANTONESE,
-                    VoiceModelType.WHISPER_LARGE_V2_CANTONESE,
                     VoiceModelType.U2PP_CONFORMER_YUE -> {
                         val versionFile = File(modelDir, VERSION_FILE)
                         versionFile.writeText(currentVersion)
@@ -399,53 +369,6 @@ object ModelDownloadManager {
         // Fall back to hardcoded URL
         Log.i(TAG, "Using fallback Whisper Cantonese URL")
         return WHISPER_CANTONESE_FALLBACK_URL
-    }
-
-    /**
-     * Get the latest Whisper Large v2 Cantonese release URL from GitHub API.
-     * Falls back to hardcoded URL if API is unavailable.
-     */
-    private fun getWhisperLargeV2CantoneseBaseUrl(): String {
-        // Try to fetch latest release from GitHub API
-        try {
-            val url = URL(GITHUB_RELEASES_API)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-            connection.requestMethod = "GET"
-            connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
-            connection.setRequestProperty("User-Agent", "DualQuickIME/1.0")
-
-            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                val response = connection.inputStream.bufferedReader().readText()
-
-                // Simple JSON parsing - find the latest whisper-large-v3-cantonese-* tag
-                val tagPattern = """"tag_name"\s*:\s*"($WHISPER_LARGE_V2_CANTONESE_TAG_PREFIX[^"]+)"""".toRegex()
-                val matches = tagPattern.findAll(response)
-
-                // Get all whisper-large-v3-cantonese tags and find the latest (highest version number)
-                val latestTag = matches
-                    .map { it.groupValues[1] }
-                    .filter { it.startsWith(WHISPER_LARGE_V2_CANTONESE_TAG_PREFIX) }
-                    .maxByOrNull { tag ->
-                        tag.removePrefix(WHISPER_LARGE_V2_CANTONESE_TAG_PREFIX)
-                            .removePrefix("v")
-                            .toIntOrNull() ?: 0
-                    }
-
-                if (latestTag != null) {
-                    val discoveredUrl = "https://github.com/awcjack/DualQuickIME/releases/download/$latestTag"
-                    Log.i(TAG, "Discovered latest Whisper Large v2 Cantonese release: $latestTag")
-                    return discoveredUrl
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to fetch latest Whisper Large v2 Cantonese release from GitHub API: ${e.message}")
-        }
-
-        // Fall back to hardcoded URL
-        Log.i(TAG, "Using fallback Whisper Large v2 Cantonese URL")
-        return WHISPER_LARGE_V2_CANTONESE_FALLBACK_URL
     }
 
     /**

@@ -44,23 +44,6 @@ enum class VoiceModelType(
     ),
 
     /**
-     * Whisper Large v2 Cantonese - Fine-tuned Whisper Large v2 model for Cantonese.
-     * Higher accuracy for Cantonese (6.73% CER on Common Voice zh-HK).
-     * Larger model but more accurate than whisper-small-cantonese.
-     * Based on simonl0909/whisper-large-v2-cantonese from HuggingFace.
-     * HuggingFace Transformers format - directly convertible to sherpa-onnx.
-     */
-    WHISPER_LARGE_V2_CANTONESE(
-        id = "whisper_large_v2_cantonese",
-        displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_large_v2_cantonese_name,
-        descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_large_v2_cantonese_desc,
-        modelDir = "sherpa-onnx-whisper-large-v2-cantonese",
-        sizeBytes = 3_100_000_000L,  // ~1.5B parameters = ~3.1GB model files (int8)
-        sizeDisplayMB = 3100,
-        isAvailable = true
-    ),
-
-    /**
      * U2pp-Conformer-Yue - WeNet Conformer model trained on WenetSpeech-Yue.
      * State-of-the-art Cantonese ASR (5.05% MER) with smallest model size.
      * 130M parameters - best accuracy-to-size ratio for Cantonese.

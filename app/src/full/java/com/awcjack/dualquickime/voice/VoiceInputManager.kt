@@ -18,7 +18,6 @@ import kotlin.concurrent.thread
  * Supports multiple model types:
  * - SenseVoice: Multilingual (Cantonese, Mandarin, English, Japanese, Korean)
  * - Whisper Cantonese: Optimized for Cantonese with 7.93% CER
- * - Whisper Large v2 Cantonese: Fine-tuned for Cantonese with 6.73% CER (larger model)
  * - U2pp-Conformer-Yue: Best accuracy-to-size ratio (130M params, 5.05% MER)
  *
  * Uses Silero VAD for voice activity detection (simulated streaming).
@@ -43,11 +42,6 @@ class VoiceInputManager(private val context: Context) {
         private const val WHISPER_ENCODER_FILE = "small-encoder.int8.onnx"
         private const val WHISPER_DECODER_FILE = "small-decoder.int8.onnx"
         private const val WHISPER_TOKENS_FILE = "small-tokens.txt"
-
-        // Whisper Large v2 Cantonese model files (simonl0909/whisper-large-v2-cantonese)
-        private const val WHISPER_LARGE_V2_ENCODER_FILE = "large-v2-encoder.int8.onnx"
-        private const val WHISPER_LARGE_V2_DECODER_FILE = "large-v2-decoder.int8.onnx"
-        private const val WHISPER_LARGE_V2_TOKENS_FILE = "large-v2-tokens.txt"
 
         // U2pp-Conformer-Yue model files (CTC architecture)
         private const val U2PP_CONFORMER_MODEL_FILE = "model.int8.onnx"
@@ -305,7 +299,6 @@ class VoiceInputManager(private val context: Context) {
             recognizer = when (currentModelType) {
                 VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
                 VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
-                VoiceModelType.WHISPER_LARGE_V2_CANTONESE -> initWhisperLargeV2CantoneseRecognizer(modelDir)
                 VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
             }
 
@@ -365,36 +358,6 @@ class VoiceInputManager(private val context: Context) {
         val modelConfig = OfflineModelConfig(
             whisper = whisperConfig,
             tokens = "$modelDir/$WHISPER_TOKENS_FILE",
-            numThreads = 2,
-            debug = false
-        )
-
-        val config = OfflineRecognizerConfig(
-            modelConfig = modelConfig,
-            decodingMethod = "greedy_search"
-        )
-
-        return OfflineRecognizer(config = config)
-    }
-
-    /**
-     * Initialize Whisper Large v2 Cantonese recognizer.
-     * Fine-tuned model for Cantonese with 6.73% CER on Common Voice zh-HK.
-     * Based on simonl0909/whisper-large-v2-cantonese from HuggingFace.
-     * Uses "yue" language code as this model was specifically trained for Cantonese.
-     */
-    private fun initWhisperLargeV2CantoneseRecognizer(modelDir: String): OfflineRecognizer {
-        val whisperConfig = OfflineWhisperModelConfig(
-            encoder = "$modelDir/$WHISPER_LARGE_V2_ENCODER_FILE",
-            decoder = "$modelDir/$WHISPER_LARGE_V2_DECODER_FILE",
-            language = "yue",  // Use Cantonese language code for Cantonese fine-tuned model
-            task = "transcribe",
-            tailPaddings = 1000  // Add padding to help with short VAD segments
-        )
-
-        val modelConfig = OfflineModelConfig(
-            whisper = whisperConfig,
-            tokens = "$modelDir/$WHISPER_LARGE_V2_TOKENS_FILE",
             numThreads = 2,
             debug = false
         )
@@ -640,8 +603,7 @@ class VoiceInputManager(private val context: Context) {
         var cleaned = stripWhisperTokens(text)
 
         // For Whisper models, remove repetition patterns (a known Whisper issue)
-        if (currentModelType == VoiceModelType.WHISPER_CANTONESE ||
-            currentModelType == VoiceModelType.WHISPER_LARGE_V2_CANTONESE) {
+        if (currentModelType == VoiceModelType.WHISPER_CANTONESE) {
             cleaned = removeRepetition(cleaned)
         }
 
