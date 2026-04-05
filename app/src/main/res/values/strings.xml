@@ -46,6 +46,11 @@
     <string name="github_icon_desc">GitHub</string>
     <string name="github_url" translatable="false">https://github.com/awcjack/DualQuickIME</string>
 
+    <!-- Keyboard Behavior -->
+    <string name="settings_keyboard_behavior">Keyboard</string>
+    <string name="settings_haptic_feedback">Haptic feedback</string>
+    <string name="settings_haptic_feedback_desc">Vibrate on long-press actions</string>
+
     <!-- Character Set -->
     <string name="settings_character_set">Character Set</string>
     <string name="settings_use_extended">Use extended character set</string>

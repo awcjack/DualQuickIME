@@ -660,7 +660,9 @@ class KeyboardView @JvmOverloads constructor(
                             longPressTriggered = true
                             // Long-press: output half-width character
                             onKeyPress?.invoke(KeyEvent.Symbol(halfWidthChar))
-                            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            if (ThemeManager.getHapticFeedbackEnabled(context)) {
+                                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            }
                         }
                         longPressRunnable = runnable
                         longPressHandler.postDelayed(runnable, LONG_PRESS_DELAY)
@@ -810,8 +812,10 @@ class KeyboardView @JvmOverloads constructor(
                             longPressTriggered = true
                             // Long-press: output half-width character
                             onKeyPress?.invoke(KeyEvent.Symbol(halfWidthChar))
-                            // Provide haptic feedback
-                            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            // Provide haptic feedback if enabled
+                            if (ThemeManager.getHapticFeedbackEnabled(context)) {
+                                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            }
                         }
                         longPressRunnable = runnable
                         longPressHandler.postDelayed(runnable, LONG_PRESS_DELAY)

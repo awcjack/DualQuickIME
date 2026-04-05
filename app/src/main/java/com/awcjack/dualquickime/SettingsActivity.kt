@@ -80,6 +80,7 @@ class SettingsActivity : AppCompatActivity() {
         setupCandidatesSeekBar()
         setupRecentCandidatesSettings()
         setupCharacterSetSettings()
+        setupKeyboardBehaviorSettings()
         setupClipboardSettings()
 
         // Voice input settings only available in full version
@@ -121,6 +122,18 @@ class SettingsActivity : AppCompatActivity() {
             ThemeManager.setUseExtendedCharset(this, isChecked)
             // Show restart hint
             hintText.visibility = View.VISIBLE
+        }
+    }
+
+    private fun setupKeyboardBehaviorSettings() {
+        val switchHaptic = findViewById<SwitchCompat>(R.id.switchHapticFeedback)
+
+        // Set current value
+        switchHaptic.isChecked = ThemeManager.getHapticFeedbackEnabled(this)
+
+        // Listen for changes
+        switchHaptic.setOnCheckedChangeListener { _, isChecked ->
+            ThemeManager.setHapticFeedbackEnabled(this, isChecked)
         }
     }
 

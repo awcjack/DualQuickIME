@@ -37,6 +37,20 @@
     <string name="github_link_text">喺 GitHub 上查看</string>
     <string name="github_icon_desc">GitHub</string>
 
+    <!-- Keyboard Behavior -->
+    <string name="settings_keyboard_behavior">鍵盤</string>
+    <string name="settings_haptic_feedback">觸感回饋</string>
+    <string name="settings_haptic_feedback_desc">長按時震動提示</string>
+
+    <!-- Recent Candidates -->
+    <string name="settings_recent_candidates">優先顯示最近使用嘅候選字</string>
+    <string name="settings_recent_candidates_desc">最近使用嘅字會排前啲</string>
+    <string name="settings_recent_candidates_clear">清除最近候選字記錄</string>
+    <string name="settings_recent_candidates_clear_confirm_title">清除最近候選字？</string>
+    <string name="settings_recent_candidates_clear_confirm_message">呢個會清除最近候選字使用記錄。</string>
+    <string name="settings_recent_candidates_clear_confirm_yes">清除</string>
+    <string name="settings_recent_candidates_cleared">最近候選字記錄已清除</string>
+
     <!-- Character Set -->
     <string name="settings_character_set">字元集</string>
     <string name="settings_use_extended">使用擴充字元集</string>

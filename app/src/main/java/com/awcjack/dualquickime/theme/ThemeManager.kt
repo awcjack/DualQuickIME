@@ -17,6 +17,7 @@ object ThemeManager {
     private const val KEY_VOICE_INPUT_ENABLED = "voice_input_enabled"
     private const val KEY_VOICE_MODEL_TYPE = "voice_model_type"
     private const val KEY_RECENT_CANDIDATES_ENABLED = "recent_candidates_enabled"
+    private const val KEY_HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
@@ -34,6 +35,7 @@ object ThemeManager {
     private var cachedVoiceInputEnabled: Boolean? = null
     private var cachedVoiceModelType: String? = null
     private var cachedRecentCandidatesEnabled: Boolean? = null
+    private var cachedHapticFeedbackEnabled: Boolean? = null
 
     fun getThemeMode(context: Context): Int {
         if (cachedTheme == -1) {
@@ -132,6 +134,19 @@ object ThemeManager {
         getPrefs(context).edit().putBoolean(KEY_RECENT_CANDIDATES_ENABLED, enabled).apply()
     }
 
+    // Haptic feedback settings (default: true to enable)
+    fun getHapticFeedbackEnabled(context: Context): Boolean {
+        if (cachedHapticFeedbackEnabled == null) {
+            cachedHapticFeedbackEnabled = getPrefs(context).getBoolean(KEY_HAPTIC_FEEDBACK_ENABLED, true)
+        }
+        return cachedHapticFeedbackEnabled!!
+    }
+
+    fun setHapticFeedbackEnabled(context: Context, enabled: Boolean) {
+        cachedHapticFeedbackEnabled = enabled
+        getPrefs(context).edit().putBoolean(KEY_HAPTIC_FEEDBACK_ENABLED, enabled).apply()
+    }
+
     /**
      * Returns true if dark theme should be used based on current settings.
      */
@@ -181,6 +196,7 @@ object ThemeManager {
         cachedVoiceInputEnabled = null
         cachedVoiceModelType = null
         cachedRecentCandidatesEnabled = null
+        cachedHapticFeedbackEnabled = null
     }
 
     // Modern Dark Theme Colors (Material You inspired)
