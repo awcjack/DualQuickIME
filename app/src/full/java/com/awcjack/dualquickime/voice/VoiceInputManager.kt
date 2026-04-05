@@ -331,20 +331,26 @@ class VoiceInputManager(private val context: Context) {
      * Initialize Whisper Cantonese recognizer.
      * Note: Uses "zh" language code because the fine-tuned model was trained on Cantonese
      * data using the Chinese (zh) base model. The model doesn't have a native "yue" language token.
+     *
+     * Key configuration:
+     * - tailPaddings: Add padding at the end of audio to help with short segments
+     * - language: "zh" for Chinese/Cantonese
+     * - task: "transcribe" for speech-to-text
      */
     private fun initWhisperRecognizer(modelDir: String): OfflineRecognizer {
         val whisperConfig = OfflineWhisperModelConfig(
             encoder = "$modelDir/$WHISPER_ENCODER_FILE",
             decoder = "$modelDir/$WHISPER_DECODER_FILE",
             language = "zh",  // Use Chinese - model fine-tuned for Cantonese on zh base
-            task = "transcribe"
+            task = "transcribe",
+            tailPaddings = 1000  // Add padding to help with short VAD segments
         )
 
         val modelConfig = OfflineModelConfig(
             whisper = whisperConfig,
             tokens = "$modelDir/$WHISPER_TOKENS_FILE",
             numThreads = 2,
-            debug = false
+            debug = true  // Enable debug temporarily to see what's happening
         )
 
         val config = OfflineRecognizerConfig(
@@ -558,7 +564,12 @@ class VoiceInputManager(private val context: Context) {
      */
     private fun processRecognizedText(text: String): String {
         // Strip Whisper special tokens (e.g., <|transcribe|>, <|notimestamps|>, <|en|>, etc.)
-        val cleaned = stripWhisperTokens(text)
+        var cleaned = stripWhisperTokens(text)
+
+        // For Whisper model, remove repetition patterns (a known Whisper issue)
+        if (currentModelType == VoiceModelType.WHISPER_CANTONESE) {
+            cleaned = removeRepetition(cleaned)
+        }
 
         // Lowercase Latin characters first (voice models often output uppercase English)
         val lowered = lowercaseLatinCharacters(cleaned)
@@ -577,6 +588,62 @@ class VoiceInputManager(private val context: Context) {
     private fun stripWhisperTokens(text: String): String {
         // Remove all <|...|> tokens
         return text.replace(Regex("<\\|[^|]+\\|>"), "").trim()
+    }
+
+    /**
+     * Remove repetition patterns from Whisper output.
+     * Whisper sometimes produces repeated text like "hellohellohello" or "早晨早晨早晨".
+     * This function detects and removes such repetitions.
+     */
+    private fun removeRepetition(text: String): String {
+        if (text.length < 4) return text
+
+        // Try to find repeating patterns of various lengths
+        for (patternLen in 1..minOf(text.length / 2, 20)) {
+            val pattern = text.substring(0, patternLen)
+            var isRepeating = true
+            var repeatCount = 1
+
+            // Check if the entire string is just this pattern repeated
+            for (i in patternLen until text.length step patternLen) {
+                val endIdx = minOf(i + patternLen, text.length)
+                val segment = text.substring(i, endIdx)
+                if (segment == pattern || (endIdx == text.length && pattern.startsWith(segment))) {
+                    repeatCount++
+                } else {
+                    isRepeating = false
+                    break
+                }
+            }
+
+            // If we found a repeating pattern and it repeats more than twice, return just one instance
+            if (isRepeating && repeatCount >= 3) {
+                Log.w(TAG, "Detected repetition: '$pattern' repeated $repeatCount times")
+                return pattern
+            }
+        }
+
+        // Also check for partial repetition at the end (e.g., "hello world hello world hel")
+        // by looking for repeated substrings
+        for (patternLen in 2..minOf(text.length / 2, 30)) {
+            val pattern = text.substring(0, patternLen)
+            val remaining = text.substring(patternLen)
+            if (remaining.startsWith(pattern)) {
+                // Found a repeat at the start, count total repeats
+                var count = 1
+                var pos = 0
+                while (pos + patternLen <= text.length && text.substring(pos, pos + patternLen) == pattern) {
+                    count++
+                    pos += patternLen
+                }
+                if (count >= 3) {
+                    Log.w(TAG, "Detected partial repetition: '$pattern' repeated $count+ times")
+                    return pattern
+                }
+            }
+        }
+
+        return text
     }
 
     /**
@@ -620,6 +687,7 @@ class VoiceInputManager(private val context: Context) {
 
                         // Transcribe the speech segment
                         val segmentSamples = segment.samples
+                        Log.d(TAG, "VAD segment: ${segmentSamples.size} samples (${segmentSamples.size / SAMPLE_RATE.toFloat()}s)")
                         if (segmentSamples.isNotEmpty()) {
                             val stream = rec.createStream()
                             stream.acceptWaveform(segmentSamples, SAMPLE_RATE)
@@ -627,10 +695,12 @@ class VoiceInputManager(private val context: Context) {
 
                             val result = rec.getResult(stream)
                             var text = result.text.trim()
+                            Log.d(TAG, "Raw recognition result: '$text'")
 
                             if (text.isNotEmpty()) {
                                 // Process text: convert to traditional Chinese and replace punctuation
                                 text = processRecognizedText(text)
+                                Log.d(TAG, "Processed text: '$text'")
 
                                 // Append to accumulated text
                                 if (accumulatedText.isNotEmpty()) {
@@ -639,6 +709,7 @@ class VoiceInputManager(private val context: Context) {
                                 accumulatedText.append(text)
 
                                 lastRecognizedText = accumulatedText.toString()
+                                Log.d(TAG, "Accumulated text: '$lastRecognizedText'")
                                 onResultCallback?.invoke(lastRecognizedText, true)
                             }
 
