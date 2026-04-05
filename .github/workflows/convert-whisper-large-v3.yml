@@ -1,0 +1,142 @@
+name: Convert Whisper Large v3 Cantonese Model
+
+on:
+  # Manual trigger only - run once to create the model release
+  # The model files don't change often, so no need to auto-rebuild on each app release
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: 'HuggingFace model ID'
+        required: false
+        default: 'khleeloo/whisper-large-v3-cantonese'
+      release_tag:
+        description: 'Release tag name (must be unique, e.g., whisper-large-v3-cantonese-v1)'
+        required: true
+        default: 'whisper-large-v3-cantonese-v1'
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    # Use a larger runner for the large-v3 model (~3GB output, needs more RAM)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          # Large-v3 model requires significant disk space
+          echo "Disk space before cleanup:"
+          df -h
+          # Remove unnecessary tools to free space
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch transformers onnx onnxruntime onnxscript optimum[onnxruntime]
+          # Install openai-whisper to get the original tiktoken vocabulary file
+          pip install openai-whisper
+
+      - name: Convert model to sherpa-onnx format
+        run: |
+          MODEL_ID="${{ github.event.inputs.model_id }}"
+          echo "Converting $MODEL_ID to sherpa-onnx format..."
+          echo "Note: This may take 15-30 minutes for large-v3 model"
+          python scripts/convert_whisper_large_v3_cantonese.py \
+            --model-id "$MODEL_ID" \
+            --output-dir ./sherpa-onnx-whisper-large-v3-cantonese
+
+      - name: List output files
+        run: |
+          echo "Output files:"
+          ls -lah ./sherpa-onnx-whisper-large-v3-cantonese/
+          echo ""
+          echo "Total size:"
+          du -sh ./sherpa-onnx-whisper-large-v3-cantonese/
+
+      - name: Generate release notes
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          cat > RELEASE_NOTES.md << 'EOF'
+          ## Whisper Large v3 Cantonese - sherpa-onnx Format
+
+          Converted from [khleeloo/whisper-large-v3-cantonese](https://huggingface.co/khleeloo/whisper-large-v3-cantonese)
+
+          ### Performance
+          - **CER**: 7.26% on Common Voice 17 yue test set
+          - **Languages**: Cantonese (primary), with multilingual support
+          - **Base model**: openai/whisper-large-v3
+
+          ### Files
+          - `large-v3-encoder.int8.onnx` - Encoder model (~1.2 GB)
+          - `large-v3-decoder.int8.onnx` - Decoder model (~1.85 GB)
+          - `large-v3-tokens.txt` - Token vocabulary (~1 MB)
+
+          ### Total Size
+          ~3.05 GB (int8 quantized)
+
+          ### Usage
+          The DualQuickIME app downloads these files from:
+          ```
+          https://github.com/awcjack/DualQuickIME/releases/download/TAG/
+          ```
+
+          ### Notes
+          This is a larger model than whisper-small-cantonese. It provides better accuracy
+          but requires more storage space and memory on device. Recommended for devices
+          with sufficient storage and for users who prioritize accuracy over size.
+          EOF
+          sed -i "s|TAG|${TAG}|g" RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      # Use gh release create to upload files atomically with release creation
+      - name: Create release with model files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          gh release create "$TAG" \
+            --title "Whisper Large v3 Cantonese Model (sherpa-onnx)" \
+            --notes-file RELEASE_NOTES.md \
+            ./sherpa-onnx-whisper-large-v3-cantonese/large-v3-encoder.int8.onnx \
+            ./sherpa-onnx-whisper-large-v3-cantonese/large-v3-decoder.int8.onnx \
+            ./sherpa-onnx-whisper-large-v3-cantonese/large-v3-tokens.txt
+
+      - name: Upload artifact (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-onnx-whisper-large-v3-cantonese
+          path: |
+            ./sherpa-onnx-whisper-large-v3-cantonese/large-v3-encoder.int8.onnx
+            ./sherpa-onnx-whisper-large-v3-cantonese/large-v3-decoder.int8.onnx
+            ./sherpa-onnx-whisper-large-v3-cantonese/large-v3-tokens.txt
+          retention-days: 7
+
+      - name: Print download URLs
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          echo "============================================"
+          echo "Model files uploaded to release: $TAG"
+          echo "============================================"
+          echo ""
+          echo "Download URLs:"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/large-v3-encoder.int8.onnx"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/large-v3-decoder.int8.onnx"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/large-v3-tokens.txt"
+          echo ""
+          echo "Update WHISPER_LARGE_V3_CANTONESE_FALLBACK_URL in ModelDownloadManager.kt if needed:"
+          echo "  private const val WHISPER_LARGE_V3_CANTONESE_FALLBACK_URL = \"https://github.com/awcjack/DualQuickIME/releases/download/${TAG}\""
