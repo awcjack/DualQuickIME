@@ -206,6 +206,9 @@ class VoiceInputManager(private val context: Context) {
     // Accumulated text from all segments in current session
     private var accumulatedText = StringBuilder()
 
+    // Track last segment result to detect VAD duplicates
+    private var lastSegmentText: String = ""
+
     /**
      * Check if the model files are downloaded and available for the current model type.
      */
@@ -350,7 +353,7 @@ class VoiceInputManager(private val context: Context) {
             whisper = whisperConfig,
             tokens = "$modelDir/$WHISPER_TOKENS_FILE",
             numThreads = 2,
-            debug = true  // Enable debug temporarily to see what's happening
+            debug = false
         )
 
         val config = OfflineRecognizerConfig(
@@ -418,6 +421,7 @@ class VoiceInputManager(private val context: Context) {
             isRecording = true
             lastRecognizedText = ""
             accumulatedText.clear()
+            lastSegmentText = ""
 
             // Reset VAD state to clear any leftover segments from previous recordings
             vad?.reset()
@@ -594,9 +598,33 @@ class VoiceInputManager(private val context: Context) {
      * Remove repetition patterns from Whisper output.
      * Whisper sometimes produces repeated text like "hellohellohello" or "早晨早晨早晨".
      * This function detects and removes such repetitions.
+     *
+     * Also handles the case where Whisper outputs the entire text twice (e.g., "hello worldhello world").
      */
     private fun removeRepetition(text: String): String {
-        if (text.length < 4) return text
+        if (text.length < 2) return text
+
+        // First check: is the text exactly the same thing repeated twice?
+        // This handles cases like "hello worldhello world" or "早晨早晨"
+        val halfLen = text.length / 2
+        if (text.length >= 2 && text.length % 2 == 0) {
+            val firstHalf = text.substring(0, halfLen)
+            val secondHalf = text.substring(halfLen)
+            if (firstHalf == secondHalf) {
+                Log.w(TAG, "Detected 2x duplication: '$firstHalf'")
+                return firstHalf
+            }
+        }
+
+        // Check for 4x duplication (common Whisper pattern)
+        if (text.length >= 4 && text.length % 4 == 0) {
+            val quarterLen = text.length / 4
+            val quarter = text.substring(0, quarterLen)
+            if (text == quarter.repeat(4)) {
+                Log.w(TAG, "Detected 4x duplication: '$quarter'")
+                return quarter
+            }
+        }
 
         // Try to find repeating patterns of various lengths
         for (patternLen in 1..minOf(text.length / 2, 20)) {
@@ -616,30 +644,10 @@ class VoiceInputManager(private val context: Context) {
                 }
             }
 
-            // If we found a repeating pattern and it repeats more than twice, return just one instance
-            if (isRepeating && repeatCount >= 3) {
+            // If we found a repeating pattern (2 or more times), return just one instance
+            if (isRepeating && repeatCount >= 2) {
                 Log.w(TAG, "Detected repetition: '$pattern' repeated $repeatCount times")
                 return pattern
-            }
-        }
-
-        // Also check for partial repetition at the end (e.g., "hello world hello world hel")
-        // by looking for repeated substrings
-        for (patternLen in 2..minOf(text.length / 2, 30)) {
-            val pattern = text.substring(0, patternLen)
-            val remaining = text.substring(patternLen)
-            if (remaining.startsWith(pattern)) {
-                // Found a repeat at the start, count total repeats
-                var count = 1
-                var pos = 0
-                while (pos + patternLen <= text.length && text.substring(pos, pos + patternLen) == pattern) {
-                    count++
-                    pos += patternLen
-                }
-                if (count >= 3) {
-                    Log.w(TAG, "Detected partial repetition: '$pattern' repeated $count+ times")
-                    return pattern
-                }
             }
         }
 
@@ -702,6 +710,15 @@ class VoiceInputManager(private val context: Context) {
                                 text = processRecognizedText(text)
                                 Log.d(TAG, "Processed text: '$text'")
 
+                                // Skip if this segment produced the same text as the previous one
+                                // (VAD might be sending duplicate segments)
+                                if (text == lastSegmentText) {
+                                    Log.w(TAG, "Skipping duplicate segment: '$text'")
+                                    stream.release()
+                                    continue
+                                }
+                                lastSegmentText = text
+
                                 // Append to accumulated text
                                 if (accumulatedText.isNotEmpty()) {
                                     accumulatedText.append(" ")
@@ -736,6 +753,14 @@ class VoiceInputManager(private val context: Context) {
 
                     if (text.isNotEmpty()) {
                         text = processRecognizedText(text)
+
+                        // Skip duplicate segments
+                        if (text == lastSegmentText) {
+                            Log.w(TAG, "Skipping duplicate flush segment: '$text'")
+                            stream.release()
+                            continue
+                        }
+                        lastSegmentText = text
 
                         if (accumulatedText.isNotEmpty()) {
                             accumulatedText.append(" ")
