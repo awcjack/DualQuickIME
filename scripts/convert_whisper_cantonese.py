@@ -531,6 +531,20 @@ def add_encoder_metadata(filename: str, config, processor):
     # Also add language tokens as non-speech
     non_speech_tokens.extend(lang_tokens)
 
+    # Get sot_prev and sot_lm tokens
+    # These are special tokens used by sherpa-onnx for decoding control
+    # sot_prev: 50361 (<|startofprev|>) - used for prompting with previous text
+    # sot_lm: 50360 (<|startoflm|>) - used for language model mode
+    sot_prev = tokenizer.convert_tokens_to_ids("<|startofprev|>")
+    sot_lm = tokenizer.convert_tokens_to_ids("<|startoflm|>")
+
+    # If these tokens don't exist in the tokenizer, use sensible defaults
+    # Based on OpenAI Whisper's token IDs
+    if sot_prev is None or sot_prev == tokenizer.unk_token_id:
+        sot_prev = 50361
+    if sot_lm is None or sot_lm == tokenizer.unk_token_id:
+        sot_lm = 50360
+
     # Add metadata
     meta_data = {
         "model_type": "whisper-small",
@@ -561,6 +575,9 @@ def add_encoder_metadata(filename: str, config, processor):
         "all_language_tokens": ",".join(map(str, lang_tokens)),
         "all_language_codes": ",".join(lang_codes),
         "non_speech_tokens": ",".join(map(str, non_speech_tokens)),
+        # Additional tokens needed by sherpa-onnx decoder
+        "sot_prev": sot_prev,
+        "sot_lm": sot_lm,
     }
 
     for key, value in meta_data.items():
@@ -572,18 +589,50 @@ def add_encoder_metadata(filename: str, config, processor):
 
 
 def export_tokens(processor, output_path: Path):
-    """Export tokenizer vocabulary in sherpa-onnx tiktoken format (base64 encoded raw bytes).
+    """Export tokenizer vocabulary in sherpa-onnx tiktoken format.
 
-    HuggingFace Whisper uses GPT-2 byte-level BPE where bytes 0-255 are mapped to
-    unicode characters. We need to decode this mapping back to raw bytes before
-    base64 encoding for sherpa-onnx compatibility.
+    sherpa-onnx expects tokens in tiktoken format (base64-encoded raw bytes).
+
+    For best compatibility, we try to use the original multilingual.tiktoken file
+    from the openai-whisper package if available, as this ensures exact token format
+    match with sherpa-onnx's expected format.
+
+    Falls back to converting HuggingFace tokenizer vocabulary if tiktoken not available.
     """
     import base64
 
+    # Try to use original tiktoken file from openai-whisper package
+    try:
+        import whisper
+        from pathlib import Path as WhisperPath
+        whisper_dir = WhisperPath(whisper.__file__).parent
+        tiktoken_file = whisper_dir / "assets" / "multilingual.tiktoken"
+
+        if tiktoken_file.is_file():
+            print(f"  Using original tiktoken file: {tiktoken_file}")
+            with open(tiktoken_file, "r") as f:
+                contents = f.read()
+                tokens = {
+                    token: int(rank)
+                    for token, rank in (line.split() for line in contents.splitlines() if line)
+                }
+
+            with open(output_path, "w", encoding="utf-8") as f:
+                for t, i in tokens.items():
+                    f.write(f"{t} {i}\n")
+
+            print(f"  Exported {len(tokens)} tokens from tiktoken")
+            return
+    except ImportError:
+        print("  openai-whisper not available, using HuggingFace tokenizer")
+
+    # Fall back to HuggingFace tokenizer conversion
+    print("  Converting HuggingFace tokenizer to tiktoken format")
     tokenizer = processor.tokenizer
 
     # GPT-2 byte encoder/decoder
     # Maps bytes 0-255 to unicode characters (and vice versa)
+    # Reference: https://github.com/openai/gpt-2/blob/master/src/encoder.py
     def bytes_to_unicode():
         bs = list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
         cs = bs[:]
@@ -609,13 +658,17 @@ def export_tokens(processor, output_path: Path):
             # Decode GPT-2 byte encoding back to raw bytes
             try:
                 raw_bytes = bytes([byte_decoder[c] for c in token])
+                # Base64 encode the raw bytes (tiktoken format)
+                token_b64 = base64.b64encode(raw_bytes).decode("ascii")
             except KeyError:
-                # Fallback for special tokens that aren't byte-encoded
+                # Special tokens like <|startoftranscript|> aren't byte-encoded
+                # For these, we encode the UTF-8 bytes directly
                 raw_bytes = token.encode("utf-8")
+                token_b64 = base64.b64encode(raw_bytes).decode("ascii")
 
-            # Base64 encode the raw bytes (this is the tiktoken format)
-            token_b64 = base64.b64encode(raw_bytes).decode("ascii")
             f.write(f"{token_b64} {idx}\n")
+
+    print(f"  Exported {len(sorted_vocab)} tokens from HuggingFace tokenizer")
 
 
 def main():
