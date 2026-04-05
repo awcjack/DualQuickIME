@@ -18,6 +18,8 @@ object ModelDownloadManager {
     // Legacy constants for backward compatibility
     const val SENSEVOICE_MODEL_DIR = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09"
     const val WHISPER_CANTONESE_MODEL_DIR = "sherpa-onnx-whisper-small-cantonese"
+    const val WHISPER_MEDIUM_YUE_MODEL_DIR = "sherpa-onnx-whisper-medium-yue"
+    const val U2PP_CONFORMER_YUE_MODEL_DIR = "sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10"
 
     // Silero VAD model filename (shared between models)
     const val VAD_MODEL_FILE = "silero_vad.onnx"
@@ -35,9 +37,33 @@ object ModelDownloadManager {
     private const val GITHUB_RELEASES_API = "https://api.github.com/repos/awcjack/DualQuickIME/releases"
     private const val WHISPER_CANTONESE_TAG_PREFIX = "whisper-cantonese-"
 
+    // Sherpa-ONNX releases for WenetSpeech-Yue models (pre-converted)
+    // U2pp-Conformer-Yue model hosted on HuggingFace (individual files, not archive)
+    // Original archive: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10.tar.bz2
+    private const val U2PP_CONFORMER_YUE_BASE_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10/resolve/main"
+
+    // Whisper Medium Yue - needs conversion or use sherpa-onnx pre-converted if available
+    // Fallback to HuggingFace if not available from sherpa-onnx
+    private const val WHISPER_MEDIUM_YUE_FALLBACK_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-medium-yue-v1"
+    private const val WHISPER_MEDIUM_YUE_TAG_PREFIX = "whisper-medium-yue-"
+
     // Model version markers - increment to force re-download of existing files
     // This handles cases where model format changes but file sizes are similar
     private const val WHISPER_CANTONESE_VERSION = "v5"
+    private const val WHISPER_MEDIUM_YUE_VERSION = "v1"
+    private const val U2PP_CONFORMER_YUE_VERSION = "v1"
+
+    /**
+     * Get the version string for a model type.
+     */
+    private fun getModelVersion(modelType: VoiceModelType): String {
+        return when (modelType) {
+            VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_VERSION
+            VoiceModelType.WHISPER_MEDIUM_YUE -> WHISPER_MEDIUM_YUE_VERSION
+            VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_VERSION
+            else -> ""
+        }
+    }
 
     // Cached latest release URL (discovered at runtime)
     @Volatile
@@ -64,12 +90,29 @@ object ModelDownloadManager {
         "small-tokens.txt" to 944_000L                // ~0.9 MB
     )
 
+    // Whisper Medium Yue model files (WenetSpeech-Yue fine-tuned)
+    // Larger than small variant but more accurate (5.05% MER)
+    private val WHISPER_MEDIUM_YUE_FILES = listOf(
+        "medium-encoder.int8.onnx" to 480_000_000L,   // ~460 MB
+        "medium-decoder.int8.onnx" to 1_020_000_000L, // ~970 MB
+        "medium-tokens.txt" to 944_000L               // ~0.9 MB
+    )
+
+    // U2pp-Conformer-Yue model files (sherpa-onnx pre-converted)
+    // CTC model - simpler architecture, fast inference
+    private val U2PP_CONFORMER_YUE_FILES = listOf(
+        "model.int8.onnx" to 130_000_000L,    // ~130 MB (CTC encoder)
+        "tokens.txt" to 320_000L               // ~320 KB (BPE tokens)
+    )
+
     // VAD model file
     private val VAD_FILE = VAD_MODEL_FILE to 630_000L  // ~630 KB
 
     // Total expected sizes
     const val SENSEVOICE_TOTAL_SIZE = 227_000_000L
     const val WHISPER_CANTONESE_TOTAL_SIZE = 415_000_000L  // ~395 MB (encoder + decoder + tokens + VAD)
+    const val WHISPER_MEDIUM_YUE_TOTAL_SIZE = 1_502_000_000L  // ~1.5 GB (encoder + decoder + tokens + VAD)
+    const val U2PP_CONFORMER_YUE_TOTAL_SIZE = 131_000_000L  // ~130 MB (CTC model + tokens + VAD)
 
     // Legacy constant for backward compatibility
     const val TOTAL_MODEL_SIZE = SENSEVOICE_TOTAL_SIZE
@@ -93,6 +136,8 @@ object ModelDownloadManager {
         val files = when (modelType) {
             VoiceModelType.SENSE_VOICE -> SENSEVOICE_FILES
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_FILES
+            VoiceModelType.WHISPER_MEDIUM_YUE -> WHISPER_MEDIUM_YUE_FILES
+            VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_FILES
         }
 
         val modelReady = files.all { (filename, _) ->
@@ -101,9 +146,10 @@ object ModelDownloadManager {
 
         // Check version for models that track it
         val versionOk = when (modelType) {
-            VoiceModelType.WHISPER_CANTONESE -> {
+            VoiceModelType.WHISPER_CANTONESE,
+            VoiceModelType.WHISPER_MEDIUM_YUE -> {
                 val versionFile = File(modelDir, VERSION_FILE)
-                versionFile.exists() && versionFile.readText().trim() == WHISPER_CANTONESE_VERSION
+                versionFile.exists() && versionFile.readText().trim() == getModelVersion(modelType)
             }
             else -> true
         }
@@ -131,11 +177,15 @@ object ModelDownloadManager {
         val files = when (modelType) {
             VoiceModelType.SENSE_VOICE -> SENSEVOICE_FILES
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_FILES
+            VoiceModelType.WHISPER_MEDIUM_YUE -> WHISPER_MEDIUM_YUE_FILES
+            VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_FILES
         }
 
         val totalSize = when (modelType) {
             VoiceModelType.SENSE_VOICE -> SENSEVOICE_TOTAL_SIZE
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_TOTAL_SIZE
+            VoiceModelType.WHISPER_MEDIUM_YUE -> WHISPER_MEDIUM_YUE_TOTAL_SIZE
+            VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_TOTAL_SIZE
         }
 
         if (modelDir.exists()) {
@@ -176,30 +226,42 @@ object ModelDownloadManager {
                 val files = when (modelType) {
                     VoiceModelType.SENSE_VOICE -> SENSEVOICE_FILES
                     VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_FILES
+                    VoiceModelType.WHISPER_MEDIUM_YUE -> WHISPER_MEDIUM_YUE_FILES
+                    VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_FILES
                 }
 
                 val baseUrl = when (modelType) {
                     VoiceModelType.SENSE_VOICE -> SENSEVOICE_BASE_URL
                     VoiceModelType.WHISPER_CANTONESE -> getWhisperCantoneseBaseUrl()
+                    VoiceModelType.WHISPER_MEDIUM_YUE -> getWhisperMediumYueBaseUrl()
+                    VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_BASE_URL
                 }
 
                 val totalSize = when (modelType) {
                     VoiceModelType.SENSE_VOICE -> SENSEVOICE_TOTAL_SIZE
                     VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_TOTAL_SIZE
+                    VoiceModelType.WHISPER_MEDIUM_YUE -> WHISPER_MEDIUM_YUE_TOTAL_SIZE
+                    VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_TOTAL_SIZE
                 }
 
                 // Check if model version is outdated and needs re-download
-                // For Whisper Cantonese, extract version from the dynamically discovered URL
+                // For Whisper models, extract version from the dynamically discovered URL
                 val currentVersion = when (modelType) {
                     VoiceModelType.WHISPER_CANTONESE -> {
                         // Extract version from URL (e.g., "whisper-cantonese-v5" -> "v5")
                         baseUrl.substringAfterLast("/").removePrefix(WHISPER_CANTONESE_TAG_PREFIX)
                     }
+                    VoiceModelType.WHISPER_MEDIUM_YUE -> {
+                        // Extract version from URL (e.g., "whisper-medium-yue-v1" -> "v1")
+                        baseUrl.substringAfterLast("/").removePrefix(WHISPER_MEDIUM_YUE_TAG_PREFIX)
+                    }
+                    VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_VERSION
                     else -> ""
                 }
 
                 val needsUpdate = when (modelType) {
-                    VoiceModelType.WHISPER_CANTONESE -> {
+                    VoiceModelType.WHISPER_CANTONESE,
+                    VoiceModelType.WHISPER_MEDIUM_YUE -> {
                         val versionFile = File(modelDir, VERSION_FILE)
                         !versionFile.exists() || versionFile.readText().trim() != currentVersion
                     }
@@ -253,7 +315,9 @@ object ModelDownloadManager {
 
                 // Write version file for models that track it
                 when (modelType) {
-                    VoiceModelType.WHISPER_CANTONESE -> {
+                    VoiceModelType.WHISPER_CANTONESE,
+                    VoiceModelType.WHISPER_MEDIUM_YUE,
+                    VoiceModelType.U2PP_CONFORMER_YUE -> {
                         val versionFile = File(modelDir, VERSION_FILE)
                         versionFile.writeText(currentVersion)
                         Log.i(TAG, "Wrote version file: $currentVersion")
@@ -335,6 +399,53 @@ object ModelDownloadManager {
         // Fall back to hardcoded URL
         Log.i(TAG, "Using fallback Whisper Cantonese URL")
         return WHISPER_CANTONESE_FALLBACK_URL
+    }
+
+    /**
+     * Get the latest Whisper Medium Yue release URL from GitHub API.
+     * Falls back to hardcoded URL if API is unavailable.
+     */
+    private fun getWhisperMediumYueBaseUrl(): String {
+        // Try to fetch latest release from GitHub API
+        try {
+            val url = URL(GITHUB_RELEASES_API)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            connection.setRequestProperty("User-Agent", "DualQuickIME/1.0")
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().readText()
+
+                // Simple JSON parsing - find the latest whisper-medium-yue-* tag
+                val tagPattern = """"tag_name"\s*:\s*"($WHISPER_MEDIUM_YUE_TAG_PREFIX[^"]+)"""".toRegex()
+                val matches = tagPattern.findAll(response)
+
+                // Get all whisper-medium-yue tags and find the latest (highest version number)
+                val latestTag = matches
+                    .map { it.groupValues[1] }
+                    .filter { it.startsWith(WHISPER_MEDIUM_YUE_TAG_PREFIX) }
+                    .maxByOrNull { tag ->
+                        tag.removePrefix(WHISPER_MEDIUM_YUE_TAG_PREFIX)
+                            .removePrefix("v")
+                            .toIntOrNull() ?: 0
+                    }
+
+                if (latestTag != null) {
+                    val discoveredUrl = "https://github.com/awcjack/DualQuickIME/releases/download/$latestTag"
+                    Log.i(TAG, "Discovered latest Whisper Medium Yue release: $latestTag")
+                    return discoveredUrl
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch latest Whisper Medium Yue release from GitHub API: ${e.message}")
+        }
+
+        // Fall back to hardcoded URL
+        Log.i(TAG, "Using fallback Whisper Medium Yue URL")
+        return WHISPER_MEDIUM_YUE_FALLBACK_URL
     }
 
     /**
