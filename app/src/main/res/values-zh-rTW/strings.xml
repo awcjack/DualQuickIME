@@ -108,4 +108,8 @@
     <string name="voice_model_sensevoice_desc">自動辨識粵語、普通話、英文、日文、韓文</string>
     <string name="voice_model_whisper_cantonese_name">Whisper 廣東話</string>
     <string name="voice_model_whisper_cantonese_desc">針對廣東話優化（7.93% CER），支援香港英語</string>
+    <string name="voice_model_whisper_medium_yue_name">Whisper Medium 粵語</string>
+    <string name="voice_model_whisper_medium_yue_desc">WenetSpeech-Yue 微調版（5.05% MER）- 更高精度，較大模型</string>
+    <string name="voice_model_u2pp_conformer_yue_name">U2pp-Conformer 粵語</string>
+    <string name="voice_model_u2pp_conformer_yue_desc">最佳精度體積比（5.05% MER，130M 參數）- 推薦</string>
 </resources>
