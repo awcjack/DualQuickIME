@@ -18,7 +18,7 @@ import kotlin.concurrent.thread
  * Supports multiple model types:
  * - SenseVoice: Multilingual (Cantonese, Mandarin, English, Japanese, Korean)
  * - Whisper Cantonese: Optimized for Cantonese with 7.93% CER
- * - Whisper Medium Yue: WenetSpeech-Yue fine-tuned with 5.05% MER (larger model)
+ * - Whisper Large v3 Cantonese: Fine-tuned for Cantonese with 7.26% CER (larger model)
  * - U2pp-Conformer-Yue: Best accuracy-to-size ratio (130M params, 5.05% MER)
  *
  * Uses Silero VAD for voice activity detection (simulated streaming).
@@ -44,10 +44,10 @@ class VoiceInputManager(private val context: Context) {
         private const val WHISPER_DECODER_FILE = "small-decoder.int8.onnx"
         private const val WHISPER_TOKENS_FILE = "small-tokens.txt"
 
-        // Whisper Medium Yue model files (WenetSpeech-Yue fine-tuned)
-        private const val WHISPER_MEDIUM_ENCODER_FILE = "medium-encoder.int8.onnx"
-        private const val WHISPER_MEDIUM_DECODER_FILE = "medium-decoder.int8.onnx"
-        private const val WHISPER_MEDIUM_TOKENS_FILE = "medium-tokens.txt"
+        // Whisper Large v3 Cantonese model files (khleeloo/whisper-large-v3-cantonese)
+        private const val WHISPER_LARGE_V3_ENCODER_FILE = "large-v3-encoder.int8.onnx"
+        private const val WHISPER_LARGE_V3_DECODER_FILE = "large-v3-decoder.int8.onnx"
+        private const val WHISPER_LARGE_V3_TOKENS_FILE = "large-v3-tokens.txt"
 
         // U2pp-Conformer-Yue model files (CTC architecture)
         private const val U2PP_CONFORMER_MODEL_FILE = "model.int8.onnx"
@@ -305,7 +305,7 @@ class VoiceInputManager(private val context: Context) {
             recognizer = when (currentModelType) {
                 VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
                 VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
-                VoiceModelType.WHISPER_MEDIUM_YUE -> initWhisperMediumYueRecognizer(modelDir)
+                VoiceModelType.WHISPER_LARGE_V3_CANTONESE -> initWhisperLargeV3CantoneseRecognizer(modelDir)
                 VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
             }
 
@@ -378,22 +378,23 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Initialize Whisper Medium Yue recognizer.
-     * Larger model trained on WenetSpeech-Yue for better Cantonese accuracy (5.05% MER).
+     * Initialize Whisper Large v3 Cantonese recognizer.
+     * Fine-tuned model for Cantonese with 7.26% CER on Common Voice 17 yue.
+     * Based on khleeloo/whisper-large-v3-cantonese from HuggingFace.
      * Uses "yue" language code as this model was specifically trained for Cantonese.
      */
-    private fun initWhisperMediumYueRecognizer(modelDir: String): OfflineRecognizer {
+    private fun initWhisperLargeV3CantoneseRecognizer(modelDir: String): OfflineRecognizer {
         val whisperConfig = OfflineWhisperModelConfig(
-            encoder = "$modelDir/$WHISPER_MEDIUM_ENCODER_FILE",
-            decoder = "$modelDir/$WHISPER_MEDIUM_DECODER_FILE",
-            language = "yue",  // Use Cantonese language code for WenetSpeech-Yue fine-tuned model
+            encoder = "$modelDir/$WHISPER_LARGE_V3_ENCODER_FILE",
+            decoder = "$modelDir/$WHISPER_LARGE_V3_DECODER_FILE",
+            language = "yue",  // Use Cantonese language code for Cantonese fine-tuned model
             task = "transcribe",
             tailPaddings = 1000  // Add padding to help with short VAD segments
         )
 
         val modelConfig = OfflineModelConfig(
             whisper = whisperConfig,
-            tokens = "$modelDir/$WHISPER_MEDIUM_TOKENS_FILE",
+            tokens = "$modelDir/$WHISPER_LARGE_V3_TOKENS_FILE",
             numThreads = 2,
             debug = false
         )
@@ -640,7 +641,7 @@ class VoiceInputManager(private val context: Context) {
 
         // For Whisper models, remove repetition patterns (a known Whisper issue)
         if (currentModelType == VoiceModelType.WHISPER_CANTONESE ||
-            currentModelType == VoiceModelType.WHISPER_MEDIUM_YUE) {
+            currentModelType == VoiceModelType.WHISPER_LARGE_V3_CANTONESE) {
             cleaned = removeRepetition(cleaned)
         }
 

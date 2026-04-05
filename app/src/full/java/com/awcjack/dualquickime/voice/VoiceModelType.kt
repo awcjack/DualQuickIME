@@ -44,18 +44,19 @@ enum class VoiceModelType(
     ),
 
     /**
-     * Whisper Medium Yue - Fine-tuned Whisper Medium model on WenetSpeech-Yue.
-     * Higher accuracy for Cantonese (5.05% MER on WSYue-eval).
+     * Whisper Large v3 Cantonese - Fine-tuned Whisper Large v3 model for Cantonese.
+     * Higher accuracy for Cantonese (7.26% CER on Common Voice 17 yue).
      * Larger model but more accurate than whisper-small-cantonese.
-     * Based on ASLP-lab/WSYue-ASR from HuggingFace.
+     * Based on khleeloo/whisper-large-v3-cantonese from HuggingFace.
+     * HuggingFace Transformers format - directly convertible to sherpa-onnx.
      */
-    WHISPER_MEDIUM_YUE(
-        id = "whisper_medium_yue",
-        displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_medium_yue_name,
-        descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_medium_yue_desc,
-        modelDir = "sherpa-onnx-whisper-medium-yue",
-        sizeBytes = 1_530_000_000L,  // ~769M parameters = ~1.5GB model files
-        sizeDisplayMB = 1530,
+    WHISPER_LARGE_V3_CANTONESE(
+        id = "whisper_large_v3_cantonese",
+        displayNameResId = com.awcjack.dualquickime.R.string.voice_model_whisper_large_v3_cantonese_name,
+        descriptionResId = com.awcjack.dualquickime.R.string.voice_model_whisper_large_v3_cantonese_desc,
+        modelDir = "sherpa-onnx-whisper-large-v3-cantonese",
+        sizeBytes = 3_100_000_000L,  // ~1.5B parameters = ~3.1GB model files (int8)
+        sizeDisplayMB = 3100,
         isAvailable = true
     ),
 

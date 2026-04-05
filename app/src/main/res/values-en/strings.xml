@@ -94,4 +94,8 @@
     <string name="voice_model_sensevoice_desc">Auto-detects Cantonese, Mandarin, English, Japanese, Korean</string>
     <string name="voice_model_whisper_cantonese_name">Whisper Cantonese</string>
     <string name="voice_model_whisper_cantonese_desc">Optimized for Cantonese (7.93% CER) with HK English support</string>
+    <string name="voice_model_whisper_large_v3_cantonese_name">Whisper Large v3 Cantonese</string>
+    <string name="voice_model_whisper_large_v3_cantonese_desc">Fine-tuned for Cantonese (7.26% CER) - Higher accuracy, larger model</string>
+    <string name="voice_model_u2pp_conformer_yue_name">U2pp-Conformer Yue</string>
+    <string name="voice_model_u2pp_conformer_yue_desc">Best accuracy-to-size ratio (5.05% MER, 130M params) - Recommended</string>
 </resources>
