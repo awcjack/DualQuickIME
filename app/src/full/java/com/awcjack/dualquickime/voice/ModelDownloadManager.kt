@@ -28,11 +28,23 @@ object ModelDownloadManager {
     // GitHub Release URL for Whisper Cantonese (converted via CI)
     // Model files are uploaded to a dedicated release by the convert-whisper-model workflow
     // Format: https://github.com/OWNER/REPO/releases/download/TAG/FILE
-    private const val WHISPER_CANTONESE_BASE_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-cantonese-v4"
+    // This is the fallback URL if dynamic discovery fails
+    private const val WHISPER_CANTONESE_FALLBACK_URL = "https://github.com/awcjack/DualQuickIME/releases/download/whisper-cantonese-v5"
+
+    // GitHub API for discovering latest whisper-cantonese release
+    private const val GITHUB_RELEASES_API = "https://api.github.com/repos/awcjack/DualQuickIME/releases"
+    private const val WHISPER_CANTONESE_TAG_PREFIX = "whisper-cantonese-"
 
     // Model version markers - increment to force re-download of existing files
     // This handles cases where model format changes but file sizes are similar
-    private const val WHISPER_CANTONESE_VERSION = "v4"
+    private const val WHISPER_CANTONESE_VERSION = "v5"
+
+    // Cached latest release URL (discovered at runtime)
+    @Volatile
+    private var cachedWhisperCantoneseUrl: String? = null
+    @Volatile
+    private var lastUrlCheckTime: Long = 0
+    private const val URL_CACHE_TTL = 24 * 60 * 60 * 1000L  // 24 hours
     private const val VERSION_FILE = ".version"
 
     // GitHub URL for Silero VAD
@@ -168,7 +180,7 @@ object ModelDownloadManager {
 
                 val baseUrl = when (modelType) {
                     VoiceModelType.SENSE_VOICE -> SENSEVOICE_BASE_URL
-                    VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_BASE_URL
+                    VoiceModelType.WHISPER_CANTONESE -> getWhisperCantoneseBaseUrl()
                 }
 
                 val totalSize = when (modelType) {
@@ -177,16 +189,25 @@ object ModelDownloadManager {
                 }
 
                 // Check if model version is outdated and needs re-download
+                // For Whisper Cantonese, extract version from the dynamically discovered URL
+                val currentVersion = when (modelType) {
+                    VoiceModelType.WHISPER_CANTONESE -> {
+                        // Extract version from URL (e.g., "whisper-cantonese-v5" -> "v5")
+                        baseUrl.substringAfterLast("/").removePrefix(WHISPER_CANTONESE_TAG_PREFIX)
+                    }
+                    else -> ""
+                }
+
                 val needsUpdate = when (modelType) {
                     VoiceModelType.WHISPER_CANTONESE -> {
                         val versionFile = File(modelDir, VERSION_FILE)
-                        !versionFile.exists() || versionFile.readText().trim() != WHISPER_CANTONESE_VERSION
+                        !versionFile.exists() || versionFile.readText().trim() != currentVersion
                     }
                     else -> false
                 }
 
                 if (needsUpdate) {
-                    Log.i(TAG, "Model version outdated for ${modelType.id}, will re-download")
+                    Log.i(TAG, "Model version outdated for ${modelType.id} (current: $currentVersion), will re-download")
                 }
 
                 var totalDownloaded = 0L
@@ -234,8 +255,8 @@ object ModelDownloadManager {
                 when (modelType) {
                     VoiceModelType.WHISPER_CANTONESE -> {
                         val versionFile = File(modelDir, VERSION_FILE)
-                        versionFile.writeText(WHISPER_CANTONESE_VERSION)
-                        Log.i(TAG, "Wrote version file: $WHISPER_CANTONESE_VERSION")
+                        versionFile.writeText(currentVersion)
+                        Log.i(TAG, "Wrote version file: $currentVersion")
                     }
                     else -> { /* No version tracking for other models */ }
                 }
@@ -254,6 +275,66 @@ object ModelDownloadManager {
      */
     fun downloadModel(context: Context, callback: DownloadCallback) {
         downloadModel(context, VoiceModelType.SENSE_VOICE, callback)
+    }
+
+    /**
+     * Get the latest Whisper Cantonese release URL from GitHub API.
+     * Uses caching to avoid excessive API calls (GitHub rate limit: 60/hour unauthenticated).
+     * Falls back to hardcoded URL if API is unavailable.
+     */
+    private fun getWhisperCantoneseBaseUrl(): String {
+        // Return cached URL if still valid
+        val now = System.currentTimeMillis()
+        cachedWhisperCantoneseUrl?.let { cached ->
+            if (now - lastUrlCheckTime < URL_CACHE_TTL) {
+                return cached
+            }
+        }
+
+        // Try to fetch latest release from GitHub API
+        try {
+            val url = URL(GITHUB_RELEASES_API)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            connection.setRequestProperty("User-Agent", "DualQuickIME/1.0")
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().readText()
+
+                // Simple JSON parsing - find the latest whisper-cantonese-* tag
+                // Looking for pattern: "tag_name":"whisper-cantonese-vX"
+                val tagPattern = """"tag_name"\s*:\s*"($WHISPER_CANTONESE_TAG_PREFIX[^"]+)"""".toRegex()
+                val matches = tagPattern.findAll(response)
+
+                // Get all whisper-cantonese tags and find the latest (highest version number)
+                val latestTag = matches
+                    .map { it.groupValues[1] }
+                    .filter { it.startsWith(WHISPER_CANTONESE_TAG_PREFIX) }
+                    .maxByOrNull { tag ->
+                        // Extract version number for comparison (e.g., "v5" -> 5)
+                        tag.removePrefix(WHISPER_CANTONESE_TAG_PREFIX)
+                            .removePrefix("v")
+                            .toIntOrNull() ?: 0
+                    }
+
+                if (latestTag != null) {
+                    val discoveredUrl = "https://github.com/awcjack/DualQuickIME/releases/download/$latestTag"
+                    Log.i(TAG, "Discovered latest Whisper Cantonese release: $latestTag")
+                    cachedWhisperCantoneseUrl = discoveredUrl
+                    lastUrlCheckTime = now
+                    return discoveredUrl
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to fetch latest release from GitHub API: ${e.message}")
+        }
+
+        // Fall back to hardcoded URL
+        Log.i(TAG, "Using fallback Whisper Cantonese URL")
+        return WHISPER_CANTONESE_FALLBACK_URL
     }
 
     /**
