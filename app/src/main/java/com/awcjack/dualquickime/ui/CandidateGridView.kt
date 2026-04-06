@@ -109,10 +109,7 @@ class CandidateGridView @JvmOverloads constructor(
 
         for (row in 0 until gridRows) {
             val rowLayout = LinearLayout(context).apply {
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
-                    setMargins(0, dpToPx(1), 0, dpToPx(1))
-                }
-                minimumHeight = dpToPx(40)
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(44))
                 orientation = HORIZONTAL
                 gravity = Gravity.CENTER
             }
@@ -137,25 +134,24 @@ class CandidateGridView @JvmOverloads constructor(
     private fun createCandidateCell(candidate: String): TextView {
         return TextView(context).apply {
             val charCount = candidate.length
-            layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
                 setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             }
             gravity = Gravity.CENTER
             text = candidate
-            // Adjust text size based on phrase length
+            // Adjust text size based on phrase length to fit in fixed cell
             textSize = when {
                 charCount <= 1 -> 20f
                 charCount <= 2 -> 18f
-                charCount <= 4 -> 16f
-                else -> 14f
+                charCount <= 4 -> 15f
+                else -> 12f
             }
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
-            // Allow text wrapping for long phrases
-            maxLines = 2
-            setLineSpacing(0f, 0.9f)
-            setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(4))
+            // Single line, scale text to fit
+            maxLines = 1
+            setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
 
             setOnClickListener {
                 onCandidateSelected?.invoke(candidate)
