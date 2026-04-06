@@ -108,15 +108,11 @@ class CandidateGridView @JvmOverloads constructor(
         var candidateIndex = 0
 
         for (row in 0 until gridRows) {
-            // Wrap each row in HorizontalScrollView to handle long phrases
-            val rowScrollView = android.widget.HorizontalScrollView(context).apply {
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(44))
-                isHorizontalScrollBarEnabled = false
-                isFillViewport = true
-            }
-
             val rowLayout = LinearLayout(context).apply {
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                    setMargins(0, dpToPx(1), 0, dpToPx(1))
+                }
+                minimumHeight = dpToPx(40)
                 orientation = HORIZONTAL
                 gravity = Gravity.CENTER
             }
@@ -132,8 +128,7 @@ class CandidateGridView @JvmOverloads constructor(
                 }
             }
 
-            rowScrollView.addView(rowLayout)
-            container.addView(rowScrollView)
+            container.addView(rowLayout)
         }
 
         return container
@@ -141,15 +136,13 @@ class CandidateGridView @JvmOverloads constructor(
 
     private fun createCandidateCell(candidate: String): TextView {
         return TextView(context).apply {
-            // Use WRAP_CONTENT width so text is fully visible
-            // Weight 1f ensures equal minimum space, but WRAP_CONTENT allows expansion
             val charCount = candidate.length
-            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
-                setMargins(dpToPx(3), dpToPx(3), dpToPx(3), dpToPx(3))
+            layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
+                setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             }
             gravity = Gravity.CENTER
             text = candidate
-            // Adjust text size based on phrase length to fit better
+            // Adjust text size based on phrase length
             textSize = when {
                 charCount <= 1 -> 20f
                 charCount <= 2 -> 18f
@@ -159,9 +152,10 @@ class CandidateGridView @JvmOverloads constructor(
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
-            // Single line, full text visible
-            maxLines = 1
-            setPadding(dpToPx(8), dpToPx(2), dpToPx(8), dpToPx(2))
+            // Allow text wrapping for long phrases
+            maxLines = 2
+            setLineSpacing(0f, 0.9f)
+            setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(4))
 
             setOnClickListener {
                 onCandidateSelected?.invoke(candidate)

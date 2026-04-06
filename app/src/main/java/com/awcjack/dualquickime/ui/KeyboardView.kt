@@ -251,7 +251,8 @@ class KeyboardView @JvmOverloads constructor(
         englishPill = null
 
         candidateContainer = LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(46))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            minimumHeight = dpToPx(46)
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(colors.candidateBarBackground)
@@ -274,15 +275,9 @@ class KeyboardView @JvmOverloads constructor(
         englishPill = createEnglishPillSlot()
         candidateContainer?.addView(englishPill)
 
-        // Scrollable candidate row to handle long phrases
-        val candidateScrollView = android.widget.HorizontalScrollView(context).apply {
-            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
-            isHorizontalScrollBarEnabled = false
-            isFillViewport = false
-        }
-
+        // Candidate row with flexible width distribution
         candidateRow = LinearLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
@@ -293,8 +288,7 @@ class KeyboardView @JvmOverloads constructor(
             candidateSlots.add(slot)
             candidateRow?.addView(slot)
         }
-        candidateScrollView.addView(candidateRow)
-        candidateContainer?.addView(candidateScrollView)
+        candidateContainer?.addView(candidateRow)
 
         // Page indicator (clickable to view all candidates)
         pageIndicator = TextView(context).apply {
@@ -317,19 +311,20 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun createCandidatePillSlot(): TextView {
         return TextView(context).apply {
-            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(34)).apply {
-                setMargins(dpToPx(2), 0, dpToPx(2), 0)
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+                setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             }
             gravity = Gravity.CENTER
-            // Use horizontal padding for better appearance
-            setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4))
+            // Horizontal padding for better appearance
+            setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
             textSize = 18f
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
             visibility = View.INVISIBLE  // Hidden by default
-            // Single line, no ellipsis since we have horizontal scroll
-            maxLines = 1
+            // Allow text wrapping for long phrases
+            maxLines = 2
+            setLineSpacing(0f, 0.9f)
         }
     }
 
