@@ -393,14 +393,51 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
-    fun setCandidates(candidates: List<String>, currentPage: Int, totalPages: Int) {
-        // Update fixed candidate slots
+    /**
+     * Set candidates to display in the candidate bar.
+     * Measures text width and only displays candidates that fit.
+     *
+     * @param candidates List of candidates to display
+     * @param currentPage Current page number (1-based for display)
+     * @param totalPages Total number of pages
+     * @return Number of candidates actually displayed (may be less than candidates.size if they don't fit)
+     */
+    fun setCandidates(candidates: List<String>, currentPage: Int, totalPages: Int): Int {
+        // Get available width for candidates (will be measured after layout)
+        val availableWidth = candidateRow?.width ?: (context.resources.displayMetrics.widthPixels - dpToPx(100))
+
+        // Measure and display candidates that fit
+        var usedWidth = 0
+        var displayedCount = 0
+        val horizontalPadding = dpToPx(8) * 2  // Left + right padding
+        val horizontalMargin = dpToPx(2) * 2   // Left + right margin
+
         candidateSlots.forEachIndexed { index, slot ->
             if (index < candidates.size) {
-                slot.text = candidates[index]
-                slot.visibility = View.VISIBLE
-                slot.setOnClickListener {
-                    onCandidateSelected?.invoke(candidates[index])
+                val candidate = candidates[index]
+
+                // Measure text width
+                slot.text = candidate
+                slot.measure(
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                )
+                val textWidth = slot.measuredWidth + horizontalMargin
+
+                // Check if it fits
+                if (usedWidth + textWidth <= availableWidth || displayedCount == 0) {
+                    // Always show at least one candidate, even if it's too wide
+                    slot.visibility = View.VISIBLE
+                    slot.setOnClickListener {
+                        onCandidateSelected?.invoke(candidate)
+                    }
+                    usedWidth += textWidth
+                    displayedCount++
+                } else {
+                    // Doesn't fit - hide this slot
+                    slot.text = ""
+                    slot.visibility = View.INVISIBLE
+                    slot.setOnClickListener(null)
                 }
             } else {
                 slot.text = ""
@@ -418,6 +455,8 @@ class KeyboardView @JvmOverloads constructor(
                 pi.visibility = View.GONE
             }
         }
+
+        return displayedCount
     }
 
     fun showNoMatch() {

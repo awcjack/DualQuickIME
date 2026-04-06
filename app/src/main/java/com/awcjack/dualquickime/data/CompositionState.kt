@@ -17,7 +17,9 @@ data class CompositionState(
     val candidates: List<String> = emptyList(),
     val currentPage: Int = 0,
     val pageSize: Int = 9,
-    val activeKeyLength: Int = 0
+    val activeKeyLength: Int = 0,
+    val displayOffset: Int = 0,  // Actual start index for display (handles overflow)
+    val lastDisplayedCount: Int = 0  // How many were displayed on current page
 ) {
     /**
      * The radical display string (e.g., "手口" for "qr")
@@ -26,18 +28,26 @@ data class CompositionState(
         get() = KeyMapping.getRadicalSequence(rawKeys)
 
     /**
-     * Total number of pages
+     * Total number of pages (estimate based on pageSize).
+     * Actual pagination is dynamic based on what fits on screen.
      */
     val totalPages: Int
         get() = if (candidates.isEmpty()) 0 else (candidates.size + pageSize - 1) / pageSize
 
     /**
-     * Candidates for the current page only
+     * Whether there are more candidates after the current display offset.
+     */
+    val hasMoreCandidates: Boolean
+        get() = displayOffset + lastDisplayedCount < candidates.size
+
+    /**
+     * Candidates for the current page only.
+     * Uses displayOffset for dynamic pagination based on what fits on screen.
      */
     val currentPageCandidates: List<String>
         get() {
             if (candidates.isEmpty()) return emptyList()
-            val start = currentPage * pageSize
+            val start = displayOffset
             val end = minOf(start + pageSize, candidates.size)
             return if (start < candidates.size) candidates.subList(start, end) else emptyList()
         }
@@ -55,18 +65,33 @@ data class CompositionState(
         get() = rawKeys.isEmpty()
 
     /**
-     * Move to the next page of candidates (wraps around to page 0)
+     * Move to the next page of candidates using dynamic offset.
+     * Uses lastDisplayedCount to determine the next offset.
+     * Wraps around to start when reaching the end.
      */
     fun nextPage(): CompositionState {
-        if (totalPages <= 1) return this
-        val next = if (currentPage + 1 >= totalPages) 0 else currentPage + 1
-        return copy(currentPage = next)
+        if (candidates.size <= 1) return this
+        val nextOffset = displayOffset + lastDisplayedCount.coerceAtLeast(1)
+        return if (nextOffset >= candidates.size) {
+            // Wrap to beginning
+            copy(currentPage = 0, displayOffset = 0)
+        } else {
+            copy(currentPage = currentPage + 1, displayOffset = nextOffset)
+        }
+    }
+
+    /**
+     * Update the displayed count after rendering.
+     * Call this after setCandidates returns to track how many were shown.
+     */
+    fun withDisplayedCount(count: Int): CompositionState {
+        return copy(lastDisplayedCount = count)
     }
 
     /**
      * Reset to page 0
      */
-    fun resetPage(): CompositionState = copy(currentPage = 0)
+    fun resetPage(): CompositionState = copy(currentPage = 0, displayOffset = 0, lastDisplayedCount = 0)
 
     companion object {
         val EMPTY = CompositionState()

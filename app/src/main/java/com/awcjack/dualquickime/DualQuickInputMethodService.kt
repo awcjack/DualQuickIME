@@ -51,6 +51,8 @@ class DualQuickInputMethodService : InputMethodService() {
     private var isAssociatedPhrasesMode = false
     private var associatedPhrases = listOf<String>()
     private var associatedPhrasesPage = 0
+    private var associatedPhrasesOffset = 0  // Actual start index for dynamic pagination
+    private var associatedPhrasesDisplayedCount = 0  // How many were displayed on current page
     private var lastCommittedChar = ""
 
     // Track current keyboard mode
@@ -422,6 +424,8 @@ class DualQuickInputMethodService : InputMethodService() {
         isAssociatedPhrasesMode = true
         associatedPhrases = phrases
         associatedPhrasesPage = 0
+        associatedPhrasesOffset = 0
+        associatedPhrasesDisplayedCount = 0
         lastCommittedChar = character
 
         updateAssociatedPhrasesView()
@@ -434,30 +438,40 @@ class DualQuickInputMethodService : InputMethodService() {
         isAssociatedPhrasesMode = false
         associatedPhrases = emptyList()
         associatedPhrasesPage = 0
+        associatedPhrasesOffset = 0
+        associatedPhrasesDisplayedCount = 0
         lastCommittedChar = ""
         keyboardView?.clearCandidates()
     }
 
     /**
      * Update the candidate bar to show associated phrases.
+     * Uses dynamic pagination based on what fits on screen.
      */
     private fun updateAssociatedPhrasesView() {
         val pageSize = ThemeManager.getCandidatesPerPage(this)
         val totalPages = (associatedPhrases.size + pageSize - 1) / pageSize
-        val startIndex = associatedPhrasesPage * pageSize
+        // Use dynamic offset instead of fixed page calculation
+        val startIndex = associatedPhrasesOffset
         val endIndex = minOf(startIndex + pageSize, associatedPhrases.size)
-        val currentPagePhrases = associatedPhrases.subList(startIndex, endIndex)
+        val currentPagePhrases = if (startIndex < associatedPhrases.size) {
+            associatedPhrases.subList(startIndex, endIndex)
+        } else {
+            emptyList()
+        }
 
         keyboardView?.let { view ->
             // Clear composition display since we're showing associated phrases
             view.setComposition("", "")
 
             // Show associated phrases in candidate bar
-            view.setCandidates(
+            val displayedCount = view.setCandidates(
                 candidates = currentPagePhrases,
                 currentPage = associatedPhrasesPage + 1,
                 totalPages = totalPages
             )
+            // Track how many were actually displayed for dynamic pagination
+            associatedPhrasesDisplayedCount = displayedCount
         }
     }
 
@@ -473,11 +487,19 @@ class DualQuickInputMethodService : InputMethodService() {
 
     /**
      * Navigate to the next page of associated phrases.
+     * Uses dynamic offset based on how many were actually displayed.
      */
     private fun nextAssociatedPhrasesPage() {
-        val pageSize = ThemeManager.getCandidatesPerPage(this)
-        val totalPages = (associatedPhrases.size + pageSize - 1) / pageSize
-        associatedPhrasesPage = (associatedPhrasesPage + 1) % totalPages
+        // Move offset by the number of phrases that were actually displayed
+        val nextOffset = associatedPhrasesOffset + associatedPhrasesDisplayedCount.coerceAtLeast(1)
+        if (nextOffset >= associatedPhrases.size) {
+            // Wrap to beginning
+            associatedPhrasesPage = 0
+            associatedPhrasesOffset = 0
+        } else {
+            associatedPhrasesPage++
+            associatedPhrasesOffset = nextOffset
+        }
         updateAssociatedPhrasesView()
     }
 
@@ -538,11 +560,13 @@ class DualQuickInputMethodService : InputMethodService() {
             view.setComposition(composition.radicalDisplay, getDisplayKeys())
 
             if (composition.hasCandidates) {
-                view.setCandidates(
+                val displayedCount = view.setCandidates(
                     candidates = composition.currentPageCandidates,
                     currentPage = composition.currentPage + 1, // 1-based for display
                     totalPages = composition.totalPages
                 )
+                // Track how many candidates were actually displayed for dynamic pagination
+                composition = composition.withDisplayedCount(displayedCount)
             } else if (composition.rawKeys.isNotEmpty()) {
                 // Show "no match" message
                 view.showNoMatch()
