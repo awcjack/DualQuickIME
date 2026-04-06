@@ -274,9 +274,15 @@ class KeyboardView @JvmOverloads constructor(
         englishPill = createEnglishPillSlot()
         candidateContainer?.addView(englishPill)
 
-        // Fixed candidate row (no scrolling)
-        candidateRow = LinearLayout(context).apply {
+        // Scrollable candidate row to handle long phrases
+        val candidateScrollView = android.widget.HorizontalScrollView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
+            isHorizontalScrollBarEnabled = false
+            isFillViewport = false
+        }
+
+        candidateRow = LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
@@ -287,7 +293,8 @@ class KeyboardView @JvmOverloads constructor(
             candidateSlots.add(slot)
             candidateRow?.addView(slot)
         }
-        candidateContainer?.addView(candidateRow)
+        candidateScrollView.addView(candidateRow)
+        candidateContainer?.addView(candidateScrollView)
 
         // Page indicator (clickable to view all candidates)
         pageIndicator = TextView(context).apply {
@@ -314,16 +321,15 @@ class KeyboardView @JvmOverloads constructor(
                 setMargins(dpToPx(2), 0, dpToPx(2), 0)
             }
             gravity = Gravity.CENTER
-            // Use horizontal padding proportional to text length for better appearance
+            // Use horizontal padding for better appearance
             setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4))
             textSize = 18f
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
             visibility = View.INVISIBLE  // Hidden by default
-            // Ensure single line and ellipsize if needed
+            // Single line, no ellipsis since we have horizontal scroll
             maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
         }
     }
 

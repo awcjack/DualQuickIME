@@ -108,8 +108,15 @@ class CandidateGridView @JvmOverloads constructor(
         var candidateIndex = 0
 
         for (row in 0 until gridRows) {
-            val rowLayout = LinearLayout(context).apply {
+            // Wrap each row in HorizontalScrollView to handle long phrases
+            val rowScrollView = android.widget.HorizontalScrollView(context).apply {
                 layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(44))
+                isHorizontalScrollBarEnabled = false
+                isFillViewport = true
+            }
+
+            val rowLayout = LinearLayout(context).apply {
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
                 orientation = HORIZONTAL
                 gravity = Gravity.CENTER
             }
@@ -125,7 +132,8 @@ class CandidateGridView @JvmOverloads constructor(
                 }
             }
 
-            container.addView(rowLayout)
+            rowScrollView.addView(rowLayout)
+            container.addView(rowScrollView)
         }
 
         return container
@@ -133,24 +141,27 @@ class CandidateGridView @JvmOverloads constructor(
 
     private fun createCandidateCell(candidate: String): TextView {
         return TextView(context).apply {
-            // Use minimum width based on character count for better sizing
-            // Single char: use weight 1f, multi-char: expand proportionally
+            // Use WRAP_CONTENT width so text is fully visible
+            // Weight 1f ensures equal minimum space, but WRAP_CONTENT allows expansion
             val charCount = candidate.length
-            val weight = if (charCount <= 1) 1f else charCount.toFloat().coerceAtMost(3f)
-            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, weight).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
                 setMargins(dpToPx(3), dpToPx(3), dpToPx(3), dpToPx(3))
             }
             gravity = Gravity.CENTER
             text = candidate
             // Adjust text size based on phrase length to fit better
-            textSize = if (charCount <= 2) 20f else if (charCount <= 4) 18f else 16f
+            textSize = when {
+                charCount <= 1 -> 20f
+                charCount <= 2 -> 18f
+                charCount <= 4 -> 16f
+                else -> 14f
+            }
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
-            // Ensure single line
+            // Single line, full text visible
             maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding(dpToPx(6), dpToPx(2), dpToPx(6), dpToPx(2))
+            setPadding(dpToPx(8), dpToPx(2), dpToPx(8), dpToPx(2))
 
             setOnClickListener {
                 onCandidateSelected?.invoke(candidate)
