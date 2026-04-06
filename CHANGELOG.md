@@ -5,6 +5,36 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-04-06
+
+### Added
+- **U2pp-Conformer-Yue Voice Model**: State-of-the-art Cantonese ASR model
+  - 5.05% MER (Mixed Error Rate) - best accuracy among small models
+  - ~260 MB download size (int8 quantized)
+  - Pre-converted model from sherpa-onnx, ready to use
+  - Based on WenetSpeech-Yue 21,800+ hours training data
+
+### Changed
+- **Dynamic Candidate Pagination**: Candidates now flow to next page based on available width
+  - Long associated phrases that don't fit are automatically moved to next page
+  - At least one candidate always displays even if too wide
+  - Improves usability for multi-character phrases
+- Candidate bar height is now dynamic (expands for multi-line text)
+- Candidate pills support up to 2 lines of text wrapping
+
+### Fixed
+- **Associated Phrase Display**: Multi-character phrases now display correctly
+  - Removed horizontal scroll approach in favor of expandable boxes
+  - Text wrapping enabled for long phrases
+- **Candidate Grid View Size**: Grid view now stays within keyboard bounds
+  - Fixed rows have 44dp height instead of expanding
+  - Prevents grid from taking over entire screen
+
+### Technical
+- CompositionState tracks `displayOffset` and `lastDisplayedCount` for dynamic pagination
+- KeyboardView.setCandidates() measures text width and returns count displayed
+- Associated phrases mode uses offset-based pagination matching composition behavior
+
 ## [1.5.7] - 2026-04-05
 
 ### Added
