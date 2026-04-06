@@ -15,6 +15,7 @@ import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import com.awcjack.dualquickime.data.EmojiData
@@ -37,6 +38,11 @@ class EmojiKeyboardView @JvmOverloads constructor(
     // Backspace repeat handling
     private val backspaceHandler = Handler(Looper.getMainLooper())
     private var backspaceRepeatRunnable: Runnable? = null
+
+    // Long-press handling for skin tone popup
+    private val longPressHandler = Handler(Looper.getMainLooper())
+    private var longPressRunnable: Runnable? = null
+    private var skinTonePopup: PopupWindow? = null
 
     private lateinit var colors: KeyboardColors
     private var currentCategory = 0
@@ -126,6 +132,7 @@ class EmojiKeyboardView @JvmOverloads constructor(
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun createEmojiKey(emoji: String): TextView {
         val cellSize = dpToPx(42)
         return TextView(context).apply {
@@ -139,9 +146,112 @@ class EmojiKeyboardView @JvmOverloads constructor(
             textSize = 24f
             background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
 
-            setOnClickListener {
-                onEmojiSelected?.invoke(emoji)
+            // Check if this emoji supports skin tones
+            val supportsSkinTone = EmojiData.supportsSkinTone(emoji)
+
+            if (supportsSkinTone) {
+                // Long-press for skin tone popup
+                setOnTouchListener { v, event ->
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            v.isPressed = true
+                            // Start long-press timer
+                            longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+                            val runnable = Runnable {
+                                showSkinTonePopup(v, emoji)
+                            }
+                            longPressRunnable = runnable
+                            longPressHandler.postDelayed(runnable, LONG_PRESS_DELAY)
+                            true
+                        }
+                        MotionEvent.ACTION_UP -> {
+                            v.isPressed = false
+                            // Cancel long-press if still pending
+                            longPressRunnable?.let {
+                                longPressHandler.removeCallbacks(it)
+                                // If long-press didn't fire, treat as click
+                                if (skinTonePopup?.isShowing != true) {
+                                    onEmojiSelected?.invoke(emoji)
+                                }
+                            }
+                            longPressRunnable = null
+                            true
+                        }
+                        MotionEvent.ACTION_CANCEL -> {
+                            v.isPressed = false
+                            longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+                            longPressRunnable = null
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            } else {
+                // Simple click for emojis without skin tone support
+                setOnClickListener {
+                    onEmojiSelected?.invoke(emoji)
+                }
             }
+        }
+    }
+
+    private fun showSkinTonePopup(anchorView: View, emoji: String) {
+        // Dismiss any existing popup
+        skinTonePopup?.dismiss()
+
+        val variants = EmojiData.getSkinToneVariants(emoji)
+        if (variants.size <= 1) return
+
+        // Create popup content
+        val popupContent = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(colors.candidateBarBackground)
+            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+            elevation = dpToPx(4).toFloat()
+        }
+
+        // Add skin tone variants
+        variants.forEach { variant ->
+            val variantView = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dpToPx(40), dpToPx(40))
+                gravity = Gravity.CENTER
+                text = variant
+                textSize = 24f
+                background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
+
+                setOnClickListener {
+                    onEmojiSelected?.invoke(variant)
+                    skinTonePopup?.dismiss()
+                }
+            }
+            popupContent.addView(variantView)
+        }
+
+        // Create and show popup
+        skinTonePopup = PopupWindow(
+            popupContent,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            elevation = dpToPx(8).toFloat()
+            isOutsideTouchable = true
+            setOnDismissListener {
+                skinTonePopup = null
+            }
+
+            // Calculate popup position (centered above the anchor)
+            val location = IntArray(2)
+            anchorView.getLocationInWindow(location)
+            val popupWidth = variants.size * dpToPx(40) + dpToPx(8)
+            val xOffset = location[0] + (anchorView.width / 2) - (popupWidth / 2)
+
+            showAtLocation(
+                anchorView,
+                Gravity.NO_GRAVITY,
+                xOffset.coerceAtLeast(dpToPx(4)),
+                location[1] - dpToPx(50)
+            )
         }
     }
 
@@ -323,6 +433,10 @@ class EmojiKeyboardView @JvmOverloads constructor(
         super.onDetachedFromWindow()
         backspaceRepeatRunnable?.let { backspaceHandler.removeCallbacks(it) }
         backspaceRepeatRunnable = null
+        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+        longPressRunnable = null
+        skinTonePopup?.dismiss()
+        skinTonePopup = null
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -336,5 +450,6 @@ class EmojiKeyboardView @JvmOverloads constructor(
     companion object {
         private const val BACKSPACE_INITIAL_DELAY = 400L
         private const val BACKSPACE_REPEAT_INTERVAL = 50L
+        private const val LONG_PRESS_DELAY = 500L
     }
 }

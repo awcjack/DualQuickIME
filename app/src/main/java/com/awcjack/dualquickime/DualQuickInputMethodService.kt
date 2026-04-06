@@ -335,8 +335,8 @@ class DualQuickInputMethodService : InputMethodService() {
         // Exit associated phrases mode on backspace
         if (isAssociatedPhrasesMode) {
             clearAssociatedPhrases()
-            // Also delete the character in text field
-            currentInputConnection?.deleteSurroundingText(1, 0)
+            // Also delete the character in text field (grapheme-aware)
+            deleteOneGrapheme()
             return
         }
 
@@ -352,8 +352,40 @@ class DualQuickInputMethodService : InputMethodService() {
                 updateComposition(newKeys)
             }
         } else {
-            // Delete character in text field
-            currentInputConnection?.deleteSurroundingText(1, 0)
+            // Delete character in text field (grapheme-aware for emojis)
+            deleteOneGrapheme()
+        }
+    }
+
+    /**
+     * Delete one grapheme cluster (visual character) before the cursor.
+     * This handles emojis with skin tones, ZWJ sequences, and other multi-codepoint characters.
+     */
+    private fun deleteOneGrapheme() {
+        val ic = currentInputConnection ?: return
+
+        // Get text before cursor (enough to cover longest emoji sequences)
+        val textBefore = ic.getTextBeforeCursor(32, 0)?.toString() ?: return
+        if (textBefore.isEmpty()) return
+
+        // Use BreakIterator to find grapheme cluster boundaries
+        val breakIterator = android.icu.text.BreakIterator.getCharacterInstance()
+        breakIterator.setText(textBefore)
+
+        // Find the last grapheme cluster boundary
+        var end = breakIterator.last()
+        var start = breakIterator.previous()
+
+        if (start == android.icu.text.BreakIterator.DONE) {
+            // Only one grapheme cluster, delete all
+            start = 0
+        }
+
+        // Calculate how many UTF-16 code units to delete
+        val charsToDelete = textBefore.length - start
+
+        if (charsToDelete > 0) {
+            ic.deleteSurroundingText(charsToDelete, 0)
         }
     }
 
