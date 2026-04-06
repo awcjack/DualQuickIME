@@ -127,8 +127,17 @@ class EmojiKeyboardView @JvmOverloads constructor(
             else -> EmojiData.smileys
         }
 
+        // Get default skin tone preference
+        val defaultSkinTone = ThemeManager.getDefaultSkinTone(context)
+
         emojis.forEach { emoji ->
-            emojiGrid?.addView(createEmojiKey(emoji))
+            // Apply default skin tone to emojis that support it
+            val displayEmoji = if (EmojiData.supportsSkinTone(emoji) && defaultSkinTone > 0) {
+                EmojiData.applySkiTone(emoji, defaultSkinTone)
+            } else {
+                emoji
+            }
+            emojiGrid?.addView(createEmojiKey(displayEmoji))
         }
     }
 
@@ -211,7 +220,7 @@ class EmojiKeyboardView @JvmOverloads constructor(
         }
 
         // Add skin tone variants
-        variants.forEach { variant ->
+        variants.forEachIndexed { index, variant ->
             val variantView = TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(dpToPx(40), dpToPx(40))
                 gravity = Gravity.CENTER
@@ -220,8 +229,13 @@ class EmojiKeyboardView @JvmOverloads constructor(
                 background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
 
                 setOnClickListener {
+                    // Save the selected skin tone as the new default
+                    ThemeManager.setDefaultSkinTone(context, index)
+                    // Emit the selected emoji
                     onEmojiSelected?.invoke(variant)
                     skinTonePopup?.dismiss()
+                    // Refresh the grid to show emojis with new default skin tone
+                    populateEmojis(currentCategory)
                 }
             }
             popupContent.addView(variantView)

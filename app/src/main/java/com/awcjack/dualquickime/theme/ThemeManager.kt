@@ -18,6 +18,7 @@ object ThemeManager {
     private const val KEY_VOICE_MODEL_TYPE = "voice_model_type"
     private const val KEY_RECENT_CANDIDATES_ENABLED = "recent_candidates_enabled"
     private const val KEY_HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled"
+    private const val KEY_DEFAULT_SKIN_TONE = "default_skin_tone"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
@@ -36,6 +37,7 @@ object ThemeManager {
     private var cachedVoiceModelType: String? = null
     private var cachedRecentCandidatesEnabled: Boolean? = null
     private var cachedHapticFeedbackEnabled: Boolean? = null
+    private var cachedDefaultSkinTone: Int = -1
 
     fun getThemeMode(context: Context): Int {
         if (cachedTheme == -1) {
@@ -147,6 +149,19 @@ object ThemeManager {
         getPrefs(context).edit().putBoolean(KEY_HAPTIC_FEEDBACK_ENABLED, enabled).apply()
     }
 
+    // Default skin tone for emojis (0 = yellow/default, 1-5 = light to dark)
+    fun getDefaultSkinTone(context: Context): Int {
+        if (cachedDefaultSkinTone == -1) {
+            cachedDefaultSkinTone = getPrefs(context).getInt(KEY_DEFAULT_SKIN_TONE, 0)
+        }
+        return cachedDefaultSkinTone
+    }
+
+    fun setDefaultSkinTone(context: Context, skinToneIndex: Int) {
+        cachedDefaultSkinTone = skinToneIndex.coerceIn(0, 5)
+        getPrefs(context).edit().putInt(KEY_DEFAULT_SKIN_TONE, cachedDefaultSkinTone).apply()
+    }
+
     /**
      * Returns true if dark theme should be used based on current settings.
      */
@@ -197,6 +212,7 @@ object ThemeManager {
         cachedVoiceModelType = null
         cachedRecentCandidatesEnabled = null
         cachedHapticFeedbackEnabled = null
+        cachedDefaultSkinTone = -1
     }
 
     // Modern Dark Theme Colors (Material You inspired)
