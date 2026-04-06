@@ -6,14 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.6.2] - 2026-04-06
-
-### Added
-- **U2pp-Conformer-Yue Voice Model**: State-of-the-art Cantonese ASR model
-  - 5.05% MER (Mixed Error Rate) - best accuracy among small models
-  - ~260 MB download size (int8 quantized)
-  - Pre-converted model from sherpa-onnx, ready to use
-  - Based on WenetSpeech-Yue 21,800+ hours training data
-
 ### Changed
 - **Dynamic Candidate Pagination**: Candidates now flow to next page based on available width
   - Long associated phrases that don't fit are automatically moved to next page
@@ -34,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CompositionState tracks `displayOffset` and `lastDisplayedCount` for dynamic pagination
 - KeyboardView.setCandidates() measures text width and returns count displayed
 - Associated phrases mode uses offset-based pagination matching composition behavior
+
+## [1.6.0] - 2026-04-05
+
+### Added
+- **U2pp-Conformer-Yue Voice Model**: State-of-the-art Cantonese ASR model
+  - 5.05% MER (Mixed Error Rate) - best accuracy among small models
+  - ~260 MB download size (int8 quantized)
+  - Pre-converted model from sherpa-onnx, ready to use
+  - Based on WenetSpeech-Yue 21,800+ hours training data
 
 ## [1.5.7] - 2026-04-05
 
