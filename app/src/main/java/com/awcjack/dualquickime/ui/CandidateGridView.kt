@@ -133,15 +133,24 @@ class CandidateGridView @JvmOverloads constructor(
 
     private fun createCandidateCell(candidate: String): TextView {
         return TextView(context).apply {
-            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
+            // Use minimum width based on character count for better sizing
+            // Single char: use weight 1f, multi-char: expand proportionally
+            val charCount = candidate.length
+            val weight = if (charCount <= 1) 1f else charCount.toFloat().coerceAtMost(3f)
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, weight).apply {
                 setMargins(dpToPx(3), dpToPx(3), dpToPx(3), dpToPx(3))
             }
             gravity = Gravity.CENTER
             text = candidate
-            textSize = 20f
+            // Adjust text size based on phrase length to fit better
+            textSize = if (charCount <= 2) 20f else if (charCount <= 4) 18f else 16f
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
+            // Ensure single line
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(dpToPx(6), dpToPx(2), dpToPx(6), dpToPx(2))
 
             setOnClickListener {
                 onCandidateSelected?.invoke(candidate)
@@ -149,9 +158,9 @@ class CandidateGridView @JvmOverloads constructor(
         }
     }
 
-    private fun createEmptyCell(): View {
+    private fun createEmptyCell(weight: Float = 1f): View {
         return View(context).apply {
-            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, weight).apply {
                 setMargins(dpToPx(3), dpToPx(3), dpToPx(3), dpToPx(3))
             }
         }

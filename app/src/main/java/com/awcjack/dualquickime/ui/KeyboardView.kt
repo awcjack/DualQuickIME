@@ -310,16 +310,20 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun createCandidatePillSlot(): TextView {
         return TextView(context).apply {
-            layoutParams = LayoutParams(0, dpToPx(34), 1f).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(34)).apply {
                 setMargins(dpToPx(2), 0, dpToPx(2), 0)
             }
             gravity = Gravity.CENTER
-            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+            // Use horizontal padding proportional to text length for better appearance
+            setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4))
             textSize = 18f
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
             visibility = View.INVISIBLE  // Hidden by default
+            // Ensure single line and ellipsize if needed
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
     }
 
