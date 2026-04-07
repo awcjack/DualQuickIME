@@ -5,6 +5,16 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-04-07
+### Added
+- **Complete Unicode 16.0 Emoji Support**: Expanded emoji keyboard from ~1,247 to 3,781 emojis
+  - All skin tone variants (🏻🏼🏽🏾🏿) for supported emojis
+  - All gender variants (♂️/♀️) for people activities
+  - All ZWJ sequences (professions, families, couples)
+  - Directional variants (🚶‍➡️, 🏃‍➡️, etc.)
+  - All 270 flags including UK subdivisions (🏴󠁧󠁢󠁥󠁮󠁧󠁿, 🏴󠁧󠁢󠁳󠁣󠁴󠁿, 🏴󠁧󠁢󠁷󠁬󠁳󠁿)
+  - Unicode 16.0 additions: 🫩 🫆 🪾 🫜 🪉 🪏 🫟 and more
+
 ## [1.6.5] - 2026-04-07
 ### Added
 - **Quick Number Row**: Number keys (1-0) displayed in candidate bar when idle
