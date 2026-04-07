@@ -5,6 +5,20 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.4] - 2026-04-07
+### Security
+- **Encrypted Clipboard History**: Clipboard data now encrypted at rest using AES256-GCM
+  - Uses EncryptedSharedPreferences with automatic migration from old storage
+  - Password field detection: skips capturing content from password inputs
+  - Configurable TTL (default 24h) auto-expires non-pinned clipboard items
+- **Disabled Android Backup**: Prevents clipboard history exposure via backup mechanisms
+- **HTTPS-Only Network**: Added network security config enforcing HTTPS connections
+- **Model Download Integrity**: SHA-256 checksum verification for voice model downloads
+- **Debug Log Protection**: Sensitive speech recognition content no longer logged in release builds
+
+### Fixed
+- R8 minification failure in lite release build (added ProGuard rules for security-crypto)
+
 ## [1.6.3] - 2026-04-07
 ### Added
 - **Emoji Skin Tone Selector**: Long-press emojis that support skin tones to choose from 6 variants
