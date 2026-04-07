@@ -190,6 +190,10 @@ class DualQuickInputMethodService : InputMethodService() {
             setOnPageIndicatorClickedListener {
                 handlePageIndicatorClicked()
             }
+            setOnCandidateRefreshRequestedListener {
+                // Refresh candidate view when returning from symbol/emoji/clipboard/grid mode
+                updateCandidateView()
+            }
         }
         rootContainer?.addView(keyboardView)
 

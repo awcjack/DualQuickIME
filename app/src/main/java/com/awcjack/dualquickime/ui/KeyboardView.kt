@@ -36,6 +36,7 @@ class KeyboardView @JvmOverloads constructor(
     private var onCandidateSelected: ((String) -> Unit)? = null
     private var onEnglishSelected: ((String) -> Unit)? = null
     private var onPageIndicatorClicked: (() -> Unit)? = null
+    private var onCandidateRefreshRequested: (() -> Unit)? = null
     private var currentRawKeys: String = ""
     private var isShiftOn = false
     private var isCapsLock = false
@@ -153,6 +154,8 @@ class KeyboardView @JvmOverloads constructor(
                     setOnBackPressedListener {
                         isCandidateGridMode = false
                         buildKeyboard()
+                        // Request candidate refresh to restore proper state
+                        onCandidateRefreshRequested?.invoke()
                     }
                 }
             }
@@ -177,10 +180,8 @@ class KeyboardView @JvmOverloads constructor(
                         symbolPage = 0
                         onModeChange?.invoke(false)
                         buildKeyboard()
-                        // Restore number row if there's no active composition
-                        if (currentRawKeys.isEmpty()) {
-                            showNumberRow()
-                        }
+                        // Request candidate refresh to restore proper state
+                        onCandidateRefreshRequested?.invoke()
                     }
                 }
             }
@@ -204,10 +205,8 @@ class KeyboardView @JvmOverloads constructor(
                         symbolPage = 0
                         onModeChange?.invoke(false)
                         buildKeyboard()
-                        // Restore number row if there's no active composition
-                        if (currentRawKeys.isEmpty()) {
-                            showNumberRow()
-                        }
+                        // Request candidate refresh to restore proper state
+                        onCandidateRefreshRequested?.invoke()
                     }
                 }
             }
@@ -221,6 +220,8 @@ class KeyboardView @JvmOverloads constructor(
         addView(createCandidateBar())
 
         if (isSymbolMode) {
+            // Hide number row in symbol mode to avoid duplication with number keyboard
+            hideNumberRow()
             when (symbolPage) {
                 0 -> {
                     addView(createSymbolRow(numRow1))
@@ -1014,10 +1015,8 @@ class KeyboardView @JvmOverloads constructor(
                 symbolPage = 0
                 onModeChange?.invoke(false)
                 buildKeyboard()
-                // Restore number row if there's no active composition
-                if (currentRawKeys.isEmpty()) {
-                    showNumberRow()
-                }
+                // Request candidate refresh to restore proper state
+                onCandidateRefreshRequested?.invoke()
             })
 
             // Emoji button to switch to full emoji keyboard
@@ -1093,6 +1092,10 @@ class KeyboardView @JvmOverloads constructor(
 
     fun setOnPageIndicatorClickedListener(listener: () -> Unit) {
         onPageIndicatorClicked = listener
+    }
+
+    fun setOnCandidateRefreshRequestedListener(listener: () -> Unit) {
+        onCandidateRefreshRequested = listener
     }
 
     /**
