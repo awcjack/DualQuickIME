@@ -155,7 +155,7 @@ class KeyboardView @JvmOverloads constructor(
                         isCandidateGridMode = false
                         buildKeyboard()
                         // Request candidate refresh after layout completes
-                        post { onCandidateRefreshRequested?.invoke() }
+                        this@KeyboardView.post { onCandidateRefreshRequested?.invoke() }
                     }
                 }
             }
@@ -181,7 +181,7 @@ class KeyboardView @JvmOverloads constructor(
                         onModeChange?.invoke(false)
                         buildKeyboard()
                         // Request candidate refresh after layout completes
-                        post { onCandidateRefreshRequested?.invoke() }
+                        this@KeyboardView.post { onCandidateRefreshRequested?.invoke() }
                     }
                 }
             }
@@ -206,7 +206,7 @@ class KeyboardView @JvmOverloads constructor(
                         onModeChange?.invoke(false)
                         buildKeyboard()
                         // Request candidate refresh after layout completes
-                        post { onCandidateRefreshRequested?.invoke() }
+                        this@KeyboardView.post { onCandidateRefreshRequested?.invoke() }
                     }
                 }
             }
@@ -1018,7 +1018,7 @@ class KeyboardView @JvmOverloads constructor(
                 onModeChange?.invoke(false)
                 buildKeyboard()
                 // Request candidate refresh after layout completes
-                post { onCandidateRefreshRequested?.invoke() }
+                this@KeyboardView.post { onCandidateRefreshRequested?.invoke() }
             })
 
             // Emoji button to switch to full emoji keyboard
