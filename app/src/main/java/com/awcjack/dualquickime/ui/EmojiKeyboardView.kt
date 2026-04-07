@@ -110,9 +110,11 @@ class EmojiKeyboardView @JvmOverloads constructor(
         }
     }
 
-    private fun populateEmojis(categoryIndex: Int) {
+    private fun populateEmojis(categoryIndex: Int, resetScroll: Boolean = true) {
         emojiGrid?.removeAllViews()
-        emojiScrollView?.scrollTo(0, 0)
+        if (resetScroll) {
+            emojiScrollView?.scrollTo(0, 0)
+        }
 
         val emojis = when (categoryIndex) {
             0 -> EmojiData.smileys
@@ -234,8 +236,8 @@ class EmojiKeyboardView @JvmOverloads constructor(
                     // Emit the selected emoji
                     onEmojiSelected?.invoke(variant)
                     skinTonePopup?.dismiss()
-                    // Refresh the grid to show emojis with new default skin tone
-                    populateEmojis(currentCategory)
+                    // Refresh the grid to show emojis with new default skin tone (preserve scroll position)
+                    populateEmojis(currentCategory, resetScroll = false)
                 }
             }
             popupContent.addView(variantView)
