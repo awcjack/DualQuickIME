@@ -154,8 +154,8 @@ class KeyboardView @JvmOverloads constructor(
                     setOnBackPressedListener {
                         isCandidateGridMode = false
                         buildKeyboard()
-                        // Request candidate refresh to restore proper state
-                        onCandidateRefreshRequested?.invoke()
+                        // Request candidate refresh after layout completes
+                        post { onCandidateRefreshRequested?.invoke() }
                     }
                 }
             }
@@ -180,8 +180,8 @@ class KeyboardView @JvmOverloads constructor(
                         symbolPage = 0
                         onModeChange?.invoke(false)
                         buildKeyboard()
-                        // Request candidate refresh to restore proper state
-                        onCandidateRefreshRequested?.invoke()
+                        // Request candidate refresh after layout completes
+                        post { onCandidateRefreshRequested?.invoke() }
                     }
                 }
             }
@@ -205,8 +205,8 @@ class KeyboardView @JvmOverloads constructor(
                         symbolPage = 0
                         onModeChange?.invoke(false)
                         buildKeyboard()
-                        // Request candidate refresh to restore proper state
-                        onCandidateRefreshRequested?.invoke()
+                        // Request candidate refresh after layout completes
+                        post { onCandidateRefreshRequested?.invoke() }
                     }
                 }
             }
@@ -437,8 +437,10 @@ class KeyboardView @JvmOverloads constructor(
         // Hide number row when showing candidates
         hideNumberRow()
 
-        // Get available width for candidates (will be measured after layout)
-        val availableWidth = candidateRow?.width ?: (context.resources.displayMetrics.widthPixels - dpToPx(100))
+        // Get available width for candidates
+        // Use candidateRow width if available and non-zero, otherwise calculate from screen width
+        val rowWidth = candidateRow?.width ?: 0
+        val availableWidth = if (rowWidth > 0) rowWidth else (context.resources.displayMetrics.widthPixels - dpToPx(100))
 
         // Measure and display candidates that fit
         var usedWidth = 0
@@ -1015,8 +1017,8 @@ class KeyboardView @JvmOverloads constructor(
                 symbolPage = 0
                 onModeChange?.invoke(false)
                 buildKeyboard()
-                // Request candidate refresh to restore proper state
-                onCandidateRefreshRequested?.invoke()
+                // Request candidate refresh after layout completes
+                post { onCandidateRefreshRequested?.invoke() }
             })
 
             // Emoji button to switch to full emoji keyboard
