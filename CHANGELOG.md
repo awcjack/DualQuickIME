@@ -5,6 +5,18 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] - 2026-04-07
+### Added
+- **Emoji Skin Tone Selector**: Long-press emojis that support skin tones to choose from 6 variants
+  - Selected skin tone becomes the default for all future emoji input
+  - Preference persists across sessions
+- **Grapheme-Aware Backspace**: Delete entire emoji (including skin tone modifiers) in one press
+  - Uses ICU BreakIterator to properly handle multi-codepoint emojis
+  - Works with ZWJ sequences, flags, and other complex emoji
+
+### Fixed
+- Emoji keyboard no longer scrolls to top after selecting a skin tone
+
 ## [1.6.2] - 2026-04-06
 ### Changed
 - **Dynamic Candidate Pagination**: Candidates now flow to next page based on available width
