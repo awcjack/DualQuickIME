@@ -5,6 +5,19 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.5] - 2026-04-07
+### Added
+- **Quick Number Row**: Number keys (1-0) displayed in candidate bar when idle
+  - Allows quick number input without switching to symbol keyboard
+  - Numbers fill the entire candidate bar width with equal spacing
+  - Automatically hides when typing to show candidates
+  - Hidden in symbol mode to avoid duplication with number keyboard
+
+### Fixed
+- Candidate bar properly restored when returning from symbol/emoji/clipboard/grid views
+- All candidates now display correctly (not just the first one) after switching views
+- Fixed post callback on detached views causing candidate refresh failures
+
 ## [1.6.4] - 2026-04-07
 ### Security
 - **Encrypted Clipboard History**: Clipboard data now encrypted at rest using AES256-GCM
