@@ -70,6 +70,11 @@ class KeyboardView @JvmOverloads constructor(
     private val candidateSlots = mutableListOf<TextView>()
     private var englishPill: TextView? = null
 
+    // Number row overlay for quick number input when idle
+    private var numberRow: LinearLayout? = null
+    private val numberSlots = mutableListOf<TextView>()
+    private var isNumberRowVisible = true  // Show number row by default when idle
+
     // Emoji keyboard view (full-featured)
     private var emojiKeyboardView: EmojiKeyboardView? = null
     private var clipboardKeyboardView: ClipboardKeyboardView? = null
@@ -172,6 +177,10 @@ class KeyboardView @JvmOverloads constructor(
                         symbolPage = 0
                         onModeChange?.invoke(false)
                         buildKeyboard()
+                        // Restore number row if there's no active composition
+                        if (currentRawKeys.isEmpty()) {
+                            showNumberRow()
+                        }
                     }
                 }
             }
@@ -195,6 +204,10 @@ class KeyboardView @JvmOverloads constructor(
                         symbolPage = 0
                         onModeChange?.invoke(false)
                         buildKeyboard()
+                        // Restore number row if there's no active composition
+                        if (currentRawKeys.isEmpty()) {
+                            showNumberRow()
+                        }
                     }
                 }
             }
@@ -246,12 +259,18 @@ class KeyboardView @JvmOverloads constructor(
 
     // ==================== CANDIDATE BAR ====================
 
-    private fun createCandidateBar(): LinearLayout {
+    private fun createCandidateBar(): FrameLayout {
         candidateSlots.clear()
+        numberSlots.clear()
         englishPill = null
 
-        candidateContainer = LinearLayout(context).apply {
+        // Use FrameLayout as wrapper to allow overlaying number row on candidate row
+        val wrapper = FrameLayout(context).apply {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        }
+
+        candidateContainer = LinearLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             minimumHeight = dpToPx(46)
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -306,7 +325,18 @@ class KeyboardView @JvmOverloads constructor(
         }
         candidateContainer?.addView(pageIndicator)
 
-        return candidateContainer!!
+        wrapper.addView(candidateContainer)
+
+        // Number row overlay (10 number keys with equal width)
+        numberRow = createNumberRowOverlay()
+        wrapper.addView(numberRow)
+
+        // Show number row by default when keyboard starts
+        if (isNumberRowVisible) {
+            showNumberRow()
+        }
+
+        return wrapper
     }
 
     private fun createCandidatePillSlot(): TextView {
@@ -403,6 +433,9 @@ class KeyboardView @JvmOverloads constructor(
      * @return Number of candidates actually displayed (may be less than candidates.size if they don't fit)
      */
     fun setCandidates(candidates: List<String>, currentPage: Int, totalPages: Int): Int {
+        // Hide number row when showing candidates
+        hideNumberRow()
+
         // Get available width for candidates (will be measured after layout)
         val availableWidth = candidateRow?.width ?: (context.resources.displayMetrics.widthPixels - dpToPx(100))
 
@@ -460,6 +493,9 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     fun showNoMatch() {
+        // Hide number row when showing no match message
+        hideNumberRow()
+
         // Clear all candidate slots
         candidateSlots.forEach { slot ->
             slot.text = ""
@@ -500,26 +536,60 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
+     * Create the number row overlay with 10 number keys (1-0) evenly distributed.
+     */
+    private fun createNumberRowOverlay(): LinearLayout {
+        val numbers = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
+
+        return LinearLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            minimumHeight = dpToPx(46)
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(colors.candidateBarBackground)
+            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+            visibility = View.GONE  // Hidden by default
+
+            numbers.forEach { digit ->
+                val slot = TextView(context).apply {
+                    layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
+                        setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
+                    }
+                    gravity = Gravity.CENTER
+                    setPadding(dpToPx(4), dpToPx(8), dpToPx(4), dpToPx(8))
+                    textSize = 18f
+                    setTextColor(colors.candidateText)
+                    background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
+                    elevation = dpToPx(1).toFloat()
+                    text = digit.toString()
+
+                    setOnClickListener {
+                        onKeyPress?.invoke(KeyEvent.Number(digit.digitToInt()))
+                    }
+                }
+                numberSlots.add(slot)
+                addView(slot)
+            }
+        }
+    }
+
+    /**
      * Display number keys (1-0) in the candidate bar when no candidates are shown.
      * This allows quick number input without switching to symbol keyboard.
      */
     fun showNumberRow() {
-        val numbers = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
+        isNumberRowVisible = true
+        candidateContainer?.visibility = View.GONE
+        numberRow?.visibility = View.VISIBLE
+    }
 
-        candidateSlots.forEachIndexed { index, slot ->
-            if (index < numbers.size) {
-                slot.text = numbers[index].toString()
-                slot.visibility = View.VISIBLE
-                slot.setTextColor(colors.candidateText)
-                slot.setOnClickListener {
-                    onKeyPress?.invoke(KeyEvent.Number(numbers[index].digitToInt()))
-                }
-            } else {
-                slot.text = ""
-                slot.visibility = View.INVISIBLE
-                slot.setOnClickListener(null)
-            }
-        }
+    /**
+     * Hide the number row and show the candidate bar.
+     */
+    fun hideNumberRow() {
+        isNumberRowVisible = false
+        numberRow?.visibility = View.GONE
+        candidateContainer?.visibility = View.VISIBLE
     }
 
     // ==================== KEYBOARD ROWS ====================
@@ -944,6 +1014,10 @@ class KeyboardView @JvmOverloads constructor(
                 symbolPage = 0
                 onModeChange?.invoke(false)
                 buildKeyboard()
+                // Restore number row if there's no active composition
+                if (currentRawKeys.isEmpty()) {
+                    showNumberRow()
+                }
             })
 
             // Emoji button to switch to full emoji keyboard
