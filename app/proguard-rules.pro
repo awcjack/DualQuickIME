@@ -57,3 +57,10 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# AndroidX Security / EncryptedSharedPreferences
+-keep class androidx.security.crypto.** { *; }
+-keep class com.google.crypto.tink.** { *; }
+-dontwarn com.google.crypto.tink.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
