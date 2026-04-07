@@ -118,7 +118,7 @@ class EmojiKeyboardView @JvmOverloads constructor(
 
         val emojis = when (categoryIndex) {
             0 -> EmojiData.smileys
-            1 -> EmojiData.gestures
+            1 -> EmojiData.people
             2 -> EmojiData.animals
             3 -> EmojiData.food
             4 -> EmojiData.activities
