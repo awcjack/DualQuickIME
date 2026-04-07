@@ -493,15 +493,33 @@ class KeyboardView @JvmOverloads constructor(
         // Hide English pill
         englishPill?.visibility = View.GONE
 
-        // Clear all candidate slots
-        candidateSlots.forEach { slot ->
-            slot.text = ""
-            slot.visibility = View.INVISIBLE
-            slot.setTextColor(colors.candidateText)  // Reset color
-            slot.setOnClickListener(null)
-        }
+        // Show number row in candidate bar when idle (no code/key being typed)
+        showNumberRow()
 
         pageIndicator?.visibility = View.GONE
+    }
+
+    /**
+     * Display number keys (1-0) in the candidate bar when no candidates are shown.
+     * This allows quick number input without switching to symbol keyboard.
+     */
+    fun showNumberRow() {
+        val numbers = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
+
+        candidateSlots.forEachIndexed { index, slot ->
+            if (index < numbers.size) {
+                slot.text = numbers[index].toString()
+                slot.visibility = View.VISIBLE
+                slot.setTextColor(colors.candidateText)
+                slot.setOnClickListener {
+                    onKeyPress?.invoke(KeyEvent.Number(numbers[index].digitToInt()))
+                }
+            } else {
+                slot.text = ""
+                slot.visibility = View.INVISIBLE
+                slot.setOnClickListener(null)
+            }
+        }
     }
 
     // ==================== KEYBOARD ROWS ====================
