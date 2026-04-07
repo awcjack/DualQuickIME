@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for DualQuickIME
+
+    Security measures:
+    - Enforces HTTPS-only connections (cleartextTrafficPermitted="false")
+    - Trusts system Certificate Authorities
+
+    This configuration blocks all cleartext (HTTP) traffic while relying on
+    Android's system CA store for certificate validation. This approach is
+    maintenance-free and doesn't require app updates when CAs rotate.
+-->
+<network-security-config>
+
+    <!-- Default: Block all cleartext (HTTP) traffic, trust system CAs -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Debug configuration: Allow user-installed CAs only in debug builds -->
+    <!-- This enables traffic inspection with tools like Charles Proxy during development -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+
+</network-security-config>
