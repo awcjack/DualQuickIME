@@ -8,6 +8,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.awcjack.dualquickime.BuildConfig
 import com.k2fsa.sherpa.onnx.*
 import openccjava.OpenCC
 import java.io.File
@@ -266,7 +267,9 @@ class VoiceInputManager(private val context: Context) {
     fun initialize(): Boolean {
         if (isInitialized) return true
         if (!isModelAvailable()) {
-            Log.e(TAG, "Model files not available for ${currentModelType.id}")
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "Model files not available for ${currentModelType.id}")
+            }
             return false
         }
 
@@ -277,7 +280,9 @@ class VoiceInputManager(private val context: Context) {
             // Initialize OpenCC converter (Simplified to Hong Kong Traditional)
             // s2hk: Simplified Chinese to Hong Kong Traditional Chinese
             openccConverter = OpenCC("s2hk")
-            Log.i(TAG, "OpenCC converter initialized for s2hk conversion")
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "OpenCC converter initialized for s2hk conversion")
+            }
 
             // Initialize Silero VAD
             val vadConfig = VadModelConfig(
@@ -303,10 +308,14 @@ class VoiceInputManager(private val context: Context) {
             }
 
             isInitialized = true
-            Log.i(TAG, "${currentModelType.id} recognizer initialized successfully")
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "${currentModelType.id} recognizer initialized successfully")
+            }
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize recognizer: ${e.message}", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "Failed to initialize recognizer: ${e.message}", e)
+            }
             return false
         }
     }
@@ -464,10 +473,14 @@ class VoiceInputManager(private val context: Context) {
                 processAudioWithVad()
             }
 
-            Log.i(TAG, "Recording started with ${currentModelType.id}")
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "Recording started with ${currentModelType.id}")
+            }
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start recording: ${e.message}", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "Failed to start recording: ${e.message}", e)
+            }
             onErrorCallback?.invoke("Failed to start recording: ${e.message}")
             isRecording = false
             return false
@@ -485,13 +498,17 @@ class VoiceInputManager(private val context: Context) {
             audioRecord?.release()
             audioRecord = null
         } catch (e: Exception) {
-            Log.e(TAG, "Error stopping audio record: ${e.message}")
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "Error stopping audio record: ${e.message}")
+            }
         }
 
         recordingThread?.join(1000)
         recordingThread = null
 
-        Log.i(TAG, "Recording stopped")
+        if (BuildConfig.DEBUG) {
+            Log.i(TAG, "Recording stopped")
+        }
     }
 
     /**
@@ -575,7 +592,9 @@ class VoiceInputManager(private val context: Context) {
             }
             result.toString()
         } catch (e: Exception) {
-            Log.w(TAG, "OpenCC conversion failed, returning original text: ${e.message}")
+            if (BuildConfig.DEBUG) {
+                Log.w(TAG, "OpenCC conversion failed, returning original text: ${e.message}")
+            }
             text
         }
     }
@@ -643,7 +662,9 @@ class VoiceInputManager(private val context: Context) {
             val firstHalf = text.substring(0, halfLen)
             val secondHalf = text.substring(halfLen)
             if (firstHalf == secondHalf) {
-                Log.w(TAG, "Detected 2x duplication: '$firstHalf'")
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "Detected 2x duplication")
+                }
                 return firstHalf
             }
         }
@@ -653,7 +674,9 @@ class VoiceInputManager(private val context: Context) {
             val quarterLen = text.length / 4
             val quarter = text.substring(0, quarterLen)
             if (text == quarter.repeat(4)) {
-                Log.w(TAG, "Detected 4x duplication: '$quarter'")
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "Detected 4x duplication")
+                }
                 return quarter
             }
         }
@@ -678,7 +701,9 @@ class VoiceInputManager(private val context: Context) {
 
             // If we found a repeating pattern (2 or more times), return just one instance
             if (isRepeating && repeatCount >= 2) {
-                Log.w(TAG, "Detected repetition: '$pattern' repeated $repeatCount times")
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "Detected repetition pattern repeated $repeatCount times")
+                }
                 return pattern
             }
         }
@@ -727,7 +752,9 @@ class VoiceInputManager(private val context: Context) {
 
                         // Transcribe the speech segment
                         val segmentSamples = segment.samples
-                        Log.d(TAG, "VAD segment: ${segmentSamples.size} samples (${segmentSamples.size / SAMPLE_RATE.toFloat()}s)")
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "VAD segment: ${segmentSamples.size} samples (${segmentSamples.size / SAMPLE_RATE.toFloat()}s)")
+                        }
                         if (segmentSamples.isNotEmpty()) {
                             val stream = rec.createStream()
                             stream.acceptWaveform(segmentSamples, SAMPLE_RATE)
@@ -735,17 +762,21 @@ class VoiceInputManager(private val context: Context) {
 
                             val result = rec.getResult(stream)
                             var text = result.text.trim()
-                            Log.d(TAG, "Raw recognition result: '$text'")
+                            // Note: Raw recognition results may contain sensitive user speech
+                            // Do NOT log the actual text content in production
 
                             if (text.isNotEmpty()) {
                                 // Process text: convert to traditional Chinese and replace punctuation
                                 text = processRecognizedText(text)
-                                Log.d(TAG, "Processed text: '$text'")
+                                // Note: Processed text may contain sensitive user speech
+                                // Do NOT log the actual text content in production
 
                                 // Skip if this segment produced the same text as the previous one
                                 // (VAD might be sending duplicate segments)
                                 if (text == lastSegmentText) {
-                                    Log.w(TAG, "Skipping duplicate segment: '$text'")
+                                    if (BuildConfig.DEBUG) {
+                                        Log.w(TAG, "Skipping duplicate segment")
+                                    }
                                     stream.release()
                                     continue
                                 }
@@ -758,7 +789,8 @@ class VoiceInputManager(private val context: Context) {
                                 accumulatedText.append(text)
 
                                 lastRecognizedText = accumulatedText.toString()
-                                Log.d(TAG, "Accumulated text: '$lastRecognizedText'")
+                                // Note: Accumulated text may contain sensitive user speech
+                                // Do NOT log the actual text content in production
                                 onResultCallback?.invoke(lastRecognizedText, true)
                             }
 
@@ -788,7 +820,9 @@ class VoiceInputManager(private val context: Context) {
 
                         // Skip duplicate segments
                         if (text == lastSegmentText) {
-                            Log.w(TAG, "Skipping duplicate flush segment: '$text'")
+                            if (BuildConfig.DEBUG) {
+                                Log.w(TAG, "Skipping duplicate flush segment")
+                            }
                             stream.release()
                             continue
                         }
@@ -808,7 +842,9 @@ class VoiceInputManager(private val context: Context) {
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error processing audio: ${e.message}", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(TAG, "Error processing audio: ${e.message}", e)
+            }
             onErrorCallback?.invoke("Error processing audio: ${e.message}")
         }
     }
