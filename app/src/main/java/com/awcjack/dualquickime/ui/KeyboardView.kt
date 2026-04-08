@@ -710,6 +710,10 @@ class KeyboardView @JvmOverloads constructor(
             gravity = Gravity.CENTER
 
             modeToggleKey = createSpecialKey("123", 1.2f) {
+                // Commit any pending composition as English before switching to number keyboard
+                if (currentRawKeys.isNotEmpty()) {
+                    onEnglishSelected?.invoke(currentRawKeys)
+                }
                 isSymbolMode = true
                 symbolPage = 0
                 onModeChange?.invoke(true)
