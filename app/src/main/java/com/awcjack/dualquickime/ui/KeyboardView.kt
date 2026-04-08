@@ -893,12 +893,17 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun createSymbolKey(char: Char): TextView {
-        // Check if this character has a half-width equivalent
+        // Check if this character has a half-width equivalent (full-width default)
         val halfWidthChar = FULL_TO_HALF_WIDTH[char]
+        // Check if this character has a full-width equivalent (half-width default)
+        val fullWidthChar = HALF_TO_FULL_WIDTH[char]
 
         return if (halfWidthChar != null) {
-            // Use long-press enabled key for full-width punctuation
+            // Full-width default, long-press for half-width (e.g. CJK punctuation page)
             createSymbolKeyWithLongPress(char, halfWidthChar)
+        } else if (fullWidthChar != null) {
+            // Half-width default, long-press for full-width (e.g. Gboard-style pages)
+            createSymbolKeyWithLongPress(char, fullWidthChar)
         } else {
             // Regular symbol key
             TextView(context).apply {
@@ -1198,6 +1203,19 @@ class KeyboardView @JvmOverloads constructor(
         private const val BACKSPACE_INITIAL_DELAY = 400L  // ms before first repeat
         private const val BACKSPACE_REPEAT_INTERVAL = 50L  // ms between subsequent repeats
         private const val LONG_PRESS_DELAY = 300L  // ms before long-press triggers
+
+        // Half-width to full-width punctuation mapping
+        // Used in symbol keyboard: tap half-width, long-press full-width
+        private val HALF_TO_FULL_WIDTH = mapOf(
+            '(' to '（',
+            ')' to '）',
+            '!' to '！',
+            '?' to '？',
+            ':' to '：',
+            ';' to '；',
+            ',' to '，',
+            '.' to '。',
+        )
 
         // Full-width to half-width punctuation mapping
         // Long-press on full-width outputs half-width equivalent
