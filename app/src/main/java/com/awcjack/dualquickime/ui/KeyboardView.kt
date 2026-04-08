@@ -773,17 +773,17 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
-     * Create a special key that outputs full-width on tap and half-width on long-press.
-     * Used for bottom row punctuation (，。).
+     * Create a special key with long-press variant.
+     * Tap outputs defaultLabel[0], long-press outputs longPressChar.
      */
     @SuppressLint("ClickableViewAccessibility")
-    private fun createSpecialKeyWithLongPress(fullWidthLabel: String, halfWidthChar: Char, weight: Float): TextView {
+    private fun createSpecialKeyWithLongPress(defaultLabel: String, longPressChar: Char, weight: Float): TextView {
         return TextView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, weight).apply {
                 setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
             }
             gravity = Gravity.CENTER
-            text = fullWidthLabel
+            text = defaultLabel
             textSize = 18f
             setTextColor(colors.keyTextPrimary)
             background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
@@ -798,8 +798,8 @@ class KeyboardView @JvmOverloads constructor(
 
                         val runnable = Runnable {
                             longPressTriggered = true
-                            // Long-press: output half-width character
-                            onKeyPress?.invoke(KeyEvent.Symbol(halfWidthChar))
+                            // Long-press: output alternate character
+                            onKeyPress?.invoke(KeyEvent.Symbol(longPressChar))
                             if (ThemeManager.getHapticFeedbackEnabled(context)) {
                                 v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                             }
@@ -813,8 +813,8 @@ class KeyboardView @JvmOverloads constructor(
                         longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
 
                         if (!longPressTriggered) {
-                            // Normal tap: output full-width character
-                            onKeyPress?.invoke(KeyEvent.Symbol(fullWidthLabel[0]))
+                            // Normal tap: output default character
+                            onKeyPress?.invoke(KeyEvent.Symbol(defaultLabel[0]))
                         }
                         longPressRunnable = null
                         true
@@ -925,17 +925,17 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
-     * Create a symbol key that outputs full-width on tap and half-width on long-press.
-     * Used for punctuation like ，。！？ etc.
+     * Create a symbol key with long-press variant.
+     * Tap outputs defaultChar, long-press outputs longPressChar.
      */
     @SuppressLint("ClickableViewAccessibility")
-    private fun createSymbolKeyWithLongPress(fullWidthChar: Char, halfWidthChar: Char): TextView {
+    private fun createSymbolKeyWithLongPress(defaultChar: Char, longPressChar: Char): TextView {
         return TextView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
                 setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
             }
             gravity = Gravity.CENTER
-            text = fullWidthChar.toString()
+            text = defaultChar.toString()
             textSize = 22f
             setTextColor(colors.keyTextPrimary)
             background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
@@ -950,8 +950,8 @@ class KeyboardView @JvmOverloads constructor(
 
                         val runnable = Runnable {
                             longPressTriggered = true
-                            // Long-press: output half-width character
-                            onKeyPress?.invoke(KeyEvent.Symbol(halfWidthChar))
+                            // Long-press: output alternate character
+                            onKeyPress?.invoke(KeyEvent.Symbol(longPressChar))
                             // Provide haptic feedback if enabled
                             if (ThemeManager.getHapticFeedbackEnabled(context)) {
                                 v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
@@ -966,8 +966,8 @@ class KeyboardView @JvmOverloads constructor(
                         longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
 
                         if (!longPressTriggered) {
-                            // Normal tap: output full-width character
-                            onKeyPress?.invoke(KeyEvent.Symbol(fullWidthChar))
+                            // Normal tap: output default character
+                            onKeyPress?.invoke(KeyEvent.Symbol(defaultChar))
                         }
                         longPressRunnable = null
                         true
