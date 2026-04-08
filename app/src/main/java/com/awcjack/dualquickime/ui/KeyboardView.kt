@@ -1048,7 +1048,11 @@ class KeyboardView @JvmOverloads constructor(
                 })
             }
 
+            addView(createSpecialKeyWithLongPress(",", '，', 1f))
+
             addView(createSpaceKey())
+
+            addView(createSpecialKeyWithLongPress(".", '。', 1f))
 
             addView(createSpecialKey("↵", 1.2f) {
                 onKeyPress?.invoke(KeyEvent.Enter)
