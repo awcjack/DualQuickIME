@@ -92,13 +92,13 @@ class KeyboardView @JvmOverloads constructor(
 
     // Number/Symbol rows (page 1) - Gboard "?123" layout
     private val numRow1 = listOf('1', '2', '3', '4', '5', '6', '7', '8', '9', '0')
-    private val symRow2Page1 = listOf('@', '#', '$', '%', '&', '-', '+', '(', ')')
-    private val symRow3Page1 = listOf('*', '"', '\'', ':', ';', '!', '?')
+    private val symRow2Page1 = listOf('@', '#', '$', '&', '-', '+', '(', ')', '/')
+    private val symRow3Page1 = listOf('、', '“', '”', ':', ';', '!', '?')
 
     // Symbol rows (page 2) - Gboard "=\<" layout
-    private val symRow1Page2 = listOf('~', '`', '|', '•', '√', 'π', '÷', '×', '¶', '∆')
-    private val symRow2Page2 = listOf('£', '¢', '€', '¥', '^', '°', '=', '{', '}')
-    private val symRow3Page2 = listOf('\\', '©', '®', '™', '℅', '[', ']')
+    private val symRow1Page2 = listOf('~', '`', '|', '•', '√', 'π', '÷', '×', '*', '§')
+    private val symRow2Page2 = listOf('£', '¢', '€', '¥', '^', '°', '=', '{', '}', '\\')
+    private val symRow3Page2 = listOf('％', '‘', '’', '™', '℅', '[', ']')
 
     // Symbol rows (page 3) - Chinese brackets and CJK punctuation
     private val symRow1Page3 = listOf('「', '」', '『', '』', '【', '】', '（', '）', '〈', '〉')
@@ -108,11 +108,11 @@ class KeyboardView @JvmOverloads constructor(
     // Symbol rows (page 4) - Currency and units
     private val symRow1Page4 = listOf('$', '¥', '€', '£', '¢', '₩', '₹', '฿', '₱', '₽')
     private val symRow2Page4 = listOf('%', '‰', '°', '℃', '℉', '±', '∞', '≈', '≠')
-    private val symRow3Page4 = listOf('≤', '≥', '∑', '∏', '†', '‡', '§')
+    private val symRow3Page4 = listOf('≤', '≥', '∑', '∏', '†', '‡', '"', '\'', '©', '®')
 
     // Symbol rows (page 5) - Arrows, shapes, and cards
     private val symRow1Page5 = listOf('←', '→', '↑', '↓', '↔', '↕', '⇐', '⇒', '⇑', '⇓')
-    private val symRow2Page5 = listOf('▲', '▼', '◀', '▶', '◆', '◇', '□', '■', '△')
+    private val symRow2Page5 = listOf('▲', '▼', '◀', '▶', '◆', '◇', '□', '■', '△', '∆')
     private val symRow3Page5 = listOf('♠', '♣', '♥', '♦', '★', '☆', '♪')
 
     init {
@@ -1219,6 +1219,11 @@ class KeyboardView @JvmOverloads constructor(
             ';' to '；',
             ',' to '，',
             '.' to '。',
+            '%' to '％',
+            '“' to '「',
+            '”' to '」',
+            '‘' to '『',
+            '’' to '』',
         )
 
         // Full-width to half-width punctuation mapping
@@ -1242,6 +1247,7 @@ class KeyboardView @JvmOverloads constructor(
             '》' to '>',   // Right double angle bracket -> ASCII greater-than
             '〈' to '<',   // Left angle bracket -> ASCII less-than
             '〉' to '>',   // Right angle bracket -> ASCII greater-than
+            '％' to '%',
         )
     }
 }
