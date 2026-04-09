@@ -5,6 +5,20 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-04-09
+### Changed
+- **Gboard-Style Symbol Keyboard**: Rearranged number/symbol keyboard to match Gboard layout
+  - Page 1: `@ # $ % & - + ( )` and `* " ' : ; ! ?`
+  - Page 2: `~ \` | • √ π ÷ × ¶ ∆` and `£ ¢ € ¥ ^ ° = { }`
+- **Half-Width Default in Symbol Keyboard**: Symbol keyboard now outputs half-width characters by default
+  - Long-press for full-width variants (reverse of main keyboard behavior)
+  - Main keyboard retains full-width `，` `。` default with half-width on long-press
+- **Comma and Period on Symbol Bottom Row**: Added `,` and `.` keys flanking the spacebar
+  - Matches Gboard bottom row layout while preserving emoji and clipboard buttons
+
+### Fixed
+- Pending English text now committed when switching to number keyboard
+
 ## [1.7.0] - 2026-04-07
 ### Added
 - **Complete Unicode 16.0 Emoji Support**: Expanded emoji keyboard from ~1,247 to 3,781 emojis
