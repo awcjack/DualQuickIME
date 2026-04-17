@@ -12,6 +12,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup.MarginLayoutParams
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -437,22 +438,25 @@ class KeyboardView @JvmOverloads constructor(
         // Hide number row when showing candidates
         hideNumberRow()
 
-        // Get available width for candidates
-        // Use candidateRow width if available and non-zero, otherwise calculate from screen width
-        val rowWidth = candidateRow?.width ?: 0
-        val availableWidth = if (rowWidth > 0) rowWidth else (context.resources.displayMetrics.widthPixels - dpToPx(100))
+        // Pre-set page indicator text so its measurement below is accurate.
+        pageIndicator?.let { pi ->
+            if (totalPages > 1) {
+                pi.text = "$currentPage/$totalPages"
+                pi.visibility = View.VISIBLE
+            } else {
+                pi.visibility = View.GONE
+            }
+        }
 
-        // Measure and display candidates that fit
+        val availableWidth = computeAvailableCandidateWidth(totalPages > 1)
+
         var usedWidth = 0
         var displayedCount = 0
-        val horizontalPadding = dpToPx(8) * 2  // Left + right padding
-        val horizontalMargin = dpToPx(2) * 2   // Left + right margin
+        val horizontalMargin = dpToPx(2) * 2   // slot left + right margin
 
         candidateSlots.forEachIndexed { index, slot ->
             if (index < candidates.size) {
                 val candidate = candidates[index]
-
-                // Measure text width
                 slot.text = candidate
                 slot.measure(
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -460,9 +464,10 @@ class KeyboardView @JvmOverloads constructor(
                 )
                 val textWidth = slot.measuredWidth + horizontalMargin
 
-                // Check if it fits
-                if (usedWidth + textWidth <= availableWidth || displayedCount == 0) {
-                    // Always show at least one candidate, even if it's too wide
+                // Fit check: always show at least one candidate, even if it's wider than the row,
+                // so the user can still page forward. Otherwise require the pill to fit fully;
+                // remaining candidates roll over to the next page via displayedCount.
+                if (displayedCount == 0 || usedWidth + textWidth <= availableWidth) {
                     slot.visibility = View.VISIBLE
                     slot.setOnClickListener {
                         onCandidateSelected?.invoke(candidate)
@@ -470,7 +475,6 @@ class KeyboardView @JvmOverloads constructor(
                     usedWidth += textWidth
                     displayedCount++
                 } else {
-                    // Doesn't fit - hide this slot
                     slot.text = ""
                     slot.visibility = View.INVISIBLE
                     slot.setOnClickListener(null)
@@ -482,17 +486,44 @@ class KeyboardView @JvmOverloads constructor(
             }
         }
 
-        // Update page indicator
-        pageIndicator?.let { pi ->
-            if (totalPages > 1) {
-                pi.text = "$currentPage/$totalPages"
-                pi.visibility = View.VISIBLE
-            } else {
-                pi.visibility = View.GONE
-            }
+        return displayedCount
+    }
+
+    /**
+     * Available width inside the candidate row. Computed from the candidate container minus
+     * the measured widths of its other visible children (composition text, english pill,
+     * page indicator) because candidateRow.width is stale immediately after setComposition()
+     * toggles sibling visibility — layout hasn't run yet, so the row still reports its old
+     * size and we'd overestimate space and let pills overflow past the right edge.
+     */
+    private fun computeAvailableCandidateWidth(pageIndicatorVisible: Boolean): Int {
+        val container = candidateContainer
+        val containerWidth = when {
+            container != null && container.width > 0 -> container.width
+            this.width > 0 -> this.width - paddingLeft - paddingRight
+            else -> context.resources.displayMetrics.widthPixels
+        }
+        var used = (container?.paddingLeft ?: 0) + (container?.paddingRight ?: 0)
+
+        fun addSibling(v: View?) {
+            val view = v ?: return
+            if (view.visibility != View.VISIBLE) return
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            )
+            val lp = view.layoutParams as? MarginLayoutParams
+            used += view.measuredWidth + (lp?.leftMargin ?: 0) + (lp?.rightMargin ?: 0)
         }
 
-        return displayedCount
+        addSibling(compositionText)
+        addSibling(englishPill)
+        if (pageIndicatorVisible) addSibling(pageIndicator)
+
+        // Small buffer to absorb rounding between measure and layout.
+        used += dpToPx(2)
+
+        return (containerWidth - used).coerceAtLeast(dpToPx(80))
     }
 
     fun showNoMatch() {
