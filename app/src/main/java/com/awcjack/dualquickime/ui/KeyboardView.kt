@@ -8,6 +8,7 @@ import android.graphics.drawable.StateListDrawable
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
+import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -120,8 +121,7 @@ class KeyboardView @JvmOverloads constructor(
 
     init {
         orientation = VERTICAL
-        loadTheme()
-        buildKeyboard()
+        safeRebuild("init")
     }
 
     /**
@@ -140,8 +140,28 @@ class KeyboardView @JvmOverloads constructor(
      * Refresh the keyboard when theme changes.
      */
     fun refreshTheme() {
-        loadTheme()
-        buildKeyboard()
+        safeRebuild("refreshTheme")
+    }
+
+    // If loadTheme or buildKeyboard throws, removeAllViews() has already run and the
+    // keyboard window would otherwise render empty. Reset to a known-good letter state
+    // and retry once so the user still gets a usable keyboard.
+    private fun safeRebuild(reason: String) {
+        try {
+            loadTheme()
+            buildKeyboard()
+        } catch (t: Throwable) {
+            Log.e("DualQuickIME", "KeyboardView $reason failed; recovering to letter mode", t)
+            isSymbolMode = false
+            symbolPage = 0
+            isCandidateGridMode = false
+            try {
+                loadTheme()
+                buildKeyboard()
+            } catch (t2: Throwable) {
+                Log.e("DualQuickIME", "KeyboardView recovery also failed", t2)
+            }
+        }
     }
 
     private fun buildKeyboard() {
