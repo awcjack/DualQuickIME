@@ -73,6 +73,11 @@
     <string name="clipboard_tab_all">全部</string>
     <string name="clipboard_tab_pinned">已釘選</string>
 
+    <!-- Chinese Conversion (Simplified ⇄ Traditional) -->
+    <string name="settings_chinese_convert">簡繁轉換</string>
+    <string name="settings_chinese_convert_enable">顯示「簡⇄繁」鍵</string>
+    <string name="settings_chinese_convert_enable_desc">㩒一下將揀咗嘅文字轉做簡體；長㩒就轉做繁體（香港）。</string>
+
     <!-- Voice Input -->
     <string name="settings_voice_input">語音輸入</string>
     <string name="settings_voice_enable">啟用語音輸入</string>

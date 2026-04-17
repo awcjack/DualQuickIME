@@ -19,6 +19,7 @@ object ThemeManager {
     private const val KEY_RECENT_CANDIDATES_ENABLED = "recent_candidates_enabled"
     private const val KEY_HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled"
     private const val KEY_DEFAULT_SKIN_TONE = "default_skin_tone"
+    private const val KEY_CHINESE_CONVERT_ENABLED = "chinese_convert_enabled"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
@@ -38,6 +39,7 @@ object ThemeManager {
     private var cachedRecentCandidatesEnabled: Boolean? = null
     private var cachedHapticFeedbackEnabled: Boolean? = null
     private var cachedDefaultSkinTone: Int = -1
+    private var cachedChineseConvertEnabled: Boolean? = null
 
     fun getThemeMode(context: Context): Int {
         if (cachedTheme == -1) {
@@ -162,6 +164,19 @@ object ThemeManager {
         getPrefs(context).edit().putInt(KEY_DEFAULT_SKIN_TONE, cachedDefaultSkinTone).apply()
     }
 
+    // Chinese conversion button (Simplified ⇄ Traditional). Default on.
+    fun getChineseConvertEnabled(context: Context): Boolean {
+        if (cachedChineseConvertEnabled == null) {
+            cachedChineseConvertEnabled = getPrefs(context).getBoolean(KEY_CHINESE_CONVERT_ENABLED, true)
+        }
+        return cachedChineseConvertEnabled!!
+    }
+
+    fun setChineseConvertEnabled(context: Context, enabled: Boolean) {
+        cachedChineseConvertEnabled = enabled
+        getPrefs(context).edit().putBoolean(KEY_CHINESE_CONVERT_ENABLED, enabled).apply()
+    }
+
     /**
      * Returns true if dark theme should be used based on current settings.
      */
@@ -213,6 +228,7 @@ object ThemeManager {
         cachedRecentCandidatesEnabled = null
         cachedHapticFeedbackEnabled = null
         cachedDefaultSkinTone = -1
+        cachedChineseConvertEnabled = null
     }
 
     // Modern Dark Theme Colors (Material You inspired)

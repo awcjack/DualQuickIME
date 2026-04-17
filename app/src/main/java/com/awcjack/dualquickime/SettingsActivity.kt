@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.awcjack.dualquickime.convert.ChineseConverter
 import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.RecentCandidateManager
 import com.awcjack.dualquickime.theme.ThemeManager
@@ -81,6 +82,7 @@ class SettingsActivity : AppCompatActivity() {
         setupRecentCandidatesSettings()
         setupCharacterSetSettings()
         setupKeyboardBehaviorSettings()
+        setupChineseConvertSettings()
         setupClipboardSettings()
 
         // Voice input settings only available in full version
@@ -134,6 +136,21 @@ class SettingsActivity : AppCompatActivity() {
         // Listen for changes
         switchHaptic.setOnCheckedChangeListener { _, isChecked ->
             ThemeManager.setHapticFeedbackEnabled(this, isChecked)
+        }
+    }
+
+    private fun setupChineseConvertSettings() {
+        // Hide the section entirely in lite flavor where OpenCC isn't bundled.
+        if (!ChineseConverter.isAvailable()) {
+            findViewById<View>(R.id.chineseConvertSection)?.visibility = View.GONE
+            findViewById<View>(R.id.chineseConvertSectionHeader)?.visibility = View.GONE
+            return
+        }
+
+        val switchConvert = findViewById<SwitchCompat>(R.id.switchChineseConvert)
+        switchConvert.isChecked = ThemeManager.getChineseConvertEnabled(this)
+        switchConvert.setOnCheckedChangeListener { _, isChecked ->
+            ThemeManager.setChineseConvertEnabled(this, isChecked)
         }
     }
 

@@ -59,6 +59,11 @@
     <string name="clipboard_tab_all">All</string>
     <string name="clipboard_tab_pinned">Pinned</string>
 
+    <!-- Chinese Conversion (Simplified ⇄ Traditional) -->
+    <string name="settings_chinese_convert">Chinese Conversion</string>
+    <string name="settings_chinese_convert_enable">Show 簡⇄繁 key</string>
+    <string name="settings_chinese_convert_enable_desc">Tap converts the selected text to Simplified Chinese; long-press converts it to Traditional (HK).</string>
+
     <!-- Voice Input -->
     <string name="settings_voice_input">Voice Input</string>
     <string name="settings_voice_enable">Enable voice input</string>

@@ -420,6 +420,71 @@
 
         </androidx.cardview.widget.CardView>
 
+        <!-- Chinese Conversion Section -->
+        <TextView
+            android:id="@+id/chineseConvertSectionHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_chinese_convert"
+            android:textSize="14sp"
+            android:textColor="@color/colorPrimary"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/chineseConvertSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_chinese_convert_enable"
+                            android:textSize="15sp"
+                            android:textColor="?android:textColorPrimary" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_chinese_convert_enable_desc"
+                            android:textSize="12sp"
+                            android:textColor="?android:textColorSecondary"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.SwitchCompat
+                        android:id="@+id/switchChineseConvert"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
         <!-- Clipboard Section -->
         <TextView
             android:layout_width="wrap_content"
