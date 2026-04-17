@@ -21,6 +21,8 @@
     <string name="settings_show_composition_desc">Display the Quick input code in the candidate bar</string>
     <string name="settings_candidates_per_page">Candidates per page</string>
     <string name="settings_candidates_per_page_desc">Adjust number of candidates displayed (fewer = larger)</string>
+    <string name="settings_candidate_padding">Candidate spacing</string>
+    <string name="settings_candidate_padding_desc">Horizontal padding inside each candidate (smaller = more fit per row)</string>
     <string name="settings_recent_candidates">Prioritize recent candidates</string>
     <string name="settings_recent_candidates_desc">Show recently used characters earlier in the candidate list</string>
     <string name="settings_recent_candidates_clear">Clear recent candidate history</string>

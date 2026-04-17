@@ -64,6 +64,7 @@ class KeyboardView @JvmOverloads constructor(
     // Settings
     private var showComposition = true
     private var candidatesPerPage = 6
+    private var candidatePillPaddingDp = 8  // Horizontal padding inside each candidate pill (dp)
 
     // Candidate bar components (embedded, Gboard-style) - now with fixed slots
     private var candidateContainer: LinearLayout? = null
@@ -130,6 +131,7 @@ class KeyboardView @JvmOverloads constructor(
         colors = ThemeManager.getColors(context)
         showComposition = ThemeManager.getShowComposition(context)
         candidatesPerPage = ThemeManager.getCandidatesPerPage(context)
+        candidatePillPaddingDp = ThemeManager.getCandidatePillPadding(context)
         setBackgroundColor(colors.keyboardBackground)
         setPadding(dpToPx(3), dpToPx(6), dpToPx(3), dpToPx(8))
     }
@@ -347,8 +349,7 @@ class KeyboardView @JvmOverloads constructor(
                 setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             }
             gravity = Gravity.CENTER
-            // Horizontal padding for better appearance
-            setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
+            setPadding(dpToPx(candidatePillPaddingDp), dpToPx(4), dpToPx(candidatePillPaddingDp), dpToPx(4))
             textSize = 18f
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)

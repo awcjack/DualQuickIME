@@ -43,6 +43,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var switchShowComposition: SwitchCompat
     private lateinit var seekBarCandidates: SeekBar
     private lateinit var textCandidatesValue: TextView
+    private lateinit var seekBarCandidatePadding: SeekBar
+    private lateinit var textCandidatePaddingValue: TextView
 
     // Voice input settings
     private lateinit var switchVoiceEnabled: SwitchCompat
@@ -66,6 +68,8 @@ class SettingsActivity : AppCompatActivity() {
         switchShowComposition = findViewById(R.id.switchShowComposition)
         seekBarCandidates = findViewById(R.id.seekBarCandidates)
         textCandidatesValue = findViewById(R.id.textCandidatesValue)
+        seekBarCandidatePadding = findViewById(R.id.seekBarCandidatePadding)
+        textCandidatePaddingValue = findViewById(R.id.textCandidatePaddingValue)
 
         // Voice input settings
         switchVoiceEnabled = findViewById(R.id.switchVoiceEnabled)
@@ -79,6 +83,7 @@ class SettingsActivity : AppCompatActivity() {
         setupThemeSelection()
         setupCompositionToggle()
         setupCandidatesSeekBar()
+        setupCandidatePaddingSeekBar()
         setupRecentCandidatesSettings()
         setupCharacterSetSettings()
         setupKeyboardBehaviorSettings()
@@ -404,6 +409,28 @@ class SettingsActivity : AppCompatActivity() {
                 textCandidatesValue.text = value.toString()
                 if (fromUser) {
                     ThemeManager.setCandidatesPerPage(this@SettingsActivity, value)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+    }
+
+    private fun setupCandidatePaddingSeekBar() {
+        val currentValue = ThemeManager.getCandidatePillPadding(this)
+        seekBarCandidatePadding.progress = currentValue
+        textCandidatePaddingValue.text = currentValue.toString()
+
+        seekBarCandidatePadding.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = progress.coerceIn(
+                    ThemeManager.CANDIDATE_PADDING_MIN,
+                    ThemeManager.CANDIDATE_PADDING_MAX
+                )
+                textCandidatePaddingValue.text = value.toString()
+                if (fromUser) {
+                    ThemeManager.setCandidatePillPadding(this@SettingsActivity, value)
                 }
             }
 

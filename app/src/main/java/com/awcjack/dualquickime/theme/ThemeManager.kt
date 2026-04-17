@@ -20,6 +20,7 @@ object ThemeManager {
     private const val KEY_HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled"
     private const val KEY_DEFAULT_SKIN_TONE = "default_skin_tone"
     private const val KEY_CHINESE_CONVERT_ENABLED = "chinese_convert_enabled"
+    private const val KEY_CANDIDATE_PILL_PADDING = "candidate_pill_padding"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
@@ -29,6 +30,11 @@ object ThemeManager {
     const val CANDIDATES_MIN = 4
     const val CANDIDATES_MAX = 10
     const val CANDIDATES_DEFAULT = 6
+
+    // Horizontal padding inside each candidate pill, in dp. Smaller = more candidates fit per row.
+    const val CANDIDATE_PADDING_MIN = 2
+    const val CANDIDATE_PADDING_MAX = 14
+    const val CANDIDATE_PADDING_DEFAULT = 8
 
     private var cachedTheme: Int = -1
     private var cachedShowComposition: Boolean? = null
@@ -40,6 +46,7 @@ object ThemeManager {
     private var cachedHapticFeedbackEnabled: Boolean? = null
     private var cachedDefaultSkinTone: Int = -1
     private var cachedChineseConvertEnabled: Boolean? = null
+    private var cachedCandidatePillPadding: Int = -1
 
     fun getThemeMode(context: Context): Int {
         if (cachedTheme == -1) {
@@ -177,6 +184,21 @@ object ThemeManager {
         getPrefs(context).edit().putBoolean(KEY_CHINESE_CONVERT_ENABLED, enabled).apply()
     }
 
+    // Candidate pill horizontal padding (in dp). Smaller packs more candidates per row.
+    fun getCandidatePillPadding(context: Context): Int {
+        if (cachedCandidatePillPadding == -1) {
+            cachedCandidatePillPadding = getPrefs(context)
+                .getInt(KEY_CANDIDATE_PILL_PADDING, CANDIDATE_PADDING_DEFAULT)
+                .coerceIn(CANDIDATE_PADDING_MIN, CANDIDATE_PADDING_MAX)
+        }
+        return cachedCandidatePillPadding
+    }
+
+    fun setCandidatePillPadding(context: Context, dp: Int) {
+        cachedCandidatePillPadding = dp.coerceIn(CANDIDATE_PADDING_MIN, CANDIDATE_PADDING_MAX)
+        getPrefs(context).edit().putInt(KEY_CANDIDATE_PILL_PADDING, cachedCandidatePillPadding).apply()
+    }
+
     /**
      * Returns true if dark theme should be used based on current settings.
      */
@@ -229,6 +251,7 @@ object ThemeManager {
         cachedHapticFeedbackEnabled = null
         cachedDefaultSkinTone = -1
         cachedChineseConvertEnabled = null
+        cachedCandidatePillPadding = -1
     }
 
     // Modern Dark Theme Colors (Material You inspired)

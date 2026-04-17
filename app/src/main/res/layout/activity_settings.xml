@@ -229,6 +229,75 @@
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="16dp" />
 
+                <!-- Candidate Pill Padding -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_candidate_padding"
+                    android:textSize="15sp"
+                    android:textColor="?android:textColorPrimary"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_candidate_padding_desc"
+                    android:textSize="12sp"
+                    android:textColor="?android:textColorSecondary"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2"
+                        android:textSize="12sp"
+                        android:textColor="?android:textColorSecondary" />
+
+                    <SeekBar
+                        android:id="@+id/seekBarCandidatePadding"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:min="2"
+                        android:max="14"
+                        android:progress="8"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="14"
+                        android:textSize="12sp"
+                        android:textColor="?android:textColorSecondary" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/textCandidatePaddingValue"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="8"
+                    android:textSize="14sp"
+                    android:textColor="@color/colorPrimary"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:layout_marginTop="4dp" />
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?android:dividerHorizontal"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp" />
+
                 <!-- Recent Candidates Toggle -->
                 <LinearLayout
                     android:layout_width="match_parent"

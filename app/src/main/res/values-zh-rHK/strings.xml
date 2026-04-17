@@ -20,6 +20,8 @@
     <string name="settings_show_composition_desc">在候選字列中顯示速成碼</string>
     <string name="settings_candidates_per_page">每頁候選字數量</string>
     <string name="settings_candidates_per_page_desc">調整候選字顯示數量（較少 = 較大）</string>
+    <string name="settings_candidate_padding">候選字間距</string>
+    <string name="settings_candidate_padding_desc">調整候選字內部嘅水平間距（較小 = 可顯示更多）</string>
     <string name="settings_preview">預覽</string>
     <string name="settings_about">關於</string>
 
