@@ -16,6 +16,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.awcjack.dualquickime.BuildConfig
+import com.awcjack.dualquickime.convert.ChineseConverter
 import com.awcjack.dualquickime.theme.KeyboardColors
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.util.KeyMapping
@@ -831,6 +832,64 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
+     * Convert-Chinese key. Tap → Traditional→Simplified on current selection.
+     * Long-press → Simplified→Traditional. Uses the existing long-press
+     * machinery so behavior matches other dual-action keys.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createConvertKey(): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1.2f).apply {
+                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
+            }
+            gravity = Gravity.CENTER
+            text = "簡⇄繁"
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(colors.keyTextPrimary)
+            background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
+            elevation = dpToPx(1).toFloat()
+
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.isPressed = true
+                        longPressTriggered = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+
+                        val runnable = Runnable {
+                            longPressTriggered = true
+                            onKeyPress?.invoke(KeyEvent.ConvertChinese(toTraditional = true))
+                            if (ThemeManager.getHapticFeedbackEnabled(context)) {
+                                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            }
+                        }
+                        longPressRunnable = runnable
+                        longPressHandler.postDelayed(runnable, LONG_PRESS_DELAY)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.isPressed = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+                        if (!longPressTriggered) {
+                            onKeyPress?.invoke(KeyEvent.ConvertChinese(toTraditional = false))
+                        }
+                        longPressRunnable = null
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.isPressed = false
+                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
+                        longPressRunnable = null
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+    }
+
+    /**
      * Create the shift key with bolder styling.
      */
     private fun createShiftKey(onClick: () -> Unit): TextView {
@@ -1041,6 +1100,14 @@ class KeyboardView @JvmOverloads constructor(
                 buildKeyboard()
             })
 
+            // Simplified ⇄ Traditional Chinese conversion button.
+            // Tap converts the current text-field selection to Simplified;
+            // long-press converts it to Traditional. Hidden if OpenCC isn't
+            // bundled (lite flavor) or the user disabled it in settings.
+            if (ChineseConverter.isAvailable() && ThemeManager.getChineseConvertEnabled(context)) {
+                addView(createConvertKey())
+            }
+
             // Voice input button (only in full version)
             if (BuildConfig.VOICE_INPUT_ENABLED && ThemeManager.getVoiceInputEnabled(context)) {
                 addView(createSpecialKey("🎤", 1f) {
@@ -1201,6 +1268,9 @@ class KeyboardView @JvmOverloads constructor(
         object Backspace : KeyEvent()
         object Enter : KeyEvent()
         object VoiceInput : KeyEvent()
+        // toTraditional = true → Simplified→Traditional (s2hk)
+        // toTraditional = false → Traditional→Simplified (hk2s)
+        data class ConvertChinese(val toTraditional: Boolean) : KeyEvent()
     }
 
     companion object {
