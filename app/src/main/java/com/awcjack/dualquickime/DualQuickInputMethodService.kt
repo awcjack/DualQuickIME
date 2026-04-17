@@ -223,6 +223,11 @@ class DualQuickInputMethodService : InputMethodService() {
      */
     override fun onEvaluateFullscreenMode(): Boolean = false
 
+    // The framework default hides the soft keyboard when it thinks a hardware
+    // keyboard is attached (docks, Bluetooth keyboards, some OEMs that report one
+    // spuriously). Always show our IME — if the user invoked us they want to type.
+    override fun onEvaluateInputViewShown(): Boolean = true
+
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         // Invalidate caches to pick up any settings changes
