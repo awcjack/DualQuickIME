@@ -12,6 +12,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
+import com.awcjack.dualquickime.convert.ChineseConverter
 import com.awcjack.dualquickime.data.AssociatedPhrasesParser
 import com.awcjack.dualquickime.data.AssociatedPhrasesTable
 import com.awcjack.dualquickime.data.CinParser
@@ -258,6 +259,41 @@ class DualQuickInputMethodService : InputMethodService() {
             KeyboardView.KeyEvent.Backspace -> handleBackspace()
             KeyboardView.KeyEvent.Enter -> handleEnter()
             KeyboardView.KeyEvent.VoiceInput -> handleVoiceInput()
+            is KeyboardView.KeyEvent.ConvertChinese -> handleConvertChinese(event.toTraditional)
+        }
+    }
+
+    /**
+     * Convert the user's current text selection between Simplified and
+     * Traditional Chinese using OpenCC. If nothing is selected we do
+     * nothing — silently leaving the cursor untouched is safer than
+     * guessing how much surrounding text the user meant.
+     */
+    private fun handleConvertChinese(toTraditional: Boolean) {
+        if (!ChineseConverter.isAvailable()) return
+
+        // Commit any pending composition first so it isn't lost.
+        if (composition.rawKeys.isNotEmpty()) {
+            commitEnglish(composition.rawKeys)
+            clearComposition()
+        }
+        if (isAssociatedPhrasesMode) clearAssociatedPhrases()
+
+        val ic = currentInputConnection ?: return
+        val selected = ic.getSelectedText(0)?.toString()
+        if (selected.isNullOrEmpty()) return
+
+        val converted = if (toTraditional) {
+            ChineseConverter.toTraditional(selected)
+        } else {
+            ChineseConverter.toSimplified(selected)
+        }
+
+        // Replace the selection. commitText with newCursorPosition=1 leaves
+        // the cursor immediately after the inserted text — selection is
+        // cleared by the replacement, which matches user expectation.
+        if (converted != selected) {
+            ic.commitText(converted, 1)
         }
     }
 
