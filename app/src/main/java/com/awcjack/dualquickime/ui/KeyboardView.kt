@@ -16,6 +16,7 @@ import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
 import com.awcjack.dualquickime.BuildConfig
 import com.awcjack.dualquickime.convert.ChineseConverter
@@ -320,8 +321,11 @@ class KeyboardView @JvmOverloads constructor(
                 buildKeyboard()
             })
             if (ChineseConverter.isAvailable() && ThemeManager.getChineseConvertEnabled(context)) {
-                addView(createUtilBarButton("簡⇄繁") {
-                    onKeyPress?.invoke(KeyEvent.ConvertChinese)
+                addView(createUtilBarButton(
+                    label = "簡⇄繁",
+                    onLongClick = { anchor -> showConvertDirectionPopup(anchor) }
+                ) {
+                    onKeyPress?.invoke(KeyEvent.ConvertChinese(KeyEvent.ConvertDirection.AUTO))
                 })
             }
             if (BuildConfig.VOICE_INPUT_ENABLED && ThemeManager.getVoiceInputEnabled(context)) {
@@ -338,7 +342,11 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
-    private fun createUtilBarButton(label: String, onClick: () -> Unit): TextView {
+    private fun createUtilBarButton(
+        label: String,
+        onLongClick: ((View) -> Unit)? = null,
+        onClick: () -> Unit
+    ): TextView {
         return TextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(38)).apply {
                 setMargins(dpToPx(3), dpToPx(2), dpToPx(3), dpToPx(2))
@@ -353,6 +361,81 @@ class KeyboardView @JvmOverloads constructor(
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
             setOnClickListener { onClick() }
+            if (onLongClick != null) {
+                setOnLongClickListener {
+                    onLongClick(it)
+                    true
+                }
+            }
+        }
+    }
+
+    private var convertDirectionPopup: PopupWindow? = null
+
+    private fun showConvertDirectionPopup(anchor: View) {
+        convertDirectionPopup?.dismiss()
+
+        val popupContent = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            setBackgroundColor(colors.candidateBarBackground)
+            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+            elevation = dpToPx(4).toFloat()
+        }
+
+        // Labels use "繁→簡" and "簡→繁" to make direction explicit.
+        // Order: Traditional-to-Simplified first since that's the more common
+        // direction for Hong Kong / Taiwan users reading Simplified content.
+        val options = listOf(
+            "繁→簡" to KeyEvent.ConvertDirection.TO_SIMPLIFIED,
+            "簡→繁" to KeyEvent.ConvertDirection.TO_TRADITIONAL
+        )
+
+        options.forEach { (label, direction) ->
+            popupContent.addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dpToPx(38)
+                ).apply { setMargins(dpToPx(3), 0, dpToPx(3), 0) }
+                gravity = Gravity.CENTER
+                text = label
+                textSize = 15f
+                typeface = Typeface.DEFAULT_BOLD
+                minWidth = dpToPx(64)
+                setPadding(dpToPx(10), 0, dpToPx(10), 0)
+                setTextColor(colors.keyTextPrimary)
+                background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
+                setOnClickListener {
+                    onKeyPress?.invoke(KeyEvent.ConvertChinese(direction))
+                    convertDirectionPopup?.dismiss()
+                }
+            })
+        }
+
+        convertDirectionPopup = PopupWindow(
+            popupContent,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            elevation = dpToPx(8).toFloat()
+            isOutsideTouchable = true
+            setOnDismissListener { convertDirectionPopup = null }
+
+            val location = IntArray(2)
+            anchor.getLocationInWindow(location)
+            popupContent.measure(
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            )
+            val popupWidth = popupContent.measuredWidth
+            val xOffset = location[0] + (anchor.width / 2) - (popupWidth / 2)
+
+            showAtLocation(
+                anchor,
+                Gravity.NO_GRAVITY,
+                xOffset.coerceAtLeast(dpToPx(4)),
+                location[1] - dpToPx(50)
+            )
         }
     }
 
@@ -1323,6 +1406,8 @@ class KeyboardView @JvmOverloads constructor(
         backspaceRepeatRunnable = null
         longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
         longPressRunnable = null
+        convertDirectionPopup?.dismiss()
+        convertDirectionPopup = null
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -1343,8 +1428,11 @@ class KeyboardView @JvmOverloads constructor(
         object Backspace : KeyEvent()
         object Enter : KeyEvent()
         object VoiceInput : KeyEvent()
-        // Auto-detects conversion direction from the current text-field selection.
-        object ConvertChinese : KeyEvent()
+        // Tap = AUTO (detect from content). Long-press popup lets the user
+        // force a specific direction regardless of what the text looks like.
+        data class ConvertChinese(val direction: ConvertDirection = ConvertDirection.AUTO) : KeyEvent()
+
+        enum class ConvertDirection { AUTO, TO_SIMPLIFIED, TO_TRADITIONAL }
     }
 
     companion object {

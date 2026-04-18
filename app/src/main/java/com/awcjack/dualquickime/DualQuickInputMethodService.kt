@@ -264,7 +264,7 @@ class DualQuickInputMethodService : InputMethodService() {
             KeyboardView.KeyEvent.Backspace -> handleBackspace()
             KeyboardView.KeyEvent.Enter -> handleEnter()
             KeyboardView.KeyEvent.VoiceInput -> handleVoiceInput()
-            KeyboardView.KeyEvent.ConvertChinese -> handleConvertChinese()
+            is KeyboardView.KeyEvent.ConvertChinese -> handleConvertChinese(event.direction)
         }
     }
 
@@ -275,7 +275,7 @@ class DualQuickInputMethodService : InputMethodService() {
      * silently leaving the cursor untouched is safer than guessing how
      * much surrounding text the user meant.
      */
-    private fun handleConvertChinese() {
+    private fun handleConvertChinese(direction: KeyboardView.KeyEvent.ConvertDirection) {
         if (!ChineseConverter.isAvailable()) return
 
         // Commit any pending composition first so it isn't lost.
@@ -289,7 +289,7 @@ class DualQuickInputMethodService : InputMethodService() {
         val selected = ic.getSelectedText(0)?.toString()
         if (selected.isNullOrEmpty()) return
 
-        val converted = ChineseConverter.convertAuto(selected)
+        val converted = convertWithDirection(selected, direction)
 
         // Replace the selection. commitText with newCursorPosition=1 leaves
         // the cursor immediately after the inserted text — selection is
@@ -297,6 +297,15 @@ class DualQuickInputMethodService : InputMethodService() {
         if (converted != selected) {
             ic.commitText(converted, 1)
         }
+    }
+
+    private fun convertWithDirection(
+        text: String,
+        direction: KeyboardView.KeyEvent.ConvertDirection
+    ): String = when (direction) {
+        KeyboardView.KeyEvent.ConvertDirection.TO_SIMPLIFIED -> ChineseConverter.toSimplified(text)
+        KeyboardView.KeyEvent.ConvertDirection.TO_TRADITIONAL -> ChineseConverter.toTraditional(text)
+        KeyboardView.KeyEvent.ConvertDirection.AUTO -> ChineseConverter.convertAuto(text)
     }
 
     private fun handleLetter(char: Char) {
