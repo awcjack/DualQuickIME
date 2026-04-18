@@ -5,6 +5,14 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-04-18
+### Added
+- **Long-press direction picker on 簡⇄繁 key**: Long-press the conversion key to force 繁→簡 or 簡→繁 when auto-detection would pick the wrong direction (e.g., mixed Simplified/Traditional text). Tap still auto-detects.
+- **Sentence fallback for 簡⇄繁 key**: When no text is selected, the conversion key now converts the last sentence before the cursor — useful for fixing a sentence immediately after typing it without having to select first.
+
+### Fixed
+- Emoji picker no longer shows duplicate base emojis when a skin-tone variant is present in the same category
+
 ## [1.8.0] - 2026-04-18
 ### Added
 - **Simplified ⇄ Traditional Chinese Conversion**: New 簡⇄繁 key on the symbol keyboard converts the selected text using OpenCC
