@@ -5,6 +5,23 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-04-18
+### Added
+- **Simplified ⇄ Traditional Chinese Conversion**: New 簡⇄繁 key on the symbol keyboard converts the selected text using OpenCC
+  - Auto-detects direction: Traditional input becomes Simplified, Simplified input becomes Traditional
+  - Single tap; no long-press needed
+  - Settings toggle to hide the key (full flavor only — lite ships without OpenCC)
+- **Symbol-Mode Util Bar**: Emoji, clipboard, 簡⇄繁, and voice buttons moved into a dedicated bar above the number row
+  - Frees up the symbol bottom row and keeps utility actions reachable while typing numbers/symbols
+- **Configurable Candidate Spacing**: New seekbar in Settings → Keyboard adjusts candidate pill padding (2–14dp)
+  - Smaller padding fits more candidates per row
+
+### Fixed
+- Candidate bar overflow: pills no longer get clipped past the right edge when English-character candidates or composition text change row width
+- Candidate page indicator now reflects the corrected total after overflow rolls candidates to the next page
+- Soft keyboard now shows reliably even when the framework reports a hardware keyboard attached
+- KeyboardView recovers automatically (resets to letter mode and retries) if `loadTheme` or `buildKeyboard` throws, with the failure logged for diagnosis
+
 ## [1.7.1] - 2026-04-09
 ### Changed
 - **Gboard-Style Symbol Keyboard**: Rearranged number/symbol keyboard to match Gboard layout
