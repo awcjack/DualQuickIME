@@ -884,11 +884,10 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
-     * Convert-Chinese key. Tap → Traditional→Simplified on current selection.
-     * Long-press → Simplified→Traditional. Uses the existing long-press
-     * machinery so behavior matches other dual-action keys.
+     * Convert-Chinese key. Tap auto-detects direction on the current
+     * selection (Traditional→Simplified if the selection contains any
+     * Traditional characters, otherwise Simplified→Traditional).
      */
-    @SuppressLint("ClickableViewAccessibility")
     private fun createConvertKey(): TextView {
         return TextView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1.2f).apply {
@@ -902,41 +901,8 @@ class KeyboardView @JvmOverloads constructor(
             background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
             elevation = dpToPx(1).toFloat()
 
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.isPressed = true
-                        longPressTriggered = false
-                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
-
-                        val runnable = Runnable {
-                            longPressTriggered = true
-                            onKeyPress?.invoke(KeyEvent.ConvertChinese(toTraditional = true))
-                            if (ThemeManager.getHapticFeedbackEnabled(context)) {
-                                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                            }
-                        }
-                        longPressRunnable = runnable
-                        longPressHandler.postDelayed(runnable, LONG_PRESS_DELAY)
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        v.isPressed = false
-                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
-                        if (!longPressTriggered) {
-                            onKeyPress?.invoke(KeyEvent.ConvertChinese(toTraditional = false))
-                        }
-                        longPressRunnable = null
-                        true
-                    }
-                    MotionEvent.ACTION_CANCEL -> {
-                        v.isPressed = false
-                        longPressRunnable?.let { longPressHandler.removeCallbacks(it) }
-                        longPressRunnable = null
-                        true
-                    }
-                    else -> false
-                }
+            setOnClickListener {
+                onKeyPress?.invoke(KeyEvent.ConvertChinese)
             }
         }
     }
@@ -1320,9 +1286,7 @@ class KeyboardView @JvmOverloads constructor(
         object Backspace : KeyEvent()
         object Enter : KeyEvent()
         object VoiceInput : KeyEvent()
-        // toTraditional = true → Simplified→Traditional (s2hk)
-        // toTraditional = false → Traditional→Simplified (hk2s)
-        data class ConvertChinese(val toTraditional: Boolean) : KeyEvent()
+        object ConvertChinese : KeyEvent()
     }
 
     companion object {

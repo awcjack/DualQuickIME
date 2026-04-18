@@ -9,4 +9,5 @@ object ChineseConverter {
     fun isAvailable(): Boolean = false
     fun toTraditional(text: String): String = text
     fun toSimplified(text: String): String = text
+    fun convertAuto(text: String): String = text
 }

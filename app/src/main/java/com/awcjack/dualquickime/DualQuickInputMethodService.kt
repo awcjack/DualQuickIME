@@ -264,17 +264,18 @@ class DualQuickInputMethodService : InputMethodService() {
             KeyboardView.KeyEvent.Backspace -> handleBackspace()
             KeyboardView.KeyEvent.Enter -> handleEnter()
             KeyboardView.KeyEvent.VoiceInput -> handleVoiceInput()
-            is KeyboardView.KeyEvent.ConvertChinese -> handleConvertChinese(event.toTraditional)
+            KeyboardView.KeyEvent.ConvertChinese -> handleConvertChinese()
         }
     }
 
     /**
      * Convert the user's current text selection between Simplified and
-     * Traditional Chinese using OpenCC. If nothing is selected we do
-     * nothing — silently leaving the cursor untouched is safer than
-     * guessing how much surrounding text the user meant.
+     * Traditional Chinese using OpenCC. Direction is auto-detected from
+     * the selection content. If nothing is selected we do nothing —
+     * silently leaving the cursor untouched is safer than guessing how
+     * much surrounding text the user meant.
      */
-    private fun handleConvertChinese(toTraditional: Boolean) {
+    private fun handleConvertChinese() {
         if (!ChineseConverter.isAvailable()) return
 
         // Commit any pending composition first so it isn't lost.
@@ -288,11 +289,7 @@ class DualQuickInputMethodService : InputMethodService() {
         val selected = ic.getSelectedText(0)?.toString()
         if (selected.isNullOrEmpty()) return
 
-        val converted = if (toTraditional) {
-            ChineseConverter.toTraditional(selected)
-        } else {
-            ChineseConverter.toSimplified(selected)
-        }
+        val converted = ChineseConverter.convertAuto(selected)
 
         // Replace the selection. commitText with newCursorPosition=1 leaves
         // the cursor immediately after the inserted text — selection is

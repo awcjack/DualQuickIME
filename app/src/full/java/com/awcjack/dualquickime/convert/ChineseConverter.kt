@@ -35,6 +35,23 @@ object ChineseConverter {
         return convertCjkOnly(text, converter)
     }
 
+    /**
+     * Auto-detect direction and convert. We try Traditional→Simplified first;
+     * if it changes the text, the input contained Traditional characters, so
+     * we return the simplified result. Otherwise we run Simplified→Traditional.
+     * If neither changes the text (e.g. all ASCII), we return the input.
+     *
+     * Mixed-script selections are biased toward Simplified — running hk2s
+     * leaves any already-Simplified characters untouched and converts the
+     * Traditional ones, producing a uniformly-Simplified result.
+     */
+    fun convertAuto(text: String): String {
+        if (text.isEmpty()) return text
+        val asSimplified = toSimplified(text)
+        if (asSimplified != text) return asSimplified
+        return toTraditional(text)
+    }
+
     /** Convert Hong Kong Traditional Chinese in [text] to Simplified. */
     fun toSimplified(text: String): String {
         if (text.isEmpty()) return text
