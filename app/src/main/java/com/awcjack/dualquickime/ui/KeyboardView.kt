@@ -448,28 +448,45 @@ class KeyboardView @JvmOverloads constructor(
 
     /**
      * Set candidates to display in the candidate bar.
-     * Measures text width and only displays candidates that fit.
+     * Measures text width and only displays candidates that fit; remaining
+     * candidates roll forward to the next page via the returned displayed
+     * count, and the page indicator is updated with a corrected total based
+     * on what actually fit (the original totalPages argument is only an
+     * upper-bound estimate — overflow makes the real count larger).
      *
-     * @param candidates List of candidates to display
+     * @param candidates List of candidates to display on this page
      * @param currentPage Current page number (1-based for display)
-     * @param totalPages Total number of pages
+     * @param totalCandidates Total candidates across all pages (>= candidates.size + startOffset)
+     * @param startOffset Index in the full candidate list where [candidates] begins
      * @return Number of candidates actually displayed (may be less than candidates.size if they don't fit)
      */
-    fun setCandidates(candidates: List<String>, currentPage: Int, totalPages: Int): Int {
+    fun setCandidates(
+        candidates: List<String>,
+        currentPage: Int,
+        totalCandidates: Int,
+        startOffset: Int
+    ): Int {
         // Hide number row when showing candidates
         hideNumberRow()
 
-        // Pre-set page indicator text so its measurement below is accurate.
+        // Pre-set page indicator text with a worst-case-width estimate so the
+        // width reservation below is enough even if the real total grows after
+        // overflow. We pick the larger of the naive estimate and currentPage+1
+        // so we always reserve at least 2 digits for the total.
+        val naiveTotalEstimate = if (candidates.isEmpty()) currentPage
+            else (totalCandidates + candidates.size - 1) / maxOf(candidates.size, 1)
+        val measurementTotal = maxOf(naiveTotalEstimate, currentPage + 1)
+        val showPageIndicator = totalCandidates > candidates.size || currentPage > 1
         pageIndicator?.let { pi ->
-            if (totalPages > 1) {
-                pi.text = "$currentPage/$totalPages"
+            if (showPageIndicator) {
+                pi.text = "$currentPage/$measurementTotal"
                 pi.visibility = View.VISIBLE
             } else {
                 pi.visibility = View.GONE
             }
         }
 
-        val availableWidth = computeAvailableCandidateWidth(totalPages > 1)
+        val availableWidth = computeAvailableCandidateWidth(showPageIndicator)
 
         var usedWidth = 0
         var displayedCount = 0
@@ -505,6 +522,19 @@ class KeyboardView @JvmOverloads constructor(
                 slot.visibility = View.INVISIBLE
                 slot.setOnClickListener(null)
             }
+        }
+
+        // Now we know how many actually fit on this page — recompute the total
+        // page count using displayedCount as the per-page estimate for the
+        // remaining candidates. Without this, a page that overflowed would
+        // still show the original "1/2" even though the spillover plus future
+        // pages mean the real total is larger.
+        if (showPageIndicator) {
+            val remaining = (totalCandidates - startOffset - displayedCount).coerceAtLeast(0)
+            val perPage = displayedCount.coerceAtLeast(1)
+            val remainingPages = (remaining + perPage - 1) / perPage
+            val actualTotal = (currentPage + remainingPages).coerceAtLeast(currentPage)
+            pageIndicator?.text = "$currentPage/$actualTotal"
         }
 
         return displayedCount

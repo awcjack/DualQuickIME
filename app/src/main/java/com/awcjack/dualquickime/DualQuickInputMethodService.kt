@@ -542,7 +542,8 @@ class DualQuickInputMethodService : InputMethodService() {
             val displayedCount = view.setCandidates(
                 candidates = currentPagePhrases,
                 currentPage = associatedPhrasesPage + 1,
-                totalPages = totalPages
+                totalCandidates = associatedPhrases.size,
+                startOffset = startIndex
             )
             // Track how many were actually displayed for dynamic pagination
             associatedPhrasesDisplayedCount = displayedCount
@@ -637,7 +638,8 @@ class DualQuickInputMethodService : InputMethodService() {
                 val displayedCount = view.setCandidates(
                     candidates = composition.currentPageCandidates,
                     currentPage = composition.currentPage + 1, // 1-based for display
-                    totalPages = composition.totalPages
+                    totalCandidates = composition.candidates.size,
+                    startOffset = composition.displayOffset
                 )
                 // Track how many candidates were actually displayed for dynamic pagination
                 composition = composition.withDisplayedCount(displayedCount)
