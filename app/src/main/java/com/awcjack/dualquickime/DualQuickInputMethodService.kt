@@ -269,11 +269,11 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     /**
-     * Convert the user's current text selection between Simplified and
-     * Traditional Chinese using OpenCC. Direction is auto-detected from
-     * the selection content. If nothing is selected we do nothing —
-     * silently leaving the cursor untouched is safer than guessing how
-     * much surrounding text the user meant.
+     * Convert Chinese text between Simplified and Traditional using OpenCC.
+     *
+     * If the user has a selection, convert the selection. Otherwise fall
+     * back to the last sentence before the cursor so the user doesn't have
+     * to select first — handy for fixing a sentence they just typed.
      */
     private fun handleConvertChinese(direction: KeyboardView.KeyEvent.ConvertDirection) {
         if (!ChineseConverter.isAvailable()) return
@@ -287,16 +287,26 @@ class DualQuickInputMethodService : InputMethodService() {
 
         val ic = currentInputConnection ?: return
         val selected = ic.getSelectedText(0)?.toString()
-        if (selected.isNullOrEmpty()) return
-
-        val converted = convertWithDirection(selected, direction)
-
-        // Replace the selection. commitText with newCursorPosition=1 leaves
-        // the cursor immediately after the inserted text — selection is
-        // cleared by the replacement, which matches user expectation.
-        if (converted != selected) {
-            ic.commitText(converted, 1)
+        if (!selected.isNullOrEmpty()) {
+            val converted = convertWithDirection(selected, direction)
+            if (converted != selected) ic.commitText(converted, 1)
+            return
         }
+
+        // No selection — grab the last sentence before the cursor.
+        // 1024 chars covers the vast majority of short-form writing without
+        // pulling unreasonable amounts of surrounding text.
+        val before = ic.getTextBeforeCursor(1024, 0)?.toString() ?: return
+        val sentence = extractLastSentence(before)
+        if (sentence.isEmpty()) return
+
+        val converted = convertWithDirection(sentence, direction)
+        if (converted == sentence) return
+
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(sentence.length, 0)
+        ic.commitText(converted, 1)
+        ic.endBatchEdit()
     }
 
     private fun convertWithDirection(
@@ -306,6 +316,26 @@ class DualQuickInputMethodService : InputMethodService() {
         KeyboardView.KeyEvent.ConvertDirection.TO_SIMPLIFIED -> ChineseConverter.toSimplified(text)
         KeyboardView.KeyEvent.ConvertDirection.TO_TRADITIONAL -> ChineseConverter.toTraditional(text)
         KeyboardView.KeyEvent.ConvertDirection.AUTO -> ChineseConverter.convertAuto(text)
+    }
+
+    /**
+     * Return the last sentence in [text] — everything after the last
+     * sentence-ending delimiter, trimmed of any trailing delimiters /
+     * whitespace so that a final "。" doesn't collapse the result to empty.
+     * Falls back to the full string when no delimiter is present.
+     */
+    private fun extractLastSentence(text: String): String {
+        val delimiters = setOf('.', '。', '!', '！', '?', '？', '\n', ';', '；', '…')
+        var end = text.length
+        while (end > 0 && (text[end - 1] in delimiters || text[end - 1].isWhitespace())) {
+            end--
+        }
+        if (end == 0) return ""
+        var start = end - 1
+        while (start >= 0 && text[start] !in delimiters) {
+            start--
+        }
+        return text.substring(start + 1)
     }
 
     private fun handleLetter(char: Char) {
