@@ -239,12 +239,11 @@ class KeyboardView @JvmOverloads constructor(
             return
         }
 
-        // Always add the candidate bar at the top (Gboard-style)
-        addView(createCandidateBar())
-
+        // Top bar: candidate bar in letter mode (composition + candidates), or
+        // a util-button bar in symbol mode (since composition isn't possible
+        // there, the area is otherwise unused).
         if (isSymbolMode) {
-            // Hide number row in symbol mode to avoid duplication with number keyboard
-            hideNumberRow()
+            addView(createSymbolUtilBar())
             when (symbolPage) {
                 0 -> {
                     addView(createSymbolRow(numRow1))
@@ -274,6 +273,7 @@ class KeyboardView @JvmOverloads constructor(
             }
             addView(createSymbolBottomRow())
         } else {
+            addView(createCandidateBar())
             addView(createKeyRow(row1))
             addView(createKeyRow(row2, leftPadding = 0.5f))
             addView(createSpecialRow3())
@@ -282,6 +282,79 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     // ==================== CANDIDATE BAR ====================
+
+    /**
+     * Top bar shown in symbol/number mode. The candidate bar is unused there
+     * (no Cangjie composition can happen on a digit/symbol keyboard), so we
+     * reuse the space for utility buttons that would otherwise crowd the
+     * bottom row: emoji, clipboard, Chinese conversion, voice input.
+     *
+     * Candidate-bar field references are nulled out so any stray ?.-guarded
+     * call (e.g. clearCandidates) doesn't touch detached views from the
+     * previous letter-mode build.
+     */
+    private fun createSymbolUtilBar(): LinearLayout {
+        candidateContainer = null
+        compositionText = null
+        candidateRow = null
+        pageIndicator = null
+        englishPill = null
+        numberRow = null
+        candidateSlots.clear()
+        numberSlots.clear()
+
+        return LinearLayout(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            minimumHeight = dpToPx(46)
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(colors.candidateBarBackground)
+            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+
+            addView(createUtilBarButton("😀") {
+                symbolPage = 99
+                buildKeyboard()
+            })
+            addView(createUtilBarButton("📋") {
+                symbolPage = 100
+                buildKeyboard()
+            })
+            if (ChineseConverter.isAvailable() && ThemeManager.getChineseConvertEnabled(context)) {
+                addView(createUtilBarButton("簡⇄繁") {
+                    onKeyPress?.invoke(KeyEvent.ConvertChinese)
+                })
+            }
+            if (BuildConfig.VOICE_INPUT_ENABLED && ThemeManager.getVoiceInputEnabled(context)) {
+                addView(createUtilBarButton("🎤") {
+                    onKeyPress?.invoke(KeyEvent.VoiceInput)
+                })
+            }
+
+            // Trailing spacer keeps buttons left-aligned. Without it the row
+            // would distribute children evenly and the buttons would balloon.
+            addView(View(context).apply {
+                layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
+            })
+        }
+    }
+
+    private fun createUtilBarButton(label: String, onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(38)).apply {
+                setMargins(dpToPx(3), dpToPx(2), dpToPx(3), dpToPx(2))
+            }
+            gravity = Gravity.CENTER
+            text = label
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+            minWidth = dpToPx(46)
+            setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4))
+            setTextColor(colors.keyTextPrimary)
+            background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
+            elevation = dpToPx(1).toFloat()
+            setOnClickListener { onClick() }
+        }
+    }
 
     private fun createCandidateBar(): FrameLayout {
         candidateSlots.clear()
@@ -914,30 +987,6 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
-     * Convert-Chinese key. Tap auto-detects direction on the current
-     * selection (Traditional→Simplified if the selection contains any
-     * Traditional characters, otherwise Simplified→Traditional).
-     */
-    private fun createConvertKey(): TextView {
-        return TextView(context).apply {
-            layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1.2f).apply {
-                setMargins(dpToPx(3), dpToPx(4), dpToPx(3), dpToPx(4))
-            }
-            gravity = Gravity.CENTER
-            text = "簡⇄繁"
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(colors.keyTextPrimary)
-            background = createKeyBackground(colors.specialKeyBackground, colors.specialKeyBackgroundPressed)
-            elevation = dpToPx(1).toFloat()
-
-            setOnClickListener {
-                onKeyPress?.invoke(KeyEvent.ConvertChinese)
-            }
-        }
-    }
-
-    /**
      * Create the shift key with bolder styling.
      */
     private fun createShiftKey(onClick: () -> Unit): TextView {
@@ -1136,32 +1185,10 @@ class KeyboardView @JvmOverloads constructor(
                 this@KeyboardView.post { onCandidateRefreshRequested?.invoke() }
             })
 
-            // Emoji button to switch to full emoji keyboard
-            addView(createSpecialKey("😀", 1f) {
-                symbolPage = 99  // Emoji mode
-                buildKeyboard()
-            })
-
-            // Clipboard button
-            addView(createSpecialKey("📋", 1f) {
-                symbolPage = 100  // Clipboard mode
-                buildKeyboard()
-            })
-
-            // Simplified ⇄ Traditional Chinese conversion button.
-            // Tap converts the current text-field selection to Simplified;
-            // long-press converts it to Traditional. Hidden if OpenCC isn't
-            // bundled (lite flavor) or the user disabled it in settings.
-            if (ChineseConverter.isAvailable() && ThemeManager.getChineseConvertEnabled(context)) {
-                addView(createConvertKey())
-            }
-
-            // Voice input button (only in full version)
-            if (BuildConfig.VOICE_INPUT_ENABLED && ThemeManager.getVoiceInputEnabled(context)) {
-                addView(createSpecialKey("🎤", 1f) {
-                    onKeyPress?.invoke(KeyEvent.VoiceInput)
-                })
-            }
+            // Emoji, clipboard, 簡⇄繁 conversion, and voice input buttons live
+            // in the symbol-mode util bar (above the digit row) — see
+            // createSymbolUtilBar — so the bottom row is only mode-toggle and
+            // punctuation/whitespace.
 
             addView(createSpecialKeyWithLongPress(",", '，', 1f))
 
@@ -1316,6 +1343,7 @@ class KeyboardView @JvmOverloads constructor(
         object Backspace : KeyEvent()
         object Enter : KeyEvent()
         object VoiceInput : KeyEvent()
+        // Auto-detects conversion direction from the current text-field selection.
         object ConvertChinese : KeyEvent()
     }
 
