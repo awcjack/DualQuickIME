@@ -132,10 +132,12 @@ class EmojiKeyboardView @JvmOverloads constructor(
         // Get default skin tone preference
         val defaultSkinTone = ThemeManager.getDefaultSkinTone(context)
 
+        val seenBases = mutableSetOf<String>()
         emojis.forEach { emoji ->
-            // Apply default skin tone to emojis that support it
-            val displayEmoji = if (EmojiData.supportsSkinTone(emoji) && defaultSkinTone > 0) {
-                EmojiData.applySkiTone(emoji, defaultSkinTone)
+            val displayEmoji = if (EmojiData.supportsSkinTone(emoji)) {
+                val base = EmojiData.getBaseEmoji(emoji)
+                if (!seenBases.add(base)) return@forEach
+                if (defaultSkinTone > 0) EmojiData.applySkiTone(base, defaultSkinTone) else base
             } else {
                 emoji
             }
