@@ -26,8 +26,15 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 - **Space pagination** - press Space to navigate through candidate pages
 - **OpenVanilla compatible** - same character ordering as macOS
 
+### 🔄 Simplified ⇄ Traditional Conversion
+- **One-tap conversion** - select any Chinese text and tap `簡⇄繁` on the symbol keyboard
+- **Auto-detect direction** - Traditional becomes Simplified and vice versa, no toggle needed
+- **Powered by OpenCC** - standard Hong Kong Traditional ↔ Simplified mappings (`hk2s` / `s2hk`)
+- **Works anywhere** - converts the current text selection in any app
+- **Full version only** - OpenCC is not bundled in the lite flavor
+
 ### 📋 Clipboard History
-- **Gboard-style clipboard** - access via 📋 button on symbol keyboard
+- **Gboard-style clipboard** - access via 📋 button on the symbol keyboard util bar
 - **Pin important items** - keep frequently used text for quick access
 - **System-wide capture** - automatically saves text copied from any app
 
@@ -52,7 +59,9 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 - **Theme support** - System default, Light mode, Dark mode
 - **Full-width punctuation** - `，` `。` `！` `？` default for Chinese input
 - **5 symbol pages** - punctuation, brackets, currency, arrows, shapes
-- **Full emoji keyboard** - 8 categories of emojis
+- **Full emoji keyboard** - 9 categories; long-press any person emoji to pick a Fitzpatrick skin tone (saved as your default, shown once per base emoji with no duplicates)
+- **Symbol-mode util bar** - emoji, clipboard, 簡⇄繁, and voice buttons live above the number row for one-tap access
+- **Configurable candidate spacing** - tune pill padding (2–14 dp) to fit more candidates per row
 - **Caps lock** - double-tap shift for continuous uppercase
 - **Hold to delete** - continuous backspace deletion on key hold
 
