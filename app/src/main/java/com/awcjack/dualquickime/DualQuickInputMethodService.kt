@@ -248,6 +248,10 @@ class DualQuickInputMethodService : InputMethodService() {
         clearComposition()
         // Clear associated phrases mode
         clearAssociatedPhrases()
+        // Caps lock from a previous field shouldn't leak into this one — the
+        // shift indicator was already redrawn by buildKeyboard via refreshTheme,
+        // but the underlying state needs to be cleared explicitly.
+        keyboardView?.resetShiftState()
         // Reset to letter mode
         isSymbolMode = false
         keyboardView?.setLetterMode()

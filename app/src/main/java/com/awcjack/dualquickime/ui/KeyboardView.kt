@@ -1368,6 +1368,19 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
+     * Clear shift / caps-lock so the keyboard returns to lowercase.
+     * Called by the service on input-view start so caps state from a
+     * previous field doesn't leak into a fresh one.
+     */
+    fun resetShiftState() {
+        if (!isShiftOn && !isCapsLock) return
+        isShiftOn = false
+        isCapsLock = false
+        lastShiftTapTime = 0L
+        updateShiftState()
+    }
+
+    /**
      * Set up touch-based key repeat for a key (used for backspace).
      * When held down, the action fires immediately on press, then repeats after an initial delay.
      */
