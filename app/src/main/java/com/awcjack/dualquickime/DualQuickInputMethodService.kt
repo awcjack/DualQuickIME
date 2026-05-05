@@ -441,9 +441,19 @@ class DualQuickInputMethodService : InputMethodService() {
     /**
      * Delete one grapheme cluster (visual character) before the cursor.
      * This handles emojis with skin tones, ZWJ sequences, and other multi-codepoint characters.
+     *
+     * If the user has a non-empty selection, the entire selection is deleted in
+     * one shot (matches the platform expectation that backspace replaces a selection).
      */
     private fun deleteOneGrapheme() {
         val ic = currentInputConnection ?: return
+
+        // If there's a selection, delete the whole selection instead of one char.
+        val selected = ic.getSelectedText(0)
+        if (!selected.isNullOrEmpty()) {
+            ic.commitText("", 1)
+            return
+        }
 
         // Get text before cursor (enough to cover longest emoji sequences)
         val textBefore = ic.getTextBeforeCursor(32, 0)?.toString() ?: return
