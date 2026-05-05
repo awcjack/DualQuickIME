@@ -1368,6 +1368,20 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     /**
+     * Switch to symbol/number mode (page 0 — digit row + common symbols).
+     * Used by the service when the focused field is numeric so the user
+     * lands on a number-friendly layout without an extra tap.
+     */
+    fun setSymbolMode() {
+        if (!isSymbolMode || symbolPage != 0 || isCandidateGridMode) {
+            isSymbolMode = true
+            symbolPage = 0
+            isCandidateGridMode = false
+            buildKeyboard()
+        }
+    }
+
+    /**
      * Clear shift / caps-lock so the keyboard returns to lowercase.
      * Called by the service on input-view start so caps state from a
      * previous field doesn't leak into a fresh one.

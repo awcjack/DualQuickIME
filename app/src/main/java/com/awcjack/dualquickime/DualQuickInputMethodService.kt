@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
+import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
@@ -252,9 +253,28 @@ class DualQuickInputMethodService : InputMethodService() {
         // shift indicator was already redrawn by buildKeyboard via refreshTheme,
         // but the underlying state needs to be cleared explicitly.
         keyboardView?.resetShiftState()
-        // Reset to letter mode
-        isSymbolMode = false
-        keyboardView?.setLetterMode()
+        // Pick the layout that matches the field type. Numeric / phone / datetime
+        // fields land on the digit page; everything else gets the QWERTY layout.
+        if (isNumericField(info)) {
+            isSymbolMode = true
+            keyboardView?.setSymbolMode()
+        } else {
+            isSymbolMode = false
+            keyboardView?.setLetterMode()
+        }
+    }
+
+    /**
+     * True when the focused field only accepts digits (number / phone / datetime
+     * input classes). Variations like signed/decimal still count — the digit row
+     * already includes the relevant symbols on adjacent symbol pages.
+     */
+    private fun isNumericField(info: EditorInfo?): Boolean {
+        val type = info?.inputType ?: return false
+        return when (type and InputType.TYPE_MASK_CLASS) {
+            InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_PHONE, InputType.TYPE_CLASS_DATETIME -> true
+            else -> false
+        }
     }
 
     private fun handleKeyEvent(event: KeyboardView.KeyEvent) {
