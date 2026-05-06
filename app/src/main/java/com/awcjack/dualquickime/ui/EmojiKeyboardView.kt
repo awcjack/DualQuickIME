@@ -135,9 +135,9 @@ class EmojiKeyboardView @JvmOverloads constructor(
         val seenBases = mutableSetOf<String>()
         emojis.forEach { emoji ->
             val displayEmoji = if (EmojiData.supportsSkinTone(emoji)) {
-                val base = EmojiData.getBaseEmoji(emoji)
-                if (!seenBases.add(base)) return@forEach
-                if (defaultSkinTone > 0) EmojiData.applySkiTone(base, defaultSkinTone) else base
+                val baseKey = EmojiData.getBaseEmoji(emoji)
+                if (!seenBases.add(baseKey)) return@forEach
+                EmojiData.applySkiTone(emoji, defaultSkinTone)
             } else {
                 emoji
             }

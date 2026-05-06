@@ -16,8 +16,10 @@ object EmojiData {
         "\uD83C\uDFFF"   // Dark skin tone
     )
 
-    // Emojis that support skin tone modifiers
-    private val skinToneEmojiSet = setOf(
+    // Emojis that support skin tone modifiers.
+    // Entries are normalized via getBaseEmoji so ZWJ sequences carrying U+FE0F
+    // (e.g. "👨‍⚕️", "👮‍♀️") match inputs whose variation selectors are stripped.
+    private val skinToneEmojiSet: Set<String> = listOf(
         "☝", "⛹", "⛹‍♀️", "⛹‍♂️", "✊", "✋", "✌", "✍", "🎅", "🏂",
         "🏃", "🏃‍♀️", "🏃‍♀️‍➡️", "🏃‍♂️", "🏃‍♂️‍➡️", "🏃‍➡️", "🏄", "🏄‍♀️", "🏄‍♂️", "🏇",
         "🏊", "🏊‍♀️", "🏊‍♂️", "🏋", "🏋‍♀️", "🏋‍♂️", "🏌", "🏌‍♀️", "🏌‍♂️", "👂",
@@ -51,13 +53,17 @@ object EmojiData {
         "🧘‍♂️", "🧙", "🧙‍♀️", "🧙‍♂️", "🧚", "🧚‍♀️", "🧚‍♂️", "🧛", "🧛‍♀️", "🧛‍♂️",
         "🧜", "🧜‍♀️", "🧜‍♂️", "🧝", "🧝‍♀️", "🧝‍♂️", "🫃", "🫄", "🫅", "🫰",
         "🫱", "🫱‍🫲", "🫲", "🫳", "🫴", "🫵", "🫶", "🫷", "🫸"
-    )
+    ).map { getBaseEmoji(it) }.toSet()
 
     fun supportsSkinTone(emoji: String): Boolean {
         val base = getBaseEmoji(emoji)
         return skinToneEmojiSet.contains(base)
     }
 
+    /**
+     * Normalized lookup form: skin tone modifiers and variation selectors stripped.
+     * Use for set membership checks and dedup keys, NOT for display.
+     */
     fun getBaseEmoji(emoji: String): String {
         if (emoji.isEmpty()) return emoji
         val result = StringBuilder()
@@ -73,9 +79,27 @@ object EmojiData {
         return result.toString()
     }
 
+    /**
+     * Strip only skin tone modifiers, preserving U+FE0F so the result still
+     * renders with emoji presentation (e.g. "👨‍⚕️" stays "👨‍⚕️").
+     */
+    private fun removeSkinTone(emoji: String): String {
+        if (emoji.isEmpty()) return emoji
+        val result = StringBuilder()
+        var i = 0
+        while (i < emoji.length) {
+            val codePoint = emoji.codePointAt(i)
+            val charCount = Character.charCount(codePoint)
+            if (codePoint in 0x1F3FB..0x1F3FF) { i += charCount; continue }
+            result.appendCodePoint(codePoint)
+            i += charCount
+        }
+        return result.toString()
+    }
+
     fun applySkiTone(emoji: String, skinToneIndex: Int): String {
-        if (skinToneIndex == 0 || !supportsSkinTone(emoji)) return getBaseEmoji(emoji)
-        val base = getBaseEmoji(emoji)
+        if (!supportsSkinTone(emoji)) return removeSkinTone(emoji)
+        val base = removeSkinTone(emoji)
         val modifier = skinTones.getOrElse(skinToneIndex) { "" }
         if (modifier.isEmpty() || base.isEmpty()) return base
         val firstCodePoint = base.codePointAt(0)
@@ -84,9 +108,17 @@ object EmojiData {
     }
 
     fun getSkinToneVariants(emoji: String): List<String> {
-        val base = getBaseEmoji(emoji)
-        if (!supportsSkinTone(base)) return listOf(emoji)
-        return skinTones.mapIndexed { index, _ -> applySkiTone(base, index) }
+        if (!supportsSkinTone(emoji)) return listOf(emoji)
+        val base = removeSkinTone(emoji)
+        return skinTones.mapIndexed { index, modifier ->
+            if (index == 0 || modifier.isEmpty()) {
+                base
+            } else {
+                val firstCodePoint = base.codePointAt(0)
+                val firstCharCount = Character.charCount(firstCodePoint)
+                base.substring(0, firstCharCount) + modifier + base.substring(firstCharCount)
+            }
+        }
     }
 
     val smileys get() = categories[0].emojis
