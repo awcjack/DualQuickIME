@@ -16,6 +16,18 @@ object EmojiData {
         "\uD83C\uDFFF"   // Dark skin tone
     )
 
+    // Equivalence aliases: single-codepoint emojis that Unicode treats as
+    // alternate forms of a ZWJ sequence. Without these, "👬" and "👨🏻‍🤝‍👨🏼"
+    // produce different dedup keys despite rendering the same concept.
+    // Values are normalized (no FE0F / skin tones) to match getBaseEmoji output.
+    private val emojiAliases: Map<String, String> = mapOf(
+        "👫" to "👩‍🤝‍👨",
+        "👬" to "👨‍🤝‍👨",
+        "👭" to "👩‍🤝‍👩",
+        "💏" to "🧑‍❤️‍💋‍🧑",
+        "💑" to "🧑‍❤️‍🧑"
+    ).mapValues { (_, v) -> stripPresentationModifiers(v) }
+
     // Emojis that support skin tone modifiers.
     // Entries are normalized via getBaseEmoji so ZWJ sequences carrying U+FE0F
     // (e.g. "👨‍⚕️", "👮‍♀️") match inputs whose variation selectors are stripped.
@@ -61,10 +73,11 @@ object EmojiData {
     }
 
     /**
-     * Normalized lookup form: skin tone modifiers and variation selectors stripped.
-     * Use for set membership checks and dedup keys, NOT for display.
+     * Strip skin tone modifiers and variation selectors. Pure character
+     * filter — no alias resolution. Used as the building block for both
+     * getBaseEmoji and the emojiAliases initializer (avoiding circularity).
      */
-    fun getBaseEmoji(emoji: String): String {
+    private fun stripPresentationModifiers(emoji: String): String {
         if (emoji.isEmpty()) return emoji
         val result = StringBuilder()
         var i = 0
@@ -77,6 +90,16 @@ object EmojiData {
             i += charCount
         }
         return result.toString()
+    }
+
+    /**
+     * Normalized lookup form: skin tone modifiers and variation selectors
+     * stripped, then mapped through equivalence aliases. Use for set
+     * membership checks and dedup keys, NOT for display.
+     */
+    fun getBaseEmoji(emoji: String): String {
+        val stripped = stripPresentationModifiers(emoji)
+        return emojiAliases[stripped] ?: stripped
     }
 
     /**
