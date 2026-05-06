@@ -5,6 +5,16 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-05-06
+### Added
+- **Numeric layout for number / phone / datetime fields**: When the focused input field declares a numeric input type, the keyboard now opens directly on the digit page. Tap "ABC" to switch to letters when needed.
+
+### Fixed
+- Backspace now deletes the entire selected text instead of removing one character at a time when a selection is active
+- Caps lock state is reset when the keyboard reopens in a new field, so a stuck shift state from a previous field no longer leaks across inputs
+- Emoji picker now collapses ZWJ skin-tone variants (e.g. `👨‍⚕️`/`👨🏻‍⚕️`/`👮‍♀️`) into a single grid entry, matching the existing dedupe behavior for plain emoji
+- Emoji picker now also collapses single-codepoint couple/holding-hands emoji (`👫` `👬` `👭` `💏` `💑`) with their Unicode-equivalent ZWJ sequences, removing duplicate entries across skin tones
+
 ## [1.8.1] - 2026-04-18
 ### Added
 - **Long-press direction picker on 簡⇄繁 key**: Long-press the conversion key to force 繁→簡 or 簡→繁 when auto-detection would pick the wrong direction (e.g., mixed Simplified/Traditional text). Tap still auto-detects.
