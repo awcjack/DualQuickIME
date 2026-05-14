@@ -75,6 +75,8 @@ class KeyboardView @JvmOverloads constructor(
     private var pageIndicator: TextView? = null
     private val candidateSlots = mutableListOf<TextView>()
     private var englishPill: TextView? = null
+    private var maskToggle: TextView? = null
+    private var onMaskToggled: (() -> Unit)? = null
 
     // Number row overlay for quick number input when idle
     private var numberRow: LinearLayout? = null
@@ -300,6 +302,7 @@ class KeyboardView @JvmOverloads constructor(
         candidateRow = null
         pageIndicator = null
         englishPill = null
+        maskToggle = null
         numberRow = null
         candidateSlots.clear()
         numberSlots.clear()
@@ -443,6 +446,7 @@ class KeyboardView @JvmOverloads constructor(
         candidateSlots.clear()
         numberSlots.clear()
         englishPill = null
+        maskToggle = null
 
         // Use FrameLayout as wrapper to allow overlaying number row on candidate row
         val wrapper = FrameLayout(context).apply {
@@ -457,6 +461,24 @@ class KeyboardView @JvmOverloads constructor(
             setBackgroundColor(colors.candidateBarBackground)
             setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
         }
+
+        // Mask toggle button (leftmost, password mode only)
+        maskToggle = TextView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, dpToPx(34)).apply {
+                setMargins(dpToPx(2), 0, dpToPx(4), 0)
+            }
+            gravity = Gravity.CENTER
+            minWidth = dpToPx(36)
+            setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
+            textSize = 17f
+            text = "👁"
+            setTextColor(colors.keyTextPrimary)
+            background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
+            elevation = dpToPx(1).toFloat()
+            visibility = View.GONE
+            setOnClickListener { onMaskToggled?.invoke() }
+        }
+        candidateContainer?.addView(maskToggle)
 
         // Composition text (radicals display) - only if setting enabled
         compositionText = TextView(context).apply {
@@ -723,6 +745,7 @@ class KeyboardView @JvmOverloads constructor(
             used += view.measuredWidth + (lp?.leftMargin ?: 0) + (lp?.rightMargin ?: 0)
         }
 
+        addSibling(maskToggle)
         addSibling(compositionText)
         addSibling(englishPill)
         if (pageIndicatorVisible) addSibling(pageIndicator)
@@ -769,6 +792,9 @@ class KeyboardView @JvmOverloads constructor(
 
         // Hide English pill
         englishPill?.visibility = View.GONE
+
+        // Hide mask toggle
+        maskToggle?.visibility = View.GONE
 
         // Show number row in candidate bar when idle (no code/key being typed)
         showNumberRow()
@@ -1335,6 +1361,47 @@ class KeyboardView @JvmOverloads constructor(
 
     fun setOnCandidateRefreshRequestedListener(listener: () -> Unit) {
         onCandidateRefreshRequested = listener
+    }
+
+    fun setOnMaskToggleListener(listener: () -> Unit) {
+        onMaskToggled = listener
+    }
+
+    /**
+     * Show or hide the password-mask toggle button.
+     * [isMasked] true = currently showing stars (tap to reveal).
+     * The button background is highlighted when the user has revealed their input.
+     */
+    fun setMaskToggle(show: Boolean, isMasked: Boolean) {
+        maskToggle?.let { toggle ->
+            if (show) {
+                toggle.text = "👁"
+                if (isMasked) {
+                    toggle.background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
+                    toggle.setTextColor(colors.keyTextPrimary)
+                } else {
+                    toggle.background = createPillBackground(colors.compositionText, colors.candidatePillBackgroundPressed)
+                    toggle.setTextColor(colors.keyBackground)
+                }
+                toggle.visibility = View.VISIBLE
+            } else {
+                toggle.visibility = View.GONE
+            }
+        }
+    }
+
+    /**
+     * Clear candidate slots without touching the English pill or mask toggle.
+     * Used in password mode when there are no Chinese candidates to display.
+     */
+    fun clearCandidateSlotsOnly() {
+        hideNumberRow()
+        candidateSlots.forEach { slot ->
+            slot.text = ""
+            slot.visibility = View.INVISIBLE
+            slot.setOnClickListener(null)
+        }
+        pageIndicator?.visibility = View.GONE
     }
 
     /**

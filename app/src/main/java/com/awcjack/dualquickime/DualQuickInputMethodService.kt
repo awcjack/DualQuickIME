@@ -70,6 +70,8 @@ class DualQuickInputMethodService : InputMethodService() {
 
     // Whether the currently focused field is a password field
     private var isPasswordField = false
+    // Whether password masking is active (user can toggle with the eye button)
+    private var isPasswordMaskEnabled = true
 
     // Track which character set is currently loaded
     private var currentCharsetExtended: Boolean? = null
@@ -205,6 +207,10 @@ class DualQuickInputMethodService : InputMethodService() {
                 // Refresh candidate view when returning from symbol/emoji/clipboard/grid mode
                 updateCandidateView()
             }
+            setOnMaskToggleListener {
+                isPasswordMaskEnabled = !isPasswordMaskEnabled
+                updateCandidateView()
+            }
         }
         rootContainer?.addView(keyboardView)
 
@@ -253,6 +259,7 @@ class DualQuickInputMethodService : InputMethodService() {
         }
 
         isPasswordField = isPasswordInputField(info)
+        isPasswordMaskEnabled = true
         // Refresh theme in case it changed in settings
         keyboardView?.refreshTheme()
         // Clear composition when starting new input
@@ -810,10 +817,14 @@ class DualQuickInputMethodService : InputMethodService() {
 
     private fun updateCandidateView() {
         keyboardView?.let { view ->
-            // In password fields, suppress the radical display and mask the typed keys
-            val radicals = if (isPasswordField) "" else composition.radicalDisplay
-            val keys = if (isPasswordField) "*".repeat(composition.rawKeys.length) else getDisplayKeys()
+            val isMasked = isPasswordField && isPasswordMaskEnabled
+            val radicals = if (isMasked) "" else composition.radicalDisplay
+            val keys = if (isMasked) "*".repeat(composition.rawKeys.length) else getDisplayKeys()
             view.setComposition(radicals, keys)
+            view.setMaskToggle(
+                show = isPasswordField && composition.rawKeys.isNotEmpty(),
+                isMasked = isPasswordMaskEnabled
+            )
 
             if (composition.hasCandidates) {
                 val displayedCount = view.setCandidates(
@@ -825,8 +836,12 @@ class DualQuickInputMethodService : InputMethodService() {
                 // Track how many candidates were actually displayed for dynamic pagination
                 composition = composition.withDisplayedCount(displayedCount)
             } else if (composition.rawKeys.isNotEmpty()) {
-                // Show "no match" message
-                view.showNoMatch()
+                if (isPasswordField) {
+                    // No Chinese match — keep displaying the masked/unmasked English pill only
+                    view.clearCandidateSlotsOnly()
+                } else {
+                    view.showNoMatch()
+                }
             } else {
                 view.clearCandidates()
             }
