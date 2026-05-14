@@ -718,6 +718,11 @@ class DualQuickInputMethodService : InputMethodService() {
     private fun enterEmailSuggestionsMode() {
         isEmailSuggestionsMode = true
         emailTypedSoFar = ""
+        // @ is on the symbol keyboard; return to letter mode so the candidate bar is visible
+        if (isSymbolMode) {
+            isSymbolMode = false
+            keyboardView?.setLetterMode()
+        }
         updateEmailSuggestionsView()
     }
 
