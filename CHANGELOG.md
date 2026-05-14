@@ -5,6 +5,15 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3] - 2026-05-14
+### Added
+- **Email domain suggestions**: Typing `@` now surfaces a list of common email domains (`gmail.com`, `yahoo.com`, `outlook.com`, etc.) as candidates, making it faster to complete email addresses without switching keyboards
+- **Eye toggle for password fields**: A show/hide button appears in the candidate bar while typing in a password field so you can unmask what you've typed without leaving the keyboard
+
+### Fixed
+- Email domain suggestions now appear correctly when `@` is typed while on the symbol keyboard (previously only worked from the letter keyboard)
+- Typed characters in the candidate bar are masked when the focused field is a password input, matching the field's own security behaviour
+
 ## [1.8.2] - 2026-05-06
 ### Added
 - **Numeric layout for number / phone / datetime fields**: When the focused input field declares a numeric input type, the keyboard now opens directly on the digit page. Tap "ABC" to switch to letters when needed.
