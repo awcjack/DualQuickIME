@@ -64,6 +64,10 @@ class DualQuickInputMethodService : InputMethodService() {
     // Maps index position to whether it was uppercase
     private var letterCases = mutableListOf<Boolean>()
 
+    // Email domain suggestion mode: triggered when @ is typed
+    private var isEmailSuggestionsMode = false
+    private var emailTypedSoFar = ""
+
     // Track which character set is currently loaded
     private var currentCharsetExtended: Boolean? = null
 
@@ -154,7 +158,9 @@ class DualQuickInputMethodService : InputMethodService() {
                 isSymbolMode = symbolMode
             }
             setOnCandidateSelectedListener { candidate ->
-                if (isAssociatedPhrasesMode) {
+                if (isEmailSuggestionsMode) {
+                    handleEmailSuggestionSelected(candidate)
+                } else if (isAssociatedPhrasesMode) {
                     // User TAPPED an associated phrase - commit it
                     handleAssociatedPhraseSelected(candidate)
                 } else {
@@ -249,6 +255,7 @@ class DualQuickInputMethodService : InputMethodService() {
         clearComposition()
         // Clear associated phrases mode
         clearAssociatedPhrases()
+        clearEmailSuggestions()
         // Caps lock from a previous field shouldn't leak into this one — the
         // shift indicator was already redrawn by buildKeyboard via refreshTheme,
         // but the underlying state needs to be cleared explicitly.
@@ -308,6 +315,7 @@ class DualQuickInputMethodService : InputMethodService() {
             clearComposition()
         }
         if (isAssociatedPhrasesMode) clearAssociatedPhrases()
+        if (isEmailSuggestionsMode) clearEmailSuggestions()
 
         val ic = currentInputConnection ?: return
         val selected = ic.getSelectedText(0)?.toString()
@@ -363,6 +371,13 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleLetter(char: Char) {
+        if (isEmailSuggestionsMode) {
+            val lowerChar = char.lowercaseChar()
+            commitText(lowerChar.toString())
+            emailTypedSoFar += lowerChar
+            updateEmailSuggestionsView()
+            return
+        }
         // Exit associated phrases mode when typing
         if (isAssociatedPhrasesMode) {
             clearAssociatedPhrases()
@@ -379,6 +394,13 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleNumber(digit: Int) {
+        if (isEmailSuggestionsMode) {
+            val digitStr = digit.toString()
+            commitText(digitStr)
+            emailTypedSoFar += digitStr
+            updateEmailSuggestionsView()
+            return
+        }
         // Numbers are regular input - commit any composition as English first
         if (composition.rawKeys.isNotEmpty()) {
             commitEnglish(composition.rawKeys)
@@ -389,6 +411,9 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleSymbol(char: Char) {
+        if (isEmailSuggestionsMode) {
+            clearEmailSuggestions()
+        }
         // Symbols commit composition as English first
         if (composition.rawKeys.isNotEmpty()) {
             commitEnglish(composition.rawKeys)
@@ -396,9 +421,13 @@ class DualQuickInputMethodService : InputMethodService() {
         }
         // Then commit the symbol
         commitText(char.toString())
+        if (char == '@') {
+            enterEmailSuggestionsMode()
+        }
     }
 
     private fun handleEmoji(emoji: String) {
+        if (isEmailSuggestionsMode) clearEmailSuggestions()
         // Emoji commits composition as English first
         if (composition.rawKeys.isNotEmpty()) {
             commitEnglish(composition.rawKeys)
@@ -409,6 +438,7 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleClipboardPaste(text: String) {
+        if (isEmailSuggestionsMode) clearEmailSuggestions()
         // Clipboard paste commits composition as English first
         if (composition.rawKeys.isNotEmpty()) {
             commitEnglish(composition.rawKeys)
@@ -419,6 +449,9 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleSpace() {
+        if (isEmailSuggestionsMode) {
+            clearEmailSuggestions()
+        }
         if (isAssociatedPhrasesMode) {
             // Navigate to next page of associated phrases
             nextAssociatedPhrasesPage()
@@ -437,6 +470,17 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleBackspace() {
+        if (isEmailSuggestionsMode) {
+            if (emailTypedSoFar.isNotEmpty()) {
+                emailTypedSoFar = emailTypedSoFar.dropLast(1)
+                deleteOneGrapheme()
+                updateEmailSuggestionsView()
+            } else {
+                clearEmailSuggestions()
+                deleteOneGrapheme()
+            }
+            return
+        }
         // Exit associated phrases mode on backspace
         if (isAssociatedPhrasesMode) {
             clearAssociatedPhrases()
@@ -505,6 +549,9 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleEnter() {
+        if (isEmailSuggestionsMode) {
+            clearEmailSuggestions()
+        }
         // Exit associated phrases mode on enter
         if (isAssociatedPhrasesMode) {
             clearAssociatedPhrases()
@@ -649,6 +696,45 @@ class DualQuickInputMethodService : InputMethodService() {
             associatedPhrasesOffset = nextOffset
         }
         updateAssociatedPhrasesView()
+    }
+
+    // ==================== EMAIL DOMAIN SUGGESTIONS ====================
+
+    private fun enterEmailSuggestionsMode() {
+        isEmailSuggestionsMode = true
+        emailTypedSoFar = ""
+        updateEmailSuggestionsView()
+    }
+
+    private fun clearEmailSuggestions() {
+        isEmailSuggestionsMode = false
+        emailTypedSoFar = ""
+        keyboardView?.clearCandidates()
+    }
+
+    private fun updateEmailSuggestionsView() {
+        val filtered = EMAIL_DOMAINS.filter { it.startsWith(emailTypedSoFar) }
+        if (filtered.isEmpty()) {
+            clearEmailSuggestions()
+            return
+        }
+        keyboardView?.let { view ->
+            view.setComposition("", "")
+            view.setCandidates(
+                candidates = filtered,
+                currentPage = 1,
+                totalCandidates = filtered.size,
+                startOffset = 0
+            )
+        }
+    }
+
+    private fun handleEmailSuggestionSelected(domain: String) {
+        val remaining = domain.drop(emailTypedSoFar.length)
+        if (remaining.isNotEmpty()) {
+            commitText(remaining)
+        }
+        clearEmailSuggestions()
     }
 
     private fun updateComposition(rawKeys: String) {
@@ -914,5 +1000,12 @@ class DualQuickInputMethodService : InputMethodService() {
         voiceInputManager = null
         // Unregister clipboard listener to avoid memory leaks
         clipboardManager?.removePrimaryClipChangedListener(clipboardListener)
+    }
+
+    companion object {
+        private val EMAIL_DOMAINS = listOf(
+            "gmail.com", "protonmail.com", "yahoo.com", "outlook.com", "hotmail.com",
+            "icloud.com", "me.com", "live.com", "msn.com"
+        )
     }
 }
