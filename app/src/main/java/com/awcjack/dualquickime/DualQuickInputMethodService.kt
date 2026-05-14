@@ -68,6 +68,9 @@ class DualQuickInputMethodService : InputMethodService() {
     private var isEmailSuggestionsMode = false
     private var emailTypedSoFar = ""
 
+    // Whether the currently focused field is a password field
+    private var isPasswordField = false
+
     // Track which character set is currently loaded
     private var currentCharsetExtended: Boolean? = null
 
@@ -249,6 +252,7 @@ class DualQuickInputMethodService : InputMethodService() {
             loadSimplexTable()
         }
 
+        isPasswordField = isPasswordInputField(info)
         // Refresh theme in case it changed in settings
         keyboardView?.refreshTheme()
         // Clear composition when starting new input
@@ -280,6 +284,17 @@ class DualQuickInputMethodService : InputMethodService() {
         val type = info?.inputType ?: return false
         return when (type and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_PHONE, InputType.TYPE_CLASS_DATETIME -> true
+            else -> false
+        }
+    }
+
+    private fun isPasswordInputField(info: EditorInfo?): Boolean {
+        val type = info?.inputType ?: return false
+        val variation = type and InputType.TYPE_MASK_VARIATION
+        return when (type and InputType.TYPE_MASK_CLASS) {
+            InputType.TYPE_CLASS_TEXT -> variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+            InputType.TYPE_CLASS_NUMBER -> variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
             else -> false
         }
     }
@@ -421,7 +436,7 @@ class DualQuickInputMethodService : InputMethodService() {
         }
         // Then commit the symbol
         commitText(char.toString())
-        if (char == '@') {
+        if (char == '@' && !isPasswordField) {
             enterEmailSuggestionsMode()
         }
     }
@@ -790,8 +805,10 @@ class DualQuickInputMethodService : InputMethodService() {
 
     private fun updateCandidateView() {
         keyboardView?.let { view ->
-            // Update composition display (radicals) with properly cased keys for English preview
-            view.setComposition(composition.radicalDisplay, getDisplayKeys())
+            // In password fields, suppress the radical display and mask the typed keys
+            val radicals = if (isPasswordField) "" else composition.radicalDisplay
+            val keys = if (isPasswordField) "*".repeat(composition.rawKeys.length) else getDisplayKeys()
+            view.setComposition(radicals, keys)
 
             if (composition.hasCandidates) {
                 val displayedCount = view.setCandidates(
