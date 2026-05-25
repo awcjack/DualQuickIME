@@ -5,6 +5,17 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.4] - 2026-05-25
+### Added
+- **Emoji 17.0 coverage**: Updated emoji keyboard to Unicode/Emoji 17.0 (released September 2025), adding 7 new characters:
+  - 🫪 Distorted face, 🫯 Fight cloud (Smileys)
+  - 🫈 Hairy creature / cryptid (People)
+  - 🫍 Orca (Animals)
+  - 🛘 Landslide (Travel)
+  - 🪊 Trombone, 🪎 Treasure chest (Objects)
+- **Skin tone support for 👯 and 🤼**: People With Bunny Ears and People Wrestling now support the long-press skin tone picker, matching the behaviour of all other people emojis
+- **Ballet dancer 🧑‍🩰**: New dancer emoji with skin tone picker support
+
 ## [1.8.3] - 2026-05-14
 ### Added
 - **Email domain suggestions**: Typing `@` now surfaces a list of common email domains (`gmail.com`, `yahoo.com`, `outlook.com`, etc.) as candidates, making it faster to complete email addresses without switching keyboards
