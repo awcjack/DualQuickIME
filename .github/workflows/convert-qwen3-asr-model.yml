@@ -1,0 +1,129 @@
+name: Convert Qwen3-ASR Model
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: 'HuggingFace model ID'
+        required: false
+        default: 'Qwen/Qwen3-ASR-0.6B'
+      release_tag:
+        description: 'Release tag (e.g., qwen3-asr-v1). Must be unique.'
+        required: true
+        default: 'qwen3-asr-v1'
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    # Qwen3-ASR-0.6B needs ~8 GB RAM during conversion; ubuntu-latest has 7 GB
+    # Use a larger runner if needed (e.g., ubuntu-latest-16-cores)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers accelerate onnx onnxruntime optimum
+          # Install qwen-asr if available, otherwise fall back to transformers
+          pip install qwen-asr || echo "qwen-asr not available, using transformers with trust_remote_code"
+
+      - name: Convert model to ONNX
+        run: |
+          MODEL_ID="${{ github.event.inputs.model_id }}"
+          OUTPUT_NAME=$(echo "$MODEL_ID" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+          python scripts/convert_qwen3_asr.py \
+            --model-id "$MODEL_ID" \
+            --output-dir "./$OUTPUT_NAME-int8"
+
+      - name: List output files
+        run: |
+          OUTPUT_NAME=$(echo "${{ github.event.inputs.model_id }}" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+          ls -lah "./$OUTPUT_NAME-int8/"
+
+      - name: Generate release notes
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          MODEL_ID="${{ github.event.inputs.model_id }}"
+          cat > RELEASE_NOTES.md << EOF
+          ## Qwen3-ASR - ONNX Format for Android
+
+          Converted from [$MODEL_ID](https://huggingface.co/$MODEL_ID)
+
+          ### Performance
+          - **WER (Cantonese, Dialog-Cantonese)**: ~4.12% (vs Whisper-large-v3: 31.04%)
+          - **Code-switching**: Native Cantonese-English mixing support
+          - **Languages**: Cantonese (primary), Mandarin, English + mixing
+
+          ### Comparison with existing DualQuickIME models
+          | Model | Cantonese WER/MER | Size |
+          |-------|-------------------|------|
+          | Qwen3-ASR (this) | ~4.12% WER | ~700 MB |
+          | U2pp-Conformer-Yue | 5.05% MER | 260 MB |
+          | Whisper Cantonese | 7.93% CER | 395 MB |
+          | SenseVoice | N/A (multilingual) | 228 MB |
+
+          ### Files
+          - \`encoder.onnx\` - Audio encoder (mel features → audio embeddings)
+          - \`decoder.onnx\` - LLM decoder with KV-cache support
+          - \`vocab.json\`   - Token vocabulary for detokenization
+          - \`config.json\`  - Model configuration (mel params, token IDs, etc.)
+
+          ### Inference Engine
+          Uses ONNX Runtime for Android (not Sherpa-ONNX) due to the LLM-based decoder.
+          Mel spectrogram extraction is implemented natively in Kotlin.
+          EOF
+
+      - name: Create GitHub release with model files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          MODEL_ID="${{ github.event.inputs.model_id }}"
+          OUTPUT_NAME=$(echo "$MODEL_ID" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+          OUTPUT_DIR="./$OUTPUT_NAME-int8"
+
+          gh release create "$TAG" \
+            --title "Qwen3-ASR Model (ONNX for Android)" \
+            --notes-file RELEASE_NOTES.md \
+            "$OUTPUT_DIR/encoder.onnx" \
+            "$OUTPUT_DIR/decoder.onnx" \
+            "$OUTPUT_DIR/vocab.json" \
+            "$OUTPUT_DIR/config.json"
+
+      - name: Upload artifact (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen3-asr-onnx
+          path: |
+            ./*-int8/encoder.onnx
+            ./*-int8/decoder.onnx
+            ./*-int8/vocab.json
+            ./*-int8/config.json
+          retention-days: 7
+
+      - name: Print download URLs
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          echo "============================================"
+          echo "Model files uploaded to release: $TAG"
+          echo "============================================"
+          echo ""
+          echo "Download URLs:"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/encoder.onnx"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/decoder.onnx"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/vocab.json"
+          echo "  https://github.com/awcjack/DualQuickIME/releases/download/${TAG}/config.json"
+          echo ""
+          echo "Update QWEN3_ASR_FALLBACK_URL in ModelDownloadManager.kt if needed:"
+          echo "  private const val QWEN3_ASR_FALLBACK_URL = \"https://github.com/awcjack/DualQuickIME/releases/download/${TAG}\""
