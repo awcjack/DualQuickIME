@@ -17,6 +17,7 @@ class VoiceInputView @JvmOverloads constructor(
     enum class State {
         HIDDEN,
         DOWNLOADING,
+        LOADING,
         LISTENING,
         PROCESSING,
         ERROR

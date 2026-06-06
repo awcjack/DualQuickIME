@@ -104,6 +104,7 @@
     <string name="voice_listening">正在聆聽...</string>
     <string name="voice_processing">處理中...</string>
     <string name="voice_cancel">取消</string>
+    <string name="voice_loading_model">載入中語音模型...</string>
     <string name="voice_downloading_model">正在下載語音模型...</string>
     <string name="voice_download_starting">開始下載...</string>
     <string name="voice_permission_required">語音輸入需要錄音權限</string>

@@ -953,7 +953,23 @@ class DualQuickInputMethodService : InputMethodService() {
         })
     }
 
+    // Guards against tapping the mic twice while the previous start is still
+    // initializing — Qwen3-ASR's 2–5 s bind+load+warmup window otherwise lets
+    // a second tap queue another full init in parallel.
+    @Volatile
+    private var voiceStartInProgress = false
+
     private fun startVoiceRecognition() {
+        // Debounce: if a start is already in flight, ignore. The Cancel button
+        // on the voice overlay is the way out, not a second mic tap.
+        if (voiceStartInProgress) return
+        voiceStartInProgress = true
+
+        // Show LOADING immediately so the user knows the keyboard responded.
+        // The previous flow left the overlay HIDDEN until init finished, which
+        // made the first tap look dead during the 2–5 s Qwen3-ASR cold start.
+        voiceInputView?.setState(VoiceInputView.State.LOADING)
+
         // Get the user's selected model type
         val selectedModelType = VoiceModelType.fromId(ThemeManager.getVoiceModelType(this))
 
@@ -962,43 +978,61 @@ class DualQuickInputMethodService : InputMethodService() {
             voiceInputManager = VoiceInputManager(this)
         }
 
-        val manager = voiceInputManager ?: return
+        val manager = voiceInputManager ?: run {
+            voiceStartInProgress = false
+            return
+        }
 
-        // Set the model type before initializing
-        manager.setModelType(selectedModelType)
-
-        // Initialize recognizer on background thread
+        // Initialize recognizer on background thread. setModelType is included
+        // because switching to a different model triggers release()+initialize()
+        // internally — for Qwen3-ASR that's bind + 700 MB load + warmup, which
+        // would block the IME UI thread for seconds if left on the caller.
         thread {
-            val initialized = manager.initialize()
+            try {
+                manager.setModelType(selectedModelType)
+                val initialized = manager.initialize()
 
-            mainHandler.post {
-                if (!initialized) {
+                mainHandler.post {
+                    try {
+                        if (!initialized) {
+                            voiceInputView?.setState(VoiceInputView.State.ERROR)
+                            voiceInputView?.setErrorMessage(getString(R.string.voice_init_failed))
+                            return@post
+                        }
+
+                        // Set up callbacks
+                        manager.setOnResultListener { text, _ ->
+                            mainHandler.post {
+                                // Only update the transcript display, don't auto-commit
+                                voiceInputView?.setTranscript(text)
+                            }
+                        }
+
+                        manager.setOnErrorListener { error ->
+                            mainHandler.post {
+                                voiceInputView?.setState(VoiceInputView.State.ERROR)
+                                voiceInputView?.setErrorMessage(error)
+                            }
+                        }
+
+                        // Start recording
+                        if (manager.startRecording()) {
+                            voiceInputView?.setState(VoiceInputView.State.LISTENING)
+                        } else {
+                            voiceInputView?.setState(VoiceInputView.State.ERROR)
+                            voiceInputView?.setErrorMessage(getString(R.string.voice_start_failed))
+                        }
+                    } finally {
+                        voiceStartInProgress = false
+                    }
+                }
+            } catch (e: Exception) {
+                // Background thread crashed before posting back — clear the
+                // debounce flag so the user can retry.
+                mainHandler.post {
+                    voiceStartInProgress = false
                     voiceInputView?.setState(VoiceInputView.State.ERROR)
                     voiceInputView?.setErrorMessage(getString(R.string.voice_init_failed))
-                    return@post
-                }
-
-                // Set up callbacks
-                manager.setOnResultListener { text, _ ->
-                    mainHandler.post {
-                        // Only update the transcript display, don't auto-commit
-                        voiceInputView?.setTranscript(text)
-                    }
-                }
-
-                manager.setOnErrorListener { error ->
-                    mainHandler.post {
-                        voiceInputView?.setState(VoiceInputView.State.ERROR)
-                        voiceInputView?.setErrorMessage(error)
-                    }
-                }
-
-                // Start recording
-                if (manager.startRecording()) {
-                    voiceInputView?.setState(VoiceInputView.State.LISTENING)
-                } else {
-                    voiceInputView?.setState(VoiceInputView.State.ERROR)
-                    voiceInputView?.setErrorMessage(getString(R.string.voice_start_failed))
                 }
             }
         }
@@ -1010,6 +1044,11 @@ class DualQuickInputMethodService : InputMethodService() {
     private fun closeVoiceInput() {
         voiceInputManager?.stopRecording()
         voiceInputView?.setState(VoiceInputView.State.HIDDEN)
+        // Clear the start-debounce flag so the user can immediately retry if
+        // they cancelled while we were still loading. The in-flight init
+        // thread will still finish and harmlessly post LISTENING back, which
+        // is benign because the voice overlay is hidden again.
+        voiceStartInProgress = false
     }
 
     /**

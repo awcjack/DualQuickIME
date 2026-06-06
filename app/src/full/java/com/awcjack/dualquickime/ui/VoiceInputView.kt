@@ -31,6 +31,7 @@ class VoiceInputView @JvmOverloads constructor(
     enum class State {
         HIDDEN,
         DOWNLOADING,
+        LOADING,
         LISTENING,
         PROCESSING,
         ERROR
@@ -293,6 +294,21 @@ class VoiceInputView @JvmOverloads constructor(
                 transcriptText?.visibility = View.GONE
                 buttonContainer?.visibility = View.VISIBLE
                 // During download, only show Cancel button
+                resetCancelButton?.text = context.getString(R.string.voice_cancel)
+                commitButton?.visibility = View.GONE
+                stopPulseAnimation()
+            }
+            State.LOADING -> {
+                // Shown immediately when the user taps the voice button so they
+                // know the keyboard responded, while the recognizer (especially
+                // Qwen3-ASR's 700 MB model in :voice) loads in the background.
+                visibility = View.VISIBLE
+                statusIcon?.text = "⏳"
+                statusText?.text = context.getString(R.string.voice_loading_model)
+                progressBar?.visibility = View.GONE
+                progressText?.visibility = View.GONE
+                transcriptText?.visibility = View.GONE
+                buttonContainer?.visibility = View.VISIBLE
                 resetCancelButton?.text = context.getString(R.string.voice_cancel)
                 commitButton?.visibility = View.GONE
                 stopPulseAnimation()
