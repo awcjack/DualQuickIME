@@ -89,6 +89,11 @@ android {
 
     buildFeatures {
         buildConfig = true
+        // Enable AIDL processing so IVoiceRecognizer.aidl (used by the
+        // VoiceService in the full flavor) is compiled to its stub class.
+        // Off by default in AGP 7+; without this the .aidl file is silently
+        // skipped and the Kotlin call sites fail to resolve.
+        aidl = true
     }
 }
 
