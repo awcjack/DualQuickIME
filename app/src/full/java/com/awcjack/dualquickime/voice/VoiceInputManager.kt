@@ -1,17 +1,23 @@
 package com.awcjack.dualquickime.voice
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.awcjack.dualquickime.BuildConfig
 import com.k2fsa.sherpa.onnx.*
 import openccjava.OpenCC
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
@@ -58,6 +64,13 @@ class VoiceInputManager(private val context: Context) {
         private const val QWEN3_ASR_DECODER_FILE = "decoder.int8.onnx"
         private const val QWEN3_ASR_TOKENIZER_DIR = "tokenizer"
 
+        // Tuning passed across the Binder to VoiceService when it loads
+        // Qwen3-ASR. 4 threads to saturate the big-core cluster during
+        // active transcription; 80-token cap to bound the worst-case
+        // repetition-hallucination so the keyboard can't freeze for 10+ s.
+        private const val QWEN3_ASR_NUM_THREADS = 4
+        private const val QWEN3_ASR_MAX_NEW_TOKENS = 80
+
         // Memory-pressure guards for the 700 MB Qwen3-ASR recognizer.
         // Release the model after this many ms of recording idle so the IME
         // process doesn't sit on a gigabyte of weights while the user is
@@ -66,6 +79,11 @@ class VoiceInputManager(private val context: Context) {
         // How often the idle monitor thread wakes to check. Coarse-grained to
         // avoid burning battery on a tight loop.
         private const val IDLE_CHECK_INTERVAL_MS = 5_000L
+        // Max wait for the :voice process to come up after bindService().
+        // bindService is async; the system has to start the process, load our
+        // APK in it, and call onServiceConnected. 5 s covers cold start on a
+        // modest device.
+        private const val SERVICE_BIND_TIMEOUT_SEC = 5L
 
         // Punctuation conversion map (spoken words to symbols)
         // Supports Cantonese, Mandarin and English
@@ -234,6 +252,38 @@ class VoiceInputManager(private val context: Context) {
     // releaser thread — both can flip it between null and non-null.
     private val recognizerLock = Any()
 
+    // ── Qwen3-ASR out-of-process plumbing ─────────────────────────────────
+    // Qwen3-ASR runs inside the VoiceService in its own :voice process to
+    // keep the IME safe from LMK. The fields below model that binding.
+
+    // Binder handle to the remote recognizer. Null when the service isn't
+    // bound or has been disconnected (e.g. the :voice process was killed).
+    @Volatile
+    private var voiceServiceBinder: IVoiceRecognizer? = null
+    @Volatile
+    private var isVoiceServiceBound = false
+    // Latched on each fresh bind so initialize() can wait synchronously for
+    // onServiceConnected. Reset on every bindVoiceService() call so we don't
+    // re-await a stale latch after a disconnect.
+    @Volatile
+    private var serviceConnectionLatch: CountDownLatch = CountDownLatch(0)
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            voiceServiceBinder = IVoiceRecognizer.Stub.asInterface(service)
+            serviceConnectionLatch.countDown()
+            if (BuildConfig.DEBUG) Log.i(TAG, ":voice service connected")
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            // Process was killed (LMK, crash, OS reclaim). The system will
+            // restart it on the next bind because we used BIND_AUTO_CREATE,
+            // so we just drop the stale binder here.
+            voiceServiceBinder = null
+            if (BuildConfig.DEBUG) Log.w(TAG, ":voice service disconnected; binder dropped")
+        }
+    }
+
     private var onResultCallback: ((String, Boolean) -> Unit)? = null
     private var onErrorCallback: ((String) -> Unit)? = null
     // Fires (true) when a segment decode starts, (false) when it ends.
@@ -337,17 +387,18 @@ class VoiceInputManager(private val context: Context) {
 
             vad = Vad(config = vadConfig)
 
-            // Initialize the appropriate recognizer based on model type
+            // Initialize the appropriate recognizer. The light models live in
+            // this process; Qwen3-ASR is hosted in VoiceService and the call
+            // below leaves [recognizer] null (the binder in [voiceServiceBinder]
+            // is the real handle). Warmup happens inside the service for
+            // Qwen3-ASR, and isn't worthwhile for the sub-second CTC/Whisper
+            // models.
             recognizer = when (currentModelType) {
                 VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
                 VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
                 VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
-                VoiceModelType.QWEN3_ASR -> initQwen3AsrRecognizer(modelDir)
+                VoiceModelType.QWEN3_ASR -> initQwen3AsrViaService(modelDir)
             }
-
-            // Warm up Qwen3-ASR so the first real utterance isn't penalized by
-            // graph optimization + weight unpack. No-op for the lighter models.
-            warmUpRecognizer()
 
             isInitialized = true
             markActivity()
@@ -451,52 +502,84 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Initialize Qwen3-ASR recognizer.
+     * Load the Qwen3-ASR recognizer in the `:voice` process via [VoiceService].
      *
-     * Backed by Sherpa-ONNX's prebuilt INT8 export
+     * The recognizer itself uses Sherpa-ONNX's prebuilt INT8 export
      * (sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25, PR #3409): a 3-stage
      * pipeline of conv_frontend → AuT audio encoder → Qwen3 LLM decoder with
-     * KV-cache. `tokens` is intentionally empty — Qwen3-ASR carries its
-     * tokenizer files under the `tokenizer/` directory specified in the
-     * sub-config.
+     * KV-cache. All of that runs out-of-process; this method just binds and
+     * asks the service to initialize with our standard tuning
+     * ([QWEN3_ASR_NUM_THREADS], [QWEN3_ASR_MAX_NEW_TOKENS]).
      *
-     * Speed tuning for IME use:
-     * - numThreads=4 to take advantage of the big-core cluster while voice
-     *   recording is the user's foreground task. Anything higher risks
-     *   thermal throttling and L2 contention.
-     * - maxNewTokens=80 instead of upstream's 128. Real IME utterances cap
-     *   out around 60 tokens; the tighter ceiling bounds pathological
-     *   "decoder hallucinates a long repetition" failures so the keyboard
-     *   doesn't freeze for 10+ seconds.
-     * - Temperature/topP/seed left at upstream defaults — temperature=1e-6
-     *   is effectively greedy so topP/seed are inert.
-     *
-     * Latency note: autoregressive decode means transcription is still
-     * several× slower than CTC models on mobile CPUs — usable for
-     * tap-and-wait but not real-time dictation.
+     * Returns null instead of an OfflineRecognizer because the recognizer
+     * doesn't live in this process — the binder handle is held in
+     * [voiceServiceBinder] and queried directly during transcription.
+     * Throws on bind failure or service-side init failure.
      */
-    private fun initQwen3AsrRecognizer(modelDir: String): OfflineRecognizer {
-        val qwen3Config = OfflineQwen3AsrModelConfig(
-            convFrontend = "$modelDir/$QWEN3_ASR_CONV_FRONTEND_FILE",
-            encoder = "$modelDir/$QWEN3_ASR_ENCODER_FILE",
-            decoder = "$modelDir/$QWEN3_ASR_DECODER_FILE",
-            tokenizer = "$modelDir/$QWEN3_ASR_TOKENIZER_DIR",
-            maxNewTokens = 80
-        )
+    private fun initQwen3AsrViaService(modelDir: String): OfflineRecognizer? {
+        if (!bindVoiceService()) {
+            throw RuntimeException("Failed to bind to :voice service")
+        }
+        val binder = voiceServiceBinder
+            ?: throw RuntimeException(":voice service connected but binder is null")
+        val ok = try {
+            binder.initialize(modelDir, QWEN3_ASR_NUM_THREADS, QWEN3_ASR_MAX_NEW_TOKENS)
+        } catch (e: Exception) {
+            throw RuntimeException("Remote initialize() threw: ${e.message}", e)
+        }
+        if (!ok) throw RuntimeException(":voice service failed to load Qwen3-ASR")
+        return null
+    }
 
-        val modelConfig = OfflineModelConfig(
-            qwen3Asr = qwen3Config,
-            tokens = "",  // Qwen3-ASR carries its own tokenizer dir, no separate tokens file
-            numThreads = 4,
-            debug = false
-        )
+    /**
+     * Whether the current model is hosted out-of-process in [VoiceService].
+     * Only Qwen3-ASR qualifies — the lighter recognizers stay in-process to
+     * avoid the Binder hop cost (and they're small enough to be safe there).
+     */
+    private fun usesOutOfProcessRecognizer(): Boolean =
+        currentModelType == VoiceModelType.QWEN3_ASR
 
-        val config = OfflineRecognizerConfig(
-            modelConfig = modelConfig,
-            decodingMethod = "greedy_search"
-        )
+    /**
+     * Bind to the [VoiceService] in the `:voice` process and block until
+     * onServiceConnected fires (or [SERVICE_BIND_TIMEOUT_SEC] expires).
+     * Idempotent on an active binding.
+     */
+    private fun bindVoiceService(): Boolean {
+        if (voiceServiceBinder != null) return true
+        // Reset the latch before we kick off a new bind so we don't return
+        // immediately on a stale count-down from a previous session.
+        serviceConnectionLatch = CountDownLatch(1)
+        if (!isVoiceServiceBound) {
+            val intent = Intent(context, VoiceService::class.java)
+            isVoiceServiceBound = try {
+                context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            } catch (e: SecurityException) {
+                if (BuildConfig.DEBUG) Log.e(TAG, "bindService threw SecurityException: ${e.message}")
+                false
+            }
+            if (!isVoiceServiceBound) {
+                if (BuildConfig.DEBUG) Log.e(TAG, "bindService returned false; :voice process not reachable")
+                return false
+            }
+        }
+        return try {
+            val ok = serviceConnectionLatch.await(SERVICE_BIND_TIMEOUT_SEC, TimeUnit.SECONDS)
+            ok && voiceServiceBinder != null
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
+    }
 
-        return OfflineRecognizer(config = config)
+    private fun unbindVoiceService() {
+        if (!isVoiceServiceBound) return
+        try {
+            context.unbindService(serviceConnection)
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "unbindService threw: ${e.message}")
+        }
+        isVoiceServiceBound = false
+        voiceServiceBinder = null
     }
 
     /**
@@ -535,13 +618,23 @@ class VoiceInputManager(private val context: Context) {
 
                     val now = System.currentTimeMillis()
                     val idleFor = now - lastActivityMillis
+                    // For Qwen3-ASR, "loaded" is owned by the :voice process —
+                    // query the binder. For other models it would be the
+                    // in-process recognizer, but we only run the monitor for
+                    // Qwen3-ASR so the in-process branch is unreachable.
+                    val isLoaded = try {
+                        voiceServiceBinder?.isLoaded == true
+                    } catch (e: Exception) {
+                        if (BuildConfig.DEBUG) Log.w(TAG, "isLoaded() across binder threw: ${e.message}")
+                        false
+                    }
                     val canRelease = idleFor >= QWEN3_ASR_IDLE_RELEASE_MS &&
                         !isRecording &&
-                        synchronized(recognizerLock) { recognizer != null }
+                        isLoaded
 
                     if (canRelease) {
                         if (BuildConfig.DEBUG) {
-                            Log.i(TAG, "Qwen3-ASR idle for ${idleFor}ms; releasing recognizer to free ~700 MB")
+                            Log.i(TAG, "Qwen3-ASR idle for ${idleFor}ms; releasing recognizer to free ~700 MB in :voice process")
                         }
                         releaseRecognizerOnly()
                         // Keep the monitor running. The next mic tap triggers a lazy
@@ -567,8 +660,23 @@ class VoiceInputManager(private val context: Context) {
      * Release only the recognizer (the heavy ~700 MB component), keeping
      * VAD, OpenCC and audio recording state alive. The next call to
      * [ensureRecognizerLoaded] rebuilds it.
+     *
+     * For Qwen3-ASR this asks the bound service to free its native handle;
+     * the `:voice` process stays alive (we keep the binding) so the next
+     * load doesn't have to wait for process startup again. The OS is free
+     * to reclaim the empty process if memory pressure spikes.
      */
     private fun releaseRecognizerOnly() {
+        if (usesOutOfProcessRecognizer()) {
+            try {
+                voiceServiceBinder?.releaseModel()
+            } catch (e: Exception) {
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "Remote releaseModel() threw: ${e.message}")
+                }
+            }
+            return
+        }
         synchronized(recognizerLock) {
             try {
                 recognizer?.release()
@@ -586,21 +694,46 @@ class VoiceInputManager(private val context: Context) {
      * the recognizer is ready after the call. Called from [startRecording]
      * before audio capture begins so the reload cost happens up front
      * rather than mid-utterance.
+     *
+     * For Qwen3-ASR the actual model lives in the `:voice` process; this
+     * method asks the bound service to re-initialize after a previous
+     * [releaseRecognizerOnly] told it to drop the model.
      */
     private fun ensureRecognizerLoaded(): Boolean {
+        if (!isInitialized) return false
+
+        if (usesOutOfProcessRecognizer()) {
+            // Out-of-process path: rebind if the binder is gone, then ask
+            // the service to reload the model if it isn't currently loaded.
+            if (!bindVoiceService()) return false
+            val binder = voiceServiceBinder ?: return false
+            return try {
+                if (binder.isLoaded) {
+                    true
+                } else {
+                    val modelDir = File(context.filesDir, currentModelType.modelDir).absolutePath
+                    val ok = binder.initialize(modelDir, QWEN3_ASR_NUM_THREADS, QWEN3_ASR_MAX_NEW_TOKENS)
+                    if (ok && BuildConfig.DEBUG) {
+                        Log.i(TAG, "Qwen3-ASR reloaded in :voice process after idle release")
+                    }
+                    ok
+                }
+            } catch (e: Exception) {
+                if (BuildConfig.DEBUG) Log.e(TAG, "Remote reload failed: ${e.message}", e)
+                false
+            }
+        }
+
         synchronized(recognizerLock) {
             if (recognizer != null) return true
-            if (!isInitialized) return false
-
             return try {
                 val modelDir = File(context.filesDir, currentModelType.modelDir).absolutePath
                 recognizer = when (currentModelType) {
                     VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
                     VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
                     VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
-                    VoiceModelType.QWEN3_ASR -> initQwen3AsrRecognizer(modelDir)
+                    VoiceModelType.QWEN3_ASR -> error("Qwen3-ASR is hosted out-of-process; unreachable")
                 }
-                warmUpRecognizer()
                 if (BuildConfig.DEBUG) {
                     Log.i(TAG, "Recognizer reloaded after idle release")
                 }
@@ -610,42 +743,6 @@ class VoiceInputManager(private val context: Context) {
                     Log.e(TAG, "Failed to reload recognizer: ${e.message}", e)
                 }
                 false
-            }
-        }
-    }
-
-    /**
-     * Run one throwaway decode so the ONNX Runtime graph optimizer, weight
-     * dequantization caches and KV-cache buffers are populated before the
-     * user speaks. Only meaningful for Qwen3-ASR — the autoregressive
-     * decoder otherwise pays a 0.5–2 s one-time tax on the first utterance.
-     *
-     * Trade-off: this extends "Loading…" by the warmup time. For the
-     * smaller CTC models the tax is negligible, so we skip warmup for them
-     * and surface "Listening…" sooner.
-     */
-    private fun warmUpRecognizer() {
-        val rec = recognizer ?: return
-        if (currentModelType != VoiceModelType.QWEN3_ASR) return
-
-        try {
-            // 0.5 s of silence — long enough to drive a full encoder+decoder pass
-            // through the pipeline, short enough that warmup stays under ~1 s
-            // wall clock on a mid-range device.
-            val silence = FloatArray(SAMPLE_RATE / 2)
-            val stream = rec.createStream()
-            stream.acceptWaveform(silence, SAMPLE_RATE)
-            rec.decode(stream)
-            // Discard result — silence usually decodes to empty or filler tokens.
-            rec.getResult(stream)
-            stream.release()
-            if (BuildConfig.DEBUG) {
-                Log.i(TAG, "Qwen3-ASR warmup complete")
-            }
-        } catch (e: Exception) {
-            // Warmup failure is non-fatal; first real utterance will pay the tax.
-            if (BuildConfig.DEBUG) {
-                Log.w(TAG, "Qwen3-ASR warmup failed (non-fatal): ${e.message}")
             }
         }
     }
@@ -793,6 +890,9 @@ class VoiceInputManager(private val context: Context) {
         stopRecording()
         stopIdleReleaseMonitor()
         releaseRecognizerOnly()
+        // Drop the binding so the :voice process can be reclaimed by the OS.
+        // Idempotent if we never bound.
+        unbindVoiceService()
         vad?.release()
         vad = null
         openccConverter = null
@@ -908,20 +1008,38 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Recognize a single VAD speech segment using the current Sherpa-ONNX
-     * recognizer. Returns empty string if no recognizer is active.
+     * Recognize a single VAD speech segment. Routes through the bound
+     * [VoiceService] for Qwen3-ASR (audio crosses the Binder boundary as
+     * int16 PCM to stay under the 1 MB transaction cap), and stays in
+     * process for the lighter Sherpa-ONNX recognizers.
      *
-     * Snapshots the recognizer reference under the lock so we don't crash
-     * if the idle releaser nulls it out mid-call. Brackets the blocking
-     * decode with a (true)/(false) signal on the processing-state callback
-     * so the IME can show "Transcribing…" while Qwen3-ASR chews through
-     * the autoregressive decoder.
+     * Brackets the blocking decode with a (true)/(false) signal on the
+     * processing-state callback so the IME can show "Transcribing…" while
+     * Qwen3-ASR chews through the autoregressive decoder. Returns empty
+     * string if no recognizer is active or if the binder is gone.
      */
     private fun recognizeSegment(samples: FloatArray): String {
-        val rec = synchronized(recognizerLock) { recognizer } ?: return ""
         markActivity()
         onProcessingStateCallback?.invoke(true)
         try {
+            if (usesOutOfProcessRecognizer()) {
+                val binder = voiceServiceBinder ?: return ""
+                // Float32 → int16 round-trip halves the IPC payload. The
+                // original audio came from AudioRecord as int16 anyway, so
+                // this is lossless at the sample bit depth.
+                val shorts = ShortArray(samples.size) { i ->
+                    (samples[i] * 32768.0f).toInt().coerceIn(-32768, 32767).toShort()
+                }
+                val text = try {
+                    binder.transcribe(shorts)
+                } catch (e: Exception) {
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Remote transcribe() threw: ${e.message}", e)
+                    ""
+                }
+                markActivity()
+                return text.trim()
+            }
+            val rec = synchronized(recognizerLock) { recognizer } ?: return ""
             val stream = rec.createStream()
             stream.acceptWaveform(samples, SAMPLE_RATE)
             rec.decode(stream)
