@@ -5,6 +5,15 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-06-06
+### Fixed
+- Voice input button now shows a "Loading…" indicator immediately on tap instead of staying silent while the recognizer initializes — the first tap no longer looks dead during the Qwen3-ASR cold start
+- Qwen3-ASR transcriptions no longer leak the internal `<asr_text>` metadata tag into the inserted text
+- Tapping the voice button twice in quick succession no longer queues parallel model initializations
+
+### Changed
+- Qwen3-ASR cold-start wait reduced from 2–5 s to roughly 0.5–2 s: the voice process is now bound speculatively while the user is still typing, and the silent-decode warmup pass has been removed. The first utterance after load is slightly slower as a result; subsequent utterances are unaffected
+
 ## [1.9.0] - 2026-06-06
 ### Added
 - **Qwen3-ASR voice input model**: New offline voice option with the highest Cantonese accuracy of any DualQuickIME model (~4.12% WER, vs U2pp 5.05% MER and Whisper 7.93% CER) and native Cantonese-English code-switching. Powered by Alibaba's Qwen3-ASR-0.6B via Sherpa-ONNX (942 MB download — recommended only on devices with 4 GB+ RAM)
