@@ -24,7 +24,7 @@ object ModelDownloadManager {
     const val SENSEVOICE_MODEL_DIR = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09"
     const val WHISPER_CANTONESE_MODEL_DIR = "sherpa-onnx-whisper-small-cantonese"
     const val U2PP_CONFORMER_YUE_MODEL_DIR = "sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10"
-    const val QWEN3_ASR_MODEL_DIR = "qwen3-asr-0.6b-int8"
+    const val QWEN3_ASR_MODEL_DIR = "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25"
 
     // Silero VAD model filename (shared between models)
     const val VAD_MODEL_FILE = "silero_vad.onnx"
@@ -47,16 +47,15 @@ object ModelDownloadManager {
     // Original archive: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10.tar.bz2
     private const val U2PP_CONFORMER_YUE_BASE_URL = "https://huggingface.co/csukuangfj/sherpa-onnx-wenetspeech-yue-u2pp-conformer-ctc-zh-en-cantonese-int8-2025-09-10/resolve/main"
 
-    // Qwen3-ASR model (converted from Qwen/Qwen3-ASR-0.6B via CI workflow)
-    // Custom ONNX format for ONNX Runtime Android (not Sherpa-ONNX)
-    private const val QWEN3_ASR_TAG_PREFIX = "qwen3-asr-"
-    private const val QWEN3_ASR_FALLBACK_URL = "https://github.com/awcjack/DualQuickIME/releases/download/qwen3-asr-v1"
+    // Qwen3-ASR model — Sherpa-ONNX pre-built INT8 export, mirrored on HuggingFace
+    // by csukuangfj2 (model name encodes the snapshot date, so the URL is stable
+    // and we do not need version discovery like Whisper Cantonese).
+    private const val QWEN3_ASR_BASE_URL = "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/main"
 
     // Model version markers - increment to force re-download of existing files
     // This handles cases where model format changes but file sizes are similar
     private const val WHISPER_CANTONESE_VERSION = "v5"
     private const val U2PP_CONFORMER_YUE_VERSION = "v1"
-    private const val QWEN3_ASR_VERSION = "v1"
 
     /**
      * Data class for model file with size and SHA-256 checksum.
@@ -74,7 +73,6 @@ object ModelDownloadManager {
         return when (modelType) {
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_VERSION
             VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_VERSION
-            VoiceModelType.QWEN3_ASR -> QWEN3_ASR_VERSION
             else -> ""
         }
     }
@@ -113,15 +111,20 @@ object ModelDownloadManager {
         ModelFile("tokens.txt", 320_000L, "a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7")  // ~320 KB - placeholder
     )
 
-    // Qwen3-ASR model files (converted via CI workflow from Qwen/Qwen3-ASR-0.6B)
-    // Custom ONNX format for inference with ONNX Runtime for Android
-    // WER: ~4.12% on Cantonese (vs Whisper 7.93% CER, U2pp 5.05% MER)
-    // Supports native Cantonese-English code-switching
+    // Qwen3-ASR model files — Sherpa-ONNX pre-built INT8 export.
+    // Sizes are exact byte counts from HuggingFace's LFS metadata; checksums are
+    // placeholders pending the same checksum-rollout that's tracked for the
+    // other models. The `tokenizer/` subdirectory is consumed by Sherpa-ONNX's
+    // OfflineQwen3AsrModelConfig.tokenizer as a directory path.
+    // WER: ~4.12% on Cantonese (vs Whisper 7.93% CER, U2pp 5.05% MER).
+    // Supports native Cantonese-English code-switching.
     private val QWEN3_ASR_FILES = listOf(
-        ModelFile("encoder.onnx", 100_000_000L, "g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a6b7c8d9e0f1g2h3i4j5k6l7"),  // ~100MB audio encoder - placeholder
-        ModelFile("decoder.onnx", 600_000_000L, "h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a6b7c8d9e0f1g2h3i4j5k6l7m8"),  // ~600MB LLM decoder - placeholder
-        ModelFile("vocab.json", 2_000_000L, "i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a6b7c8d9e0f1g2h3i4j5k6l7m8n9"),   // ~2MB vocabulary - placeholder
-        ModelFile("config.json", 1_000L, "j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a6b7c8d9e0f1g2h3i4j5k6l7m8n9o0")     // ~1KB config - placeholder
+        ModelFile("conv_frontend.onnx", 44_148_281L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00001"),
+        ModelFile("encoder.int8.onnx", 182_491_662L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00002"),
+        ModelFile("decoder.int8.onnx", 755_914_231L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00003"),
+        ModelFile("tokenizer/vocab.json", 2_776_833L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00004"),
+        ModelFile("tokenizer/tokenizer_config.json", 12_487L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00005"),
+        ModelFile("tokenizer/merges.txt", 1_671_853L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00006")
     )
 
     // VAD model file with checksum
@@ -132,16 +135,10 @@ object ModelDownloadManager {
     const val SENSEVOICE_TOTAL_SIZE = 227_000_000L
     const val WHISPER_CANTONESE_TOTAL_SIZE = 415_000_000L  // ~395 MB (encoder + decoder + tokens + VAD)
     const val U2PP_CONFORMER_YUE_TOTAL_SIZE = 131_000_000L  // ~130 MB (CTC model + tokens + VAD)
-    const val QWEN3_ASR_TOTAL_SIZE = 703_000_000L  // ~703 MB (encoder + decoder + vocab + config + VAD)
+    const val QWEN3_ASR_TOTAL_SIZE = 987_630_000L  // conv_frontend + encoder + decoder + tokenizer/* + VAD
 
     // Legacy constant for backward compatibility
     const val TOTAL_MODEL_SIZE = SENSEVOICE_TOTAL_SIZE
-
-    // Cached latest Qwen3-ASR release URL (discovered at runtime)
-    @Volatile
-    private var cachedQwen3AsrUrl: String? = null
-    @Volatile
-    private var lastQwen3UrlCheckTime: Long = 0
 
     /**
      * Download status callback
@@ -168,7 +165,7 @@ object ModelDownloadManager {
 
         // Check version for models that track it
         val versionOk = when (modelType) {
-            VoiceModelType.WHISPER_CANTONESE, VoiceModelType.QWEN3_ASR -> {
+            VoiceModelType.WHISPER_CANTONESE -> {
                 val versionFile = File(modelDir, VERSION_FILE)
                 versionFile.exists() && versionFile.readText().trim() == getModelVersion(modelType)
             }
@@ -246,7 +243,7 @@ object ModelDownloadManager {
                     VoiceModelType.SENSE_VOICE -> SENSEVOICE_BASE_URL
                     VoiceModelType.WHISPER_CANTONESE -> getWhisperCantoneseBaseUrl()
                     VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_BASE_URL
-                    VoiceModelType.QWEN3_ASR -> getQwen3AsrBaseUrl()
+                    VoiceModelType.QWEN3_ASR -> QWEN3_ASR_BASE_URL
                 }
 
                 val totalSize = when (modelType) {
@@ -256,23 +253,20 @@ object ModelDownloadManager {
                     VoiceModelType.QWEN3_ASR -> QWEN3_ASR_TOTAL_SIZE
                 }
 
-                // Check if model version is outdated and needs re-download
-                // For Whisper and Qwen3-ASR models, extract version from the dynamically discovered URL
+                // Check if model version is outdated and needs re-download.
+                // Whisper Cantonese ships its version via the dynamically discovered
+                // GitHub release tag; other models are pinned by URL/model dir.
                 val currentVersion = when (modelType) {
                     VoiceModelType.WHISPER_CANTONESE -> {
                         // Extract version from URL (e.g., "whisper-cantonese-v5" -> "v5")
                         baseUrl.substringAfterLast("/").removePrefix(WHISPER_CANTONESE_TAG_PREFIX)
                     }
                     VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_VERSION
-                    VoiceModelType.QWEN3_ASR -> {
-                        // Extract version from URL (e.g., "qwen3-asr-v1" -> "v1")
-                        baseUrl.substringAfterLast("/").removePrefix(QWEN3_ASR_TAG_PREFIX)
-                    }
                     else -> ""
                 }
 
                 val needsUpdate = when (modelType) {
-                    VoiceModelType.WHISPER_CANTONESE, VoiceModelType.QWEN3_ASR -> {
+                    VoiceModelType.WHISPER_CANTONESE -> {
                         val versionFile = File(modelDir, VERSION_FILE)
                         !versionFile.exists() || versionFile.readText().trim() != currentVersion
                     }
@@ -340,8 +334,7 @@ object ModelDownloadManager {
                 // Write version file for models that track it
                 when (modelType) {
                     VoiceModelType.WHISPER_CANTONESE,
-                    VoiceModelType.U2PP_CONFORMER_YUE,
-                    VoiceModelType.QWEN3_ASR -> {
+                    VoiceModelType.U2PP_CONFORMER_YUE -> {
                         val versionFile = File(modelDir, VERSION_FILE)
                         versionFile.writeText(currentVersion)
                         if (BuildConfig.DEBUG) {
@@ -446,57 +439,6 @@ object ModelDownloadManager {
     }
 
     /**
-     * Get the latest Qwen3-ASR release URL from GitHub API.
-     * Falls back to hardcoded URL if API is unavailable.
-     */
-    private fun getQwen3AsrBaseUrl(): String {
-        val now = System.currentTimeMillis()
-        cachedQwen3AsrUrl?.let { cached ->
-            if (now - lastQwen3UrlCheckTime < URL_CACHE_TTL) {
-                return cached
-            }
-        }
-
-        try {
-            val url = URL(GITHUB_RELEASES_API)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-            connection.requestMethod = "GET"
-            connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
-            connection.setRequestProperty("User-Agent", "DualQuickIME/1.0")
-
-            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                val response = connection.inputStream.bufferedReader().readText()
-
-                val tagPattern = """"tag_name"\s*:\s*"($QWEN3_ASR_TAG_PREFIX[^"]+)"""".toRegex()
-                val latestTag = tagPattern.findAll(response)
-                    .map { it.groupValues[1] }
-                    .filter { it.startsWith(QWEN3_ASR_TAG_PREFIX) }
-                    .maxByOrNull { tag ->
-                        tag.removePrefix(QWEN3_ASR_TAG_PREFIX).removePrefix("v").toIntOrNull() ?: 0
-                    }
-
-                if (latestTag != null) {
-                    val discoveredUrl = "https://github.com/awcjack/DualQuickIME/releases/download/$latestTag"
-                    if (BuildConfig.DEBUG) {
-                        Log.i(TAG, "Discovered latest Qwen3-ASR release: $latestTag")
-                    }
-                    cachedQwen3AsrUrl = discoveredUrl
-                    lastQwen3UrlCheckTime = now
-                    return discoveredUrl
-                }
-            }
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) {
-                Log.w(TAG, "Failed to fetch Qwen3-ASR release from GitHub API: ${e.message}")
-            }
-        }
-
-        return QWEN3_ASR_FALLBACK_URL
-    }
-
-    /**
      * Calculate SHA-256 checksum of a file.
      */
     private fun calculateSha256(file: File): String {
@@ -572,6 +514,11 @@ object ModelDownloadManager {
         callback: DownloadCallback
     ): Long {
         var totalDownloaded = currentTotal
+
+        // Ensure the parent directory exists. Required for nested paths like
+        // "tokenizer/merges.txt" where the immediate parent is a subdir of modelDir
+        // that the caller's single mkdirs() did not create.
+        targetFile.parentFile?.mkdirs()
 
         val url = URL(urlString)
         val connection = url.openConnection() as HttpURLConnection

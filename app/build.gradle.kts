@@ -105,10 +105,6 @@ dependencies {
     // Only included in the full flavor
     "fullImplementation"(files("libs/sherpa-onnx-1.12.34.aar"))
 
-    // ONNX Runtime for Android - used for Qwen3-ASR inference
-    // Qwen3-ASR uses a custom LLM-based architecture not supported by Sherpa-ONNX
-    "fullImplementation"("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
-
     // OpenCC for Simplified to Traditional Chinese conversion
     // Pure Java library, no JNI needed - used for voice input post-processing
     "fullImplementation"("io.github.laisuk:openccjava:1.2.0")

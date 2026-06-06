@@ -15,14 +15,14 @@ import java.io.File
 import kotlin.concurrent.thread
 
 /**
- * Manages voice input using Sherpa-ONNX (SenseVoice, Whisper, U2pp) and
- * ONNX Runtime (Qwen3-ASR) for offline speech recognition.
+ * Manages voice input using Sherpa-ONNX for offline speech recognition.
  *
  * Supported models:
  * - SenseVoice: Multilingual (Cantonese, Mandarin, English, Japanese, Korean)
  * - Whisper Cantonese: Optimized for Cantonese (7.93% CER)
  * - U2pp-Conformer-Yue: Best accuracy-to-size ratio (5.05% MER)
- * - Qwen3-ASR: Best Cantonese accuracy (~4.12% WER), Cantonese-English code-switching
+ * - Qwen3-ASR: Best Cantonese accuracy (~4.12% WER) via Sherpa-ONNX
+ *   prebuilt INT8 export (PR #3409); autoregressive decode, higher latency.
  *
  * Uses Silero VAD for voice activity detection (shared across all models).
  */
@@ -50,6 +50,12 @@ class VoiceInputManager(private val context: Context) {
         // U2pp-Conformer-Yue model files (CTC architecture)
         private const val U2PP_CONFORMER_MODEL_FILE = "model.int8.onnx"
         private const val U2PP_CONFORMER_TOKENS_FILE = "tokens.txt"
+
+        // Qwen3-ASR model files (Sherpa-ONNX prebuilt INT8 export, PR #3409)
+        private const val QWEN3_ASR_CONV_FRONTEND_FILE = "conv_frontend.onnx"
+        private const val QWEN3_ASR_ENCODER_FILE = "encoder.int8.onnx"
+        private const val QWEN3_ASR_DECODER_FILE = "decoder.int8.onnx"
+        private const val QWEN3_ASR_TOKENIZER_DIR = "tokenizer"
 
         // Punctuation conversion map (spoken words to symbols)
         // Supports Cantonese, Mandarin and English
@@ -186,11 +192,8 @@ class VoiceInputManager(private val context: Context) {
     // Current model type
     private var currentModelType: VoiceModelType = VoiceModelType.DEFAULT
 
-    // Sherpa-ONNX recognizer (SenseVoice, Whisper, U2pp-Conformer)
+    // Sherpa-ONNX recognizer (used for every supported model type)
     private var recognizer: OfflineRecognizer? = null
-
-    // Qwen3-ASR helper (ONNX Runtime — used instead of recognizer for QWEN3_ASR)
-    private var qwen3Helper: Qwen3AsrHelper? = null
 
     // Silero VAD (shared across all model types via Sherpa-ONNX)
     private var vad: Vad? = null
@@ -307,17 +310,11 @@ class VoiceInputManager(private val context: Context) {
             vad = Vad(config = vadConfig)
 
             // Initialize the appropriate recognizer based on model type
-            when (currentModelType) {
-                VoiceModelType.SENSE_VOICE -> recognizer = initSenseVoiceRecognizer(modelDir)
-                VoiceModelType.WHISPER_CANTONESE -> recognizer = initWhisperRecognizer(modelDir)
-                VoiceModelType.U2PP_CONFORMER_YUE -> recognizer = initU2ppConformerRecognizer(modelDir)
-                VoiceModelType.QWEN3_ASR -> {
-                    val helper = Qwen3AsrHelper(context, modelDir)
-                    if (!helper.initialize()) {
-                        throw RuntimeException("Failed to initialize Qwen3-ASR model")
-                    }
-                    qwen3Helper = helper
-                }
+            recognizer = when (currentModelType) {
+                VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
+                VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
+                VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
+                VoiceModelType.QWEN3_ASR -> initQwen3AsrRecognizer(modelDir)
             }
 
             isInitialized = true
@@ -407,6 +404,46 @@ class VoiceInputManager(private val context: Context) {
             wenetCtc = wenetConfig,
             tokens = "$modelDir/$U2PP_CONFORMER_TOKENS_FILE",
             numThreads = 2,
+            debug = false
+        )
+
+        val config = OfflineRecognizerConfig(
+            modelConfig = modelConfig,
+            decodingMethod = "greedy_search"
+        )
+
+        return OfflineRecognizer(config = config)
+    }
+
+    /**
+     * Initialize Qwen3-ASR recognizer.
+     *
+     * Backed by Sherpa-ONNX's prebuilt INT8 export
+     * (sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25, PR #3409): a 3-stage
+     * pipeline of conv_frontend → AuT audio encoder → Qwen3 LLM decoder with
+     * KV-cache. `tokens` is intentionally empty — Qwen3-ASR carries its
+     * tokenizer files under the `tokenizer/` directory specified in the
+     * sub-config. Per-call generation knobs (maxTotalLen=512, maxNewTokens=128,
+     * temperature=1e-6, topP=0.8, seed=42) use the upstream defaults; greedy
+     * decoding is implicit via the tiny temperature.
+     *
+     * Latency note: autoregressive decode means transcription is several×
+     * slower than CTC models on mobile CPUs — usable for tap-and-wait but
+     * not real-time dictation. Use this model only when Cantonese accuracy
+     * is worth the wait.
+     */
+    private fun initQwen3AsrRecognizer(modelDir: String): OfflineRecognizer {
+        val qwen3Config = OfflineQwen3AsrModelConfig(
+            convFrontend = "$modelDir/$QWEN3_ASR_CONV_FRONTEND_FILE",
+            encoder = "$modelDir/$QWEN3_ASR_ENCODER_FILE",
+            decoder = "$modelDir/$QWEN3_ASR_DECODER_FILE",
+            tokenizer = "$modelDir/$QWEN3_ASR_TOKENIZER_DIR"
+        )
+
+        val modelConfig = OfflineModelConfig(
+            qwen3Asr = qwen3Config,
+            tokens = "",  // Qwen3-ASR carries its own tokenizer dir, no separate tokens file
+            numThreads = 3,
             debug = false
         )
 
@@ -536,8 +573,6 @@ class VoiceInputManager(private val context: Context) {
         stopRecording()
         recognizer?.release()
         recognizer = null
-        qwen3Helper?.release()
-        qwen3Helper = null
         vad?.release()
         vad = null
         openccConverter = null
@@ -653,32 +688,17 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Recognize a single VAD speech segment using the current model.
-     * Returns empty string if recognition fails or produces no output.
+     * Recognize a single VAD speech segment using the current Sherpa-ONNX
+     * recognizer. Returns empty string if no recognizer is active.
      */
     private fun recognizeSegment(samples: FloatArray): String {
-        return when (currentModelType) {
-            VoiceModelType.QWEN3_ASR -> {
-                try {
-                    qwen3Helper?.transcribe(samples) ?: ""
-                } catch (e: Exception) {
-                    if (BuildConfig.DEBUG) {
-                        Log.e(TAG, "Qwen3-ASR transcription error: ${e.message}", e)
-                    }
-                    onErrorCallback?.invoke("Qwen3-ASR error: ${e.message}")
-                    ""
-                }
-            }
-            else -> {
-                val rec = recognizer ?: return ""
-                val stream = rec.createStream()
-                stream.acceptWaveform(samples, SAMPLE_RATE)
-                rec.decode(stream)
-                val result = rec.getResult(stream)
-                stream.release()
-                result.text.trim()
-            }
-        }
+        val rec = recognizer ?: return ""
+        val stream = rec.createStream()
+        stream.acceptWaveform(samples, SAMPLE_RATE)
+        rec.decode(stream)
+        val result = rec.getResult(stream)
+        stream.release()
+        return result.text.trim()
     }
 
     /**
@@ -771,7 +791,6 @@ class VoiceInputManager(private val context: Context) {
 
     /**
      * Process audio using VAD for endpoint detection and the selected model for transcription.
-     * All model types (Sherpa-ONNX and Qwen3-ASR) share the same VAD pipeline.
      */
     private fun processAudioWithVad() {
         val vadInstance = vad ?: return
