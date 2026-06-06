@@ -30,6 +30,22 @@ enum class VoiceModelType(
         modelDir = "",
         sizeBytes = 0L,
         sizeDisplayMB = 0
+    ),
+    U2PP_CONFORMER_YUE(
+        id = "u2pp_conformer_yue",
+        displayNameResId = R.string.voice_model_u2pp_conformer_yue_name,
+        descriptionResId = R.string.voice_model_u2pp_conformer_yue_desc,
+        modelDir = "",
+        sizeBytes = 0L,
+        sizeDisplayMB = 0
+    ),
+    QWEN3_ASR(
+        id = "qwen3_asr",
+        displayNameResId = R.string.voice_model_qwen3_asr_name,
+        descriptionResId = R.string.voice_model_qwen3_asr_desc,
+        modelDir = "",
+        sizeBytes = 0L,
+        sizeDisplayMB = 0
     );
 
     companion object {

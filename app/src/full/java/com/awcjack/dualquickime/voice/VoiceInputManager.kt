@@ -15,13 +15,16 @@ import java.io.File
 import kotlin.concurrent.thread
 
 /**
- * Manages voice input using Sherpa-ONNX for offline speech recognition.
- * Supports multiple model types:
- * - SenseVoice: Multilingual (Cantonese, Mandarin, English, Japanese, Korean)
- * - Whisper Cantonese: Optimized for Cantonese with 7.93% CER
- * - U2pp-Conformer-Yue: Best accuracy-to-size ratio (130M params, 5.05% MER)
+ * Manages voice input using Sherpa-ONNX (SenseVoice, Whisper, U2pp) and
+ * ONNX Runtime (Qwen3-ASR) for offline speech recognition.
  *
- * Uses Silero VAD for voice activity detection (simulated streaming).
+ * Supported models:
+ * - SenseVoice: Multilingual (Cantonese, Mandarin, English, Japanese, Korean)
+ * - Whisper Cantonese: Optimized for Cantonese (7.93% CER)
+ * - U2pp-Conformer-Yue: Best accuracy-to-size ratio (5.05% MER)
+ * - Qwen3-ASR: Best Cantonese accuracy (~4.12% WER), Cantonese-English code-switching
+ *
+ * Uses Silero VAD for voice activity detection (shared across all models).
  */
 class VoiceInputManager(private val context: Context) {
 
@@ -183,10 +186,13 @@ class VoiceInputManager(private val context: Context) {
     // Current model type
     private var currentModelType: VoiceModelType = VoiceModelType.DEFAULT
 
-    // Offline recognizer (SenseVoice or Whisper)
+    // Sherpa-ONNX recognizer (SenseVoice, Whisper, U2pp-Conformer)
     private var recognizer: OfflineRecognizer? = null
 
-    // Silero VAD
+    // Qwen3-ASR helper (ONNX Runtime — used instead of recognizer for QWEN3_ASR)
+    private var qwen3Helper: Qwen3AsrHelper? = null
+
+    // Silero VAD (shared across all model types via Sherpa-ONNX)
     private var vad: Vad? = null
 
     // OpenCC converter for Simplified to Traditional Chinese (Hong Kong variant)
@@ -301,10 +307,17 @@ class VoiceInputManager(private val context: Context) {
             vad = Vad(config = vadConfig)
 
             // Initialize the appropriate recognizer based on model type
-            recognizer = when (currentModelType) {
-                VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
-                VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
-                VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
+            when (currentModelType) {
+                VoiceModelType.SENSE_VOICE -> recognizer = initSenseVoiceRecognizer(modelDir)
+                VoiceModelType.WHISPER_CANTONESE -> recognizer = initWhisperRecognizer(modelDir)
+                VoiceModelType.U2PP_CONFORMER_YUE -> recognizer = initU2ppConformerRecognizer(modelDir)
+                VoiceModelType.QWEN3_ASR -> {
+                    val helper = Qwen3AsrHelper(context, modelDir)
+                    if (!helper.initialize()) {
+                        throw RuntimeException("Failed to initialize Qwen3-ASR model")
+                    }
+                    qwen3Helper = helper
+                }
             }
 
             isInitialized = true
@@ -523,6 +536,8 @@ class VoiceInputManager(private val context: Context) {
         stopRecording()
         recognizer?.release()
         recognizer = null
+        qwen3Helper?.release()
+        qwen3Helper = null
         vad?.release()
         vad = null
         openccConverter = null
@@ -621,7 +636,8 @@ class VoiceInputManager(private val context: Context) {
         // Strip Whisper special tokens (e.g., <|transcribe|>, <|notimestamps|>, <|en|>, etc.)
         var cleaned = stripWhisperTokens(text)
 
-        // For Whisper models, remove repetition patterns (a known Whisper issue)
+        // For Whisper models only, remove repetition patterns (a known Whisper hallucination issue)
+        // Qwen3-ASR and conformer-based models do not exhibit this behavior
         if (currentModelType == VoiceModelType.WHISPER_CANTONESE) {
             cleaned = removeRepetition(cleaned)
         }
@@ -634,6 +650,35 @@ class VoiceInputManager(private val context: Context) {
 
         // Then convert spoken punctuation to symbols
         return convertPunctuation(processed)
+    }
+
+    /**
+     * Recognize a single VAD speech segment using the current model.
+     * Returns empty string if recognition fails or produces no output.
+     */
+    private fun recognizeSegment(samples: FloatArray): String {
+        return when (currentModelType) {
+            VoiceModelType.QWEN3_ASR -> {
+                try {
+                    qwen3Helper?.transcribe(samples) ?: ""
+                } catch (e: Exception) {
+                    if (BuildConfig.DEBUG) {
+                        Log.e(TAG, "Qwen3-ASR transcription error: ${e.message}", e)
+                    }
+                    onErrorCallback?.invoke("Qwen3-ASR error: ${e.message}")
+                    ""
+                }
+            }
+            else -> {
+                val rec = recognizer ?: return ""
+                val stream = rec.createStream()
+                stream.acceptWaveform(samples, SAMPLE_RATE)
+                rec.decode(stream)
+                val result = rec.getResult(stream)
+                stream.release()
+                result.text.trim()
+            }
+        }
     }
 
     /**
@@ -726,9 +771,9 @@ class VoiceInputManager(private val context: Context) {
 
     /**
      * Process audio using VAD for endpoint detection and the selected model for transcription.
+     * All model types (Sherpa-ONNX and Qwen3-ASR) share the same VAD pipeline.
      */
     private fun processAudioWithVad() {
-        val rec = recognizer ?: return
         val vadInstance = vad ?: return
 
         val bufferSize = 512  // Process in small chunks for responsive VAD
@@ -739,105 +784,31 @@ class VoiceInputManager(private val context: Context) {
                 val ret = audioRecord?.read(buffer, 0, buffer.size) ?: -1
 
                 if (ret > 0) {
-                    // Convert 16-bit PCM to float
                     val samples = FloatArray(ret) { buffer[it] / 32768.0f }
-
-                    // Feed samples to VAD
                     vadInstance.acceptWaveform(samples)
 
-                    // Check if VAD detected speech segments
                     while (!vadInstance.empty()) {
                         val segment = vadInstance.front()
                         vadInstance.pop()
 
-                        // Transcribe the speech segment
                         val segmentSamples = segment.samples
                         if (BuildConfig.DEBUG) {
                             Log.d(TAG, "VAD segment: ${segmentSamples.size} samples (${segmentSamples.size / SAMPLE_RATE.toFloat()}s)")
                         }
                         if (segmentSamples.isNotEmpty()) {
-                            val stream = rec.createStream()
-                            stream.acceptWaveform(segmentSamples, SAMPLE_RATE)
-                            rec.decode(stream)
-
-                            val result = rec.getResult(stream)
-                            var text = result.text.trim()
-                            // Note: Raw recognition results may contain sensitive user speech
-                            // Do NOT log the actual text content in production
-
-                            if (text.isNotEmpty()) {
-                                // Process text: convert to traditional Chinese and replace punctuation
-                                text = processRecognizedText(text)
-                                // Note: Processed text may contain sensitive user speech
-                                // Do NOT log the actual text content in production
-
-                                // Skip if this segment produced the same text as the previous one
-                                // (VAD might be sending duplicate segments)
-                                if (text == lastSegmentText) {
-                                    if (BuildConfig.DEBUG) {
-                                        Log.w(TAG, "Skipping duplicate segment")
-                                    }
-                                    stream.release()
-                                    continue
-                                }
-                                lastSegmentText = text
-
-                                // Append to accumulated text
-                                if (accumulatedText.isNotEmpty()) {
-                                    accumulatedText.append(" ")
-                                }
-                                accumulatedText.append(text)
-
-                                lastRecognizedText = accumulatedText.toString()
-                                // Note: Accumulated text may contain sensitive user speech
-                                // Do NOT log the actual text content in production
-                                onResultCallback?.invoke(lastRecognizedText, true)
-                            }
-
-                            stream.release()
+                            handleSegment(segmentSamples)
                         }
                     }
                 }
             }
 
-            // Process any remaining audio in VAD buffer when stopping
+            // Flush remaining audio in VAD buffer on stop
             vadInstance.flush()
             while (!vadInstance.empty()) {
                 val segment = vadInstance.front()
                 vadInstance.pop()
-
-                val segmentSamples = segment.samples
-                if (segmentSamples.isNotEmpty()) {
-                    val stream = rec.createStream()
-                    stream.acceptWaveform(segmentSamples, SAMPLE_RATE)
-                    rec.decode(stream)
-
-                    val result = rec.getResult(stream)
-                    var text = result.text.trim()
-
-                    if (text.isNotEmpty()) {
-                        text = processRecognizedText(text)
-
-                        // Skip duplicate segments
-                        if (text == lastSegmentText) {
-                            if (BuildConfig.DEBUG) {
-                                Log.w(TAG, "Skipping duplicate flush segment")
-                            }
-                            stream.release()
-                            continue
-                        }
-                        lastSegmentText = text
-
-                        if (accumulatedText.isNotEmpty()) {
-                            accumulatedText.append(" ")
-                        }
-                        accumulatedText.append(text)
-
-                        lastRecognizedText = accumulatedText.toString()
-                        onResultCallback?.invoke(lastRecognizedText, true)
-                    }
-
-                    stream.release()
+                if (segment.samples.isNotEmpty()) {
+                    handleSegment(segment.samples)
                 }
             }
 
@@ -847,5 +818,29 @@ class VoiceInputManager(private val context: Context) {
             }
             onErrorCallback?.invoke("Error processing audio: ${e.message}")
         }
+    }
+
+    /**
+     * Transcribe one VAD speech segment and append the result to accumulatedText.
+     */
+    private fun handleSegment(segmentSamples: FloatArray) {
+        var text = recognizeSegment(segmentSamples)
+        if (text.isEmpty()) return
+
+        text = processRecognizedText(text)
+        if (text.isEmpty()) return
+
+        // Skip VAD duplicate segments
+        if (text == lastSegmentText) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "Skipping duplicate segment")
+            return
+        }
+        lastSegmentText = text
+
+        if (accumulatedText.isNotEmpty()) accumulatedText.append(" ")
+        accumulatedText.append(text)
+
+        lastRecognizedText = accumulatedText.toString()
+        onResultCallback?.invoke(lastRecognizedText, true)
     }
 }

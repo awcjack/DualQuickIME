@@ -57,6 +57,23 @@ enum class VoiceModelType(
         sizeBytes = 260_000_000L,  // ~130M parameters = ~260MB model files (int8)
         sizeDisplayMB = 260,
         isAvailable = true
+    ),
+
+    /**
+     * Qwen3-ASR - Alibaba's LLM-based ASR model, best Cantonese accuracy.
+     * WER on Cantonese: 4.12% (vs Whisper 7.93% CER, U2pp 5.05% MER).
+     * Native Cantonese-English code-switching support.
+     * Uses Qwen3-ASR-0.6B (encoder + LLM decoder) via ONNX Runtime.
+     * Note: ~710 MB download. 1.7B variant is available but too large for mobile.
+     */
+    QWEN3_ASR(
+        id = "qwen3_asr",
+        displayNameResId = com.awcjack.dualquickime.R.string.voice_model_qwen3_asr_name,
+        descriptionResId = com.awcjack.dualquickime.R.string.voice_model_qwen3_asr_desc,
+        modelDir = "qwen3-asr-0.6b-int8",
+        sizeBytes = 710_000_000L,  // encoder ~100MB + decoder ~600MB + vocab/config ~5MB
+        sizeDisplayMB = 710,
+        isAvailable = true
     );
 
     companion object {
