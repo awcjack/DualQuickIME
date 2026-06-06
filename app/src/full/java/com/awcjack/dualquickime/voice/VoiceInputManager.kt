@@ -236,6 +236,11 @@ class VoiceInputManager(private val context: Context) {
 
     private var onResultCallback: ((String, Boolean) -> Unit)? = null
     private var onErrorCallback: ((String) -> Unit)? = null
+    // Fires (true) when a segment decode starts, (false) when it ends.
+    // The IME UI uses this to show a "Transcribing…" state between the user
+    // releasing the mic and the result arriving — essential for Qwen3-ASR
+    // where a 5–10 s blocking decode otherwise looks like a frozen keyboard.
+    private var onProcessingStateCallback: ((Boolean) -> Unit)? = null
 
     // Track the last recognized text for committing when stopped manually
     @Volatile
@@ -661,6 +666,17 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
+     * Set callback for segment decode state. Receives true when a segment
+     * decode begins and false when it ends. Use to show a "Transcribing…"
+     * indicator in the IME UI between speech-end and final text — Sherpa-ONNX
+     * has no token-level streaming for Qwen3-ASR, so this is the best signal
+     * available to keep the user informed during the 5–10 s decoder wait.
+     */
+    fun setOnProcessingStateListener(callback: (Boolean) -> Unit) {
+        onProcessingStateCallback = callback
+    }
+
+    /**
      * Start voice recording and recognition.
      * @return true if started successfully
      */
@@ -896,18 +912,26 @@ class VoiceInputManager(private val context: Context) {
      * recognizer. Returns empty string if no recognizer is active.
      *
      * Snapshots the recognizer reference under the lock so we don't crash
-     * if the idle releaser nulls it out mid-call.
+     * if the idle releaser nulls it out mid-call. Brackets the blocking
+     * decode with a (true)/(false) signal on the processing-state callback
+     * so the IME can show "Transcribing…" while Qwen3-ASR chews through
+     * the autoregressive decoder.
      */
     private fun recognizeSegment(samples: FloatArray): String {
         val rec = synchronized(recognizerLock) { recognizer } ?: return ""
         markActivity()
-        val stream = rec.createStream()
-        stream.acceptWaveform(samples, SAMPLE_RATE)
-        rec.decode(stream)
-        val result = rec.getResult(stream)
-        stream.release()
-        markActivity()
-        return result.text.trim()
+        onProcessingStateCallback?.invoke(true)
+        try {
+            val stream = rec.createStream()
+            stream.acceptWaveform(samples, SAMPLE_RATE)
+            rec.decode(stream)
+            val result = rec.getResult(stream)
+            stream.release()
+            markActivity()
+            return result.text.trim()
+        } finally {
+            onProcessingStateCallback?.invoke(false)
+        }
     }
 
     /**
