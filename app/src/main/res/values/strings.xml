@@ -119,4 +119,6 @@
     <string name="voice_model_whisper_cantonese_desc">Optimized for Cantonese (7.93% CER) with HK English support</string>
     <string name="voice_model_u2pp_conformer_yue_name">U2pp-Conformer Yue</string>
     <string name="voice_model_u2pp_conformer_yue_desc">Best accuracy-to-size ratio (5.05% MER, 130M params) - Recommended</string>
+    <string name="voice_model_qwen3_asr_name">Qwen3-ASR (Best Cantonese)</string>
+    <string name="voice_model_qwen3_asr_desc">Highest accuracy for Cantonese (~4.12% WER) with Cantonese-English mixing. 710 MB download.</string>
 </resources>
