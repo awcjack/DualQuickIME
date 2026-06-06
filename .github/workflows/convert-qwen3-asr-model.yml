@@ -34,7 +34,12 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install transformers accelerate onnx onnxruntime optimum
+          # Qwen3-ASR uses model_type=qwen3_asr which is only recognized by
+          # transformers from source (or a release that postdates the Qwen3-ASR
+          # merge). Pinning to main keeps the workflow runnable even after a
+          # breaking change lands.
+          pip install "transformers @ git+https://github.com/huggingface/transformers.git@main"
+          pip install accelerate onnx onnxruntime optimum
           # Install qwen-asr if available, otherwise fall back to transformers
           pip install qwen-asr || echo "qwen-asr not available, using transformers with trust_remote_code"
 
