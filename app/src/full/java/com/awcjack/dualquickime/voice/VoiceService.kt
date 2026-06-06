@@ -6,6 +6,8 @@ import android.os.IBinder
 import android.util.Log
 import com.awcjack.dualquickime.BuildConfig
 import com.k2fsa.sherpa.onnx.*
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * Bound Service that owns the Qwen3-ASR Sherpa-ONNX recognizer and runs in
@@ -79,13 +81,17 @@ class VoiceService : Service() {
             }
         }
 
-        override fun transcribe(samples: ShortArray): String {
+        override fun transcribe(pcm16le: ByteArray): String {
             val rec = synchronized(recognizerLock) { recognizer } ?: return ""
             return try {
-                // Re-expand int16 PCM back to the float range Sherpa-ONNX wants.
-                // The round-trip is lossless at int16 precision (the source was
-                // int16 from AudioRecord), so accuracy is unaffected.
-                val floats = FloatArray(samples.size) { samples[it] / 32768.0f }
+                // Unpack little-endian int16 bytes back to the float range
+                // Sherpa-ONNX wants. The IME packed these from its existing
+                // int16 AudioRecord samples, so the round-trip is lossless.
+                val sampleCount = pcm16le.size / 2
+                val shortBuf = ByteBuffer.wrap(pcm16le)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .asShortBuffer()
+                val floats = FloatArray(sampleCount) { shortBuf.get(it) / 32768.0f }
                 val stream = rec.createStream()
                 stream.acceptWaveform(floats, SAMPLE_RATE)
                 rec.decode(stream)

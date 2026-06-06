@@ -16,6 +16,8 @@ import com.awcjack.dualquickime.BuildConfig
 import com.k2fsa.sherpa.onnx.*
 import openccjava.OpenCC
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -1024,14 +1026,22 @@ class VoiceInputManager(private val context: Context) {
         try {
             if (usesOutOfProcessRecognizer()) {
                 val binder = voiceServiceBinder ?: return ""
-                // Float32 → int16 round-trip halves the IPC payload. The
-                // original audio came from AudioRecord as int16 anyway, so
-                // this is lossless at the sample bit depth.
-                val shorts = ShortArray(samples.size) { i ->
-                    (samples[i] * 32768.0f).toInt().coerceIn(-32768, 32767).toShort()
+                // Float32 → int16 little-endian byte[] round-trip halves the
+                // IPC payload (1.92 MB → 960 KB for a 30 s segment, fitting
+                // under the ~1 MB Binder transaction cap). AIDL doesn't
+                // support short[], so we pack manually. The original audio
+                // came from AudioRecord as int16 anyway, so this is lossless
+                // at the sample bit depth.
+                val pcm = ByteArray(samples.size * 2)
+                val shortBuf = ByteBuffer.wrap(pcm)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .asShortBuffer()
+                for (i in samples.indices) {
+                    val s = (samples[i] * 32768.0f).toInt().coerceIn(-32768, 32767).toShort()
+                    shortBuf.put(i, s)
                 }
                 val text = try {
-                    binder.transcribe(shorts)
+                    binder.transcribe(pcm)
                 } catch (e: Exception) {
                     if (BuildConfig.DEBUG) Log.e(TAG, "Remote transcribe() threw: ${e.message}", e)
                     ""
