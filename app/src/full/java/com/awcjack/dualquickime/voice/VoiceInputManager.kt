@@ -12,6 +12,7 @@ import com.awcjack.dualquickime.BuildConfig
 import com.k2fsa.sherpa.onnx.*
 import openccjava.OpenCC
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
@@ -56,6 +57,15 @@ class VoiceInputManager(private val context: Context) {
         private const val QWEN3_ASR_ENCODER_FILE = "encoder.int8.onnx"
         private const val QWEN3_ASR_DECODER_FILE = "decoder.int8.onnx"
         private const val QWEN3_ASR_TOKENIZER_DIR = "tokenizer"
+
+        // Memory-pressure guards for the 700 MB Qwen3-ASR recognizer.
+        // Release the model after this many ms of recording idle so the IME
+        // process doesn't sit on a gigabyte of weights while the user is
+        // typing normally. The next mic tap pays a ~1–2 s reload cost.
+        private const val QWEN3_ASR_IDLE_RELEASE_MS = 30_000L
+        // How often the idle monitor thread wakes to check. Coarse-grained to
+        // avoid burning battery on a tight loop.
+        private const val IDLE_CHECK_INTERVAL_MS = 5_000L
 
         // Punctuation conversion map (spoken words to symbols)
         // Supports Cantonese, Mandarin and English
@@ -211,6 +221,19 @@ class VoiceInputManager(private val context: Context) {
     @Volatile
     private var isInitialized = false
 
+    // Wall-clock of the last user-visible voice activity. Drives idle release
+    // of the Qwen3-ASR recognizer so the IME doesn't hold ~700 MB resident
+    // between sessions. Updated on init, start/stop recording, and segment
+    // recognition.
+    @Volatile
+    private var lastActivityMillis: Long = 0L
+
+    private var idleReleaseThread: Thread? = null
+    private val idleReleaseActive = AtomicBoolean(false)
+    // Guards the recognizer field across the lazy-reload path and the idle
+    // releaser thread — both can flip it between null and non-null.
+    private val recognizerLock = Any()
+
     private var onResultCallback: ((String, Boolean) -> Unit)? = null
     private var onErrorCallback: ((String) -> Unit)? = null
 
@@ -322,6 +345,9 @@ class VoiceInputManager(private val context: Context) {
             warmUpRecognizer()
 
             isInitialized = true
+            markActivity()
+            // Idle releaser is a no-op for non-Qwen3-ASR models.
+            startIdleReleaseMonitor()
             if (BuildConfig.DEBUG) {
                 Log.i(TAG, "${currentModelType.id} recognizer initialized successfully")
             }
@@ -469,6 +495,121 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
+     * Whether the current model is heavy enough to warrant idle release.
+     * Only Qwen3-ASR qualifies — the other recognizers are <400 MB resident
+     * and the reload cost would outweigh the memory savings.
+     */
+    private fun usesIdleRelease(): Boolean = currentModelType == VoiceModelType.QWEN3_ASR
+
+    /**
+     * Mark the recognizer as freshly used. Resets the idle clock so the
+     * background releaser holds onto the model for at least
+     * QWEN3_ASR_IDLE_RELEASE_MS more.
+     */
+    private fun markActivity() {
+        lastActivityMillis = System.currentTimeMillis()
+    }
+
+    /**
+     * Start the background thread that releases the Qwen3-ASR recognizer
+     * after [QWEN3_ASR_IDLE_RELEASE_MS] of no voice activity. No-op for
+     * lighter models. Idempotent.
+     */
+    private fun startIdleReleaseMonitor() {
+        if (!usesIdleRelease()) return
+        if (!idleReleaseActive.compareAndSet(false, true)) return
+
+        idleReleaseThread = thread(name = "VoiceIdleReleaseThread") {
+            try {
+                while (idleReleaseActive.get()) {
+                    try {
+                        Thread.sleep(IDLE_CHECK_INTERVAL_MS)
+                    } catch (e: InterruptedException) {
+                        break
+                    }
+
+                    val now = System.currentTimeMillis()
+                    val idleFor = now - lastActivityMillis
+                    val canRelease = idleFor >= QWEN3_ASR_IDLE_RELEASE_MS &&
+                        !isRecording &&
+                        synchronized(recognizerLock) { recognizer != null }
+
+                    if (canRelease) {
+                        if (BuildConfig.DEBUG) {
+                            Log.i(TAG, "Qwen3-ASR idle for ${idleFor}ms; releasing recognizer to free ~700 MB")
+                        }
+                        releaseRecognizerOnly()
+                        // Keep the monitor running. The next mic tap triggers a lazy
+                        // reload which will arm us again via markActivity().
+                    }
+                }
+            } finally {
+                idleReleaseActive.set(false)
+            }
+        }
+    }
+
+    /**
+     * Stop the idle release monitor. Called on full release.
+     */
+    private fun stopIdleReleaseMonitor() {
+        idleReleaseActive.set(false)
+        idleReleaseThread?.interrupt()
+        idleReleaseThread = null
+    }
+
+    /**
+     * Release only the recognizer (the heavy ~700 MB component), keeping
+     * VAD, OpenCC and audio recording state alive. The next call to
+     * [ensureRecognizerLoaded] rebuilds it.
+     */
+    private fun releaseRecognizerOnly() {
+        synchronized(recognizerLock) {
+            try {
+                recognizer?.release()
+            } catch (e: Exception) {
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "Recognizer release threw: ${e.message}")
+                }
+            }
+            recognizer = null
+        }
+    }
+
+    /**
+     * Rebuild the recognizer after a previous idle release. Returns true if
+     * the recognizer is ready after the call. Called from [startRecording]
+     * before audio capture begins so the reload cost happens up front
+     * rather than mid-utterance.
+     */
+    private fun ensureRecognizerLoaded(): Boolean {
+        synchronized(recognizerLock) {
+            if (recognizer != null) return true
+            if (!isInitialized) return false
+
+            return try {
+                val modelDir = File(context.filesDir, currentModelType.modelDir).absolutePath
+                recognizer = when (currentModelType) {
+                    VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
+                    VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
+                    VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
+                    VoiceModelType.QWEN3_ASR -> initQwen3AsrRecognizer(modelDir)
+                }
+                warmUpRecognizer()
+                if (BuildConfig.DEBUG) {
+                    Log.i(TAG, "Recognizer reloaded after idle release")
+                }
+                true
+            } catch (e: Exception) {
+                if (BuildConfig.DEBUG) {
+                    Log.e(TAG, "Failed to reload recognizer: ${e.message}", e)
+                }
+                false
+            }
+        }
+    }
+
+    /**
      * Run one throwaway decode so the ONNX Runtime graph optimizer, weight
      * dequantization caches and KV-cache buffers are populated before the
      * user speaks. Only meaningful for Qwen3-ASR — the autoregressive
@@ -538,6 +679,15 @@ class VoiceInputManager(private val context: Context) {
             return true
         }
 
+        // If the idle releaser dropped the recognizer between sessions,
+        // rebuild + warm it before opening the mic so users aren't holding
+        // a stale handle.
+        if (!ensureRecognizerLoaded()) {
+            onErrorCallback?.invoke("Failed to reload recognizer")
+            return false
+        }
+        markActivity()
+
         try {
             val minBufferSize = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE,
@@ -605,6 +755,11 @@ class VoiceInputManager(private val context: Context) {
         recordingThread?.join(1000)
         recordingThread = null
 
+        // Bump activity so the idle releaser holds the recognizer for the
+        // QWEN3_ASR_IDLE_RELEASE_MS grace window after a session ends —
+        // long enough to cover the user immediately tapping mic again.
+        markActivity()
+
         if (BuildConfig.DEBUG) {
             Log.i(TAG, "Recording stopped")
         }
@@ -620,8 +775,8 @@ class VoiceInputManager(private val context: Context) {
      */
     fun release() {
         stopRecording()
-        recognizer?.release()
-        recognizer = null
+        stopIdleReleaseMonitor()
+        releaseRecognizerOnly()
         vad?.release()
         vad = null
         openccConverter = null
@@ -739,14 +894,19 @@ class VoiceInputManager(private val context: Context) {
     /**
      * Recognize a single VAD speech segment using the current Sherpa-ONNX
      * recognizer. Returns empty string if no recognizer is active.
+     *
+     * Snapshots the recognizer reference under the lock so we don't crash
+     * if the idle releaser nulls it out mid-call.
      */
     private fun recognizeSegment(samples: FloatArray): String {
-        val rec = recognizer ?: return ""
+        val rec = synchronized(recognizerLock) { recognizer } ?: return ""
+        markActivity()
         val stream = rec.createStream()
         stream.acceptWaveform(samples, SAMPLE_RATE)
         rec.decode(stream)
         val result = rec.getResult(stream)
         stream.release()
+        markActivity()
         return result.text.trim()
     }
 
