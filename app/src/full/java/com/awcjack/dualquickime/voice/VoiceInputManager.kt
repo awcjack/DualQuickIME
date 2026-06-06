@@ -993,6 +993,14 @@ class VoiceInputManager(private val context: Context) {
         // Strip Whisper special tokens (e.g., <|transcribe|>, <|notimestamps|>, <|en|>, etc.)
         var cleaned = stripWhisperTokens(text)
 
+        // Qwen3-ASR's raw output is `language Chinese<asr_text>actual text` —
+        // the <asr_text> literal separates the detected language label from
+        // the transcription itself. We only want the transcription, so drop
+        // everything up to and including the first <asr_text>.
+        if (currentModelType == VoiceModelType.QWEN3_ASR) {
+            cleaned = stripQwen3MetaPrefix(cleaned)
+        }
+
         // For Whisper models only, remove repetition patterns (a known Whisper hallucination issue)
         // Qwen3-ASR and conformer-based models do not exhibit this behavior
         if (currentModelType == VoiceModelType.WHISPER_CANTONESE) {
@@ -1007,6 +1015,19 @@ class VoiceInputManager(private val context: Context) {
 
         // Then convert spoken punctuation to symbols
         return convertPunctuation(processed)
+    }
+
+    /**
+     * Drop Qwen3-ASR's metadata prefix. Raw output looks like
+     * `language Chinese<asr_text>hello world` (or with newlines around the
+     * label); the upstream qwen_asr.parse_asr_output() utility splits on the
+     * first `<asr_text>` and keeps what's after it. We mirror that, and
+     * fall through unchanged if the tag is absent.
+     */
+    private fun stripQwen3MetaPrefix(text: String): String {
+        val tag = "<asr_text>"
+        val idx = text.indexOf(tag)
+        return if (idx >= 0) text.substring(idx + tag.length).trim() else text
     }
 
     /**
