@@ -317,6 +317,10 @@ class VoiceInputManager(private val context: Context) {
                 VoiceModelType.QWEN3_ASR -> initQwen3AsrRecognizer(modelDir)
             }
 
+            // Warm up Qwen3-ASR so the first real utterance isn't penalized by
+            // graph optimization + weight unpack. No-op for the lighter models.
+            warmUpRecognizer()
+
             isInitialized = true
             if (BuildConfig.DEBUG) {
                 Log.i(TAG, "${currentModelType.id} recognizer initialized successfully")
@@ -423,27 +427,36 @@ class VoiceInputManager(private val context: Context) {
      * pipeline of conv_frontend → AuT audio encoder → Qwen3 LLM decoder with
      * KV-cache. `tokens` is intentionally empty — Qwen3-ASR carries its
      * tokenizer files under the `tokenizer/` directory specified in the
-     * sub-config. Per-call generation knobs (maxTotalLen=512, maxNewTokens=128,
-     * temperature=1e-6, topP=0.8, seed=42) use the upstream defaults; greedy
-     * decoding is implicit via the tiny temperature.
+     * sub-config.
      *
-     * Latency note: autoregressive decode means transcription is several×
-     * slower than CTC models on mobile CPUs — usable for tap-and-wait but
-     * not real-time dictation. Use this model only when Cantonese accuracy
-     * is worth the wait.
+     * Speed tuning for IME use:
+     * - numThreads=4 to take advantage of the big-core cluster while voice
+     *   recording is the user's foreground task. Anything higher risks
+     *   thermal throttling and L2 contention.
+     * - maxNewTokens=80 instead of upstream's 128. Real IME utterances cap
+     *   out around 60 tokens; the tighter ceiling bounds pathological
+     *   "decoder hallucinates a long repetition" failures so the keyboard
+     *   doesn't freeze for 10+ seconds.
+     * - Temperature/topP/seed left at upstream defaults — temperature=1e-6
+     *   is effectively greedy so topP/seed are inert.
+     *
+     * Latency note: autoregressive decode means transcription is still
+     * several× slower than CTC models on mobile CPUs — usable for
+     * tap-and-wait but not real-time dictation.
      */
     private fun initQwen3AsrRecognizer(modelDir: String): OfflineRecognizer {
         val qwen3Config = OfflineQwen3AsrModelConfig(
             convFrontend = "$modelDir/$QWEN3_ASR_CONV_FRONTEND_FILE",
             encoder = "$modelDir/$QWEN3_ASR_ENCODER_FILE",
             decoder = "$modelDir/$QWEN3_ASR_DECODER_FILE",
-            tokenizer = "$modelDir/$QWEN3_ASR_TOKENIZER_DIR"
+            tokenizer = "$modelDir/$QWEN3_ASR_TOKENIZER_DIR",
+            maxNewTokens = 80
         )
 
         val modelConfig = OfflineModelConfig(
             qwen3Asr = qwen3Config,
             tokens = "",  // Qwen3-ASR carries its own tokenizer dir, no separate tokens file
-            numThreads = 3,
+            numThreads = 4,
             debug = false
         )
 
@@ -453,6 +466,42 @@ class VoiceInputManager(private val context: Context) {
         )
 
         return OfflineRecognizer(config = config)
+    }
+
+    /**
+     * Run one throwaway decode so the ONNX Runtime graph optimizer, weight
+     * dequantization caches and KV-cache buffers are populated before the
+     * user speaks. Only meaningful for Qwen3-ASR — the autoregressive
+     * decoder otherwise pays a 0.5–2 s one-time tax on the first utterance.
+     *
+     * Trade-off: this extends "Loading…" by the warmup time. For the
+     * smaller CTC models the tax is negligible, so we skip warmup for them
+     * and surface "Listening…" sooner.
+     */
+    private fun warmUpRecognizer() {
+        val rec = recognizer ?: return
+        if (currentModelType != VoiceModelType.QWEN3_ASR) return
+
+        try {
+            // 0.5 s of silence — long enough to drive a full encoder+decoder pass
+            // through the pipeline, short enough that warmup stays under ~1 s
+            // wall clock on a mid-range device.
+            val silence = FloatArray(SAMPLE_RATE / 2)
+            val stream = rec.createStream()
+            stream.acceptWaveform(silence, SAMPLE_RATE)
+            rec.decode(stream)
+            // Discard result — silence usually decodes to empty or filler tokens.
+            rec.getResult(stream)
+            stream.release()
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "Qwen3-ASR warmup complete")
+            }
+        } catch (e: Exception) {
+            // Warmup failure is non-fatal; first real utterance will pay the tax.
+            if (BuildConfig.DEBUG) {
+                Log.w(TAG, "Qwen3-ASR warmup failed (non-fatal): ${e.message}")
+            }
+        }
     }
 
     /**
