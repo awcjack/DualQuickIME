@@ -542,6 +542,28 @@ class VoiceInputManager(private val context: Context) {
         currentModelType == VoiceModelType.QWEN3_ASR
 
     /**
+     * Eagerly bind to the `:voice` process so that when the user actually
+     * taps the mic the bindService cold start (500 ms – 2 s) is already
+     * paid. Safe to call from any thread; the bind runs on a background
+     * thread internally. No-op for non-Qwen3-ASR models.
+     *
+     * The bind brings up the `:voice` process and a Binder handle, but does
+     * NOT load the 700 MB model — that still waits for [initialize] so we
+     * don't sit on the weights for a feature the user may never invoke.
+     *
+     * Idempotent: if a binding is already in place, this is a no-op.
+     */
+    fun prepareForModel(modelType: VoiceModelType) {
+        if (modelType != VoiceModelType.QWEN3_ASR) return
+        if (voiceServiceBinder != null) return
+        thread(name = "VoicePreBindThread") {
+            // bindVoiceService blocks on the connection latch but won't load
+            // the model. The latch wait is bounded by SERVICE_BIND_TIMEOUT_SEC.
+            bindVoiceService()
+        }
+    }
+
+    /**
      * Bind to the [VoiceService] in the `:voice` process and block until
      * onServiceConnected fires (or [SERVICE_BIND_TIMEOUT_SEC] expires).
      * Idempotent on an active binding.

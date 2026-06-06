@@ -251,6 +251,11 @@ class DualQuickInputMethodService : InputMethodService() {
         ClipboardHistoryManager.invalidateCache()
         RecentCandidateManager.invalidateCache()
 
+        // Pre-bind the :voice process if the user has Qwen3-ASR selected.
+        // Saves the 500 ms – 2 s bindService cold start off the mic-tap path,
+        // while still leaving the 700 MB model load lazy.
+        maybePreBindVoiceService()
+
         // Check if character set setting changed - reload if needed
         val useExtended = ThemeManager.getUseExtendedCharset(this)
         if (currentCharsetExtended != useExtended) {
@@ -958,6 +963,39 @@ class DualQuickInputMethodService : InputMethodService() {
     // a second tap queue another full init in parallel.
     @Volatile
     private var voiceStartInProgress = false
+
+    // One-shot per IME-process lifetime. Once we've kicked off a Qwen3-ASR
+    // service pre-bind we don't repeat it on every onStartInputView. Reset
+    // implicitly when the IME service is destroyed and recreated.
+    @Volatile
+    private var voiceServicePreBindAttempted = false
+
+    /**
+     * Speculatively bind the :voice process while the user is still typing,
+     * so that when they eventually tap the mic the bindService cold start
+     * (typically 0.5 – 2 s on the user-visible path) is already paid. Cheap
+     * — the bind brings up the process but doesn't load the 700 MB model.
+     *
+     * Triggered from [onStartInputView] the first time it runs in a given
+     * IME lifecycle. No-op if voice is disabled, the selected model isn't
+     * Qwen3-ASR, or the model files haven't been downloaded yet (no point
+     * spinning up a process that would have nothing to load).
+     */
+    private fun maybePreBindVoiceService() {
+        if (voiceServicePreBindAttempted) return
+        if (!ThemeManager.getVoiceInputEnabled(this)) return
+
+        val selectedModel = VoiceModelType.fromId(ThemeManager.getVoiceModelType(this))
+        if (selectedModel != VoiceModelType.QWEN3_ASR) return
+        if (!ModelDownloadManager.isModelDownloaded(this, selectedModel)) return
+
+        voiceServicePreBindAttempted = true
+
+        if (voiceInputManager == null) {
+            voiceInputManager = VoiceInputManager(this)
+        }
+        voiceInputManager?.prepareForModel(selectedModel)
+    }
 
     private fun startVoiceRecognition() {
         // Debounce: if a start is already in flight, ignore. The Cancel button

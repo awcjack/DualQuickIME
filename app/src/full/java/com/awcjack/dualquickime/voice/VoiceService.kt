@@ -31,10 +31,6 @@ class VoiceService : Service() {
     companion object {
         private const val TAG = "VoiceService"
         private const val SAMPLE_RATE = 16000
-        // Reuse the same warmup duration as in-process — 0.5 s of silence is
-        // enough to drive a full encoder + decoder pass and prime the ONNX
-        // Runtime caches.
-        private const val WARMUP_SAMPLES = SAMPLE_RATE / 2
     }
 
     // Single Sherpa-ONNX recognizer for the lifetime of one initialize() call.
@@ -67,9 +63,11 @@ class VoiceService : Service() {
                         modelConfig = modelConfig,
                         decodingMethod = "greedy_search"
                     )
-                    val rec = OfflineRecognizer(config = config)
-                    warmUp(rec)
-                    recognizer = rec
+                    // No warmup: the 0.5–2 s graph-optimization tax is paid by
+                    // the first real utterance instead. This shifts the cost
+                    // from a silent "Loading…" wait (bad UX) to the moment the
+                    // user has already spoken and is expecting some processing.
+                    recognizer = OfflineRecognizer(config = config)
                     if (BuildConfig.DEBUG) {
                         Log.i(TAG, "Qwen3-ASR loaded in :voice process (numThreads=$numThreads, maxNewTokens=$maxNewTokens)")
                     }
@@ -128,23 +126,5 @@ class VoiceService : Service() {
         // OS reclaims memory anyway. This is for the clean-shutdown path.
         binder.releaseModel()
         super.onDestroy()
-    }
-
-    /**
-     * Run a single throwaway decode over silence so the ONNX Runtime graph
-     * optimizer, weight dequantization caches and KV-cache buffers are
-     * populated before the user speaks. Without this the first real
-     * utterance pays a 0.5–2 s one-time tax.
-     */
-    private fun warmUp(rec: OfflineRecognizer) {
-        try {
-            val stream = rec.createStream()
-            stream.acceptWaveform(FloatArray(WARMUP_SAMPLES), SAMPLE_RATE)
-            rec.decode(stream)
-            rec.getResult(stream)
-            stream.release()
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.w(TAG, "warmUp() failed (non-fatal): ${e.message}")
-        }
     }
 }
