@@ -5,6 +5,14 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-06-06
+### Added
+- **Qwen3-ASR voice input model**: New offline voice option with the highest Cantonese accuracy of any DualQuickIME model (~4.12% WER, vs U2pp 5.05% MER and Whisper 7.93% CER) and native Cantonese-English code-switching. Powered by Alibaba's Qwen3-ASR-0.6B via Sherpa-ONNX (942 MB download — recommended only on devices with 4 GB+ RAM)
+- **Process-isolated voice recognition for Qwen3-ASR**: The Qwen3-ASR recognizer runs in a separate `:voice` process so the ~700 MB of model weights can't push the IME over Android's low-memory threshold and take the keyboard down mid-utterance
+
+### Changed
+- Qwen3-ASR recognizer is now released from memory 30 seconds after the last voice activity; the next mic tap pays a brief reload cost. Lighter voice models (SenseVoice, Whisper Cantonese, U2pp-Conformer-Yue) stay resident as before
+
 ## [1.8.4] - 2026-05-25
 ### Added
 - **Emoji 17.0 coverage**: Updated emoji keyboard to Unicode/Emoji 17.0 (released September 2025), adding 7 new characters:
