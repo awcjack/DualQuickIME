@@ -149,6 +149,21 @@ def load_qwen3_asr_model(model_id: str):
     Load Qwen3-ASR model from HuggingFace.
     Returns (model, processor/feature_extractor, config).
     """
+    # The Qwen3-ASR HF checkpoint declares model_type="qwen3_asr" but the
+    # checkpoint has no auto_map, and stock transformers (even main) does not
+    # register this architecture. Importing qwen_asr first runs its module-level
+    # AutoConfig.register / AutoModel.register calls so the loader finds the
+    # arch. We import it eagerly and fail loudly if missing rather than waiting
+    # for the cryptic KeyError downstream.
+    try:
+        import qwen_asr  # noqa: F401  (side-effect: registers Qwen3ASR* classes)
+    except ImportError as e:
+        raise RuntimeError(
+            "qwen-asr is required to load Qwen/Qwen3-ASR-* checkpoints "
+            "(the architecture is not yet upstreamed into transformers). "
+            "Install with: pip install -U qwen-asr"
+        ) from e
+
     from transformers import AutoProcessor, AutoConfig
 
     print(f"Loading model config from {model_id} ...")

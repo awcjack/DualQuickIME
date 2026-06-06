@@ -28,20 +28,21 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          # Qwen3-ASR upstream recommends Python 3.12 in a fresh env.
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu
-          # Qwen3-ASR uses model_type=qwen3_asr which is only recognized by
-          # transformers from source (or a release that postdates the Qwen3-ASR
-          # merge). Pinning to main keeps the workflow runnable even after a
-          # breaking change lands.
-          pip install "transformers @ git+https://github.com/huggingface/transformers.git@main"
+          # qwen-asr is REQUIRED — the HF checkpoint declares
+          # model_type=qwen3_asr / arch=Qwen3ASRForConditionalGeneration which
+          # is not in upstream transformers (even main) and has no auto_map,
+          # so trust_remote_code cannot rescue it. The qwen-asr package
+          # registers the architecture into transformers' AutoConfig mapping
+          # on import. Do NOT make this optional.
+          pip install -U qwen-asr
           pip install accelerate onnx onnxruntime optimum
-          # Install qwen-asr if available, otherwise fall back to transformers
-          pip install qwen-asr || echo "qwen-asr not available, using transformers with trust_remote_code"
 
       - name: Convert model to ONNX
         run: |
