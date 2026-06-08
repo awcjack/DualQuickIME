@@ -107,7 +107,7 @@
     <string name="voice_processing">處理中...</string>
     <string name="voice_stopped">已停止</string>
     <string name="voice_cancel">取消</string>
-    <string name="voice_stop_send">停止並送出</string>
+    <string name="voice_stop_send">停止</string>
     <string name="voice_loading_model">載入中語音模型...</string>
     <string name="voice_downloading_model">正在下載語音模型...</string>
     <string name="voice_download_starting">開始下載...</string>

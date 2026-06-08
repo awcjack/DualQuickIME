@@ -20,7 +20,7 @@ import com.awcjack.dualquickime.theme.ThemeManager
  * Voice input overlay UI showing recording status and transcription results.
  * Has three buttons while listening:
  * - Reset/Cancel: Clears pending text (Reset) or closes voice input (Cancel)
- * - Stop & Send: Stops listening and force-transcribes the buffered audio
+ * - Stop: Stops listening and force-transcribes the buffered audio for review
  *   (manual endpoint for noisy rooms where VAD never auto-detects the end)
  * - Commit: Commits the already-recognized text to the input field
  */
@@ -204,9 +204,10 @@ class VoiceInputView @JvmOverloads constructor(
         }
         buttonContainer?.addView(resetCancelButton)
 
-        // Stop & Send button (middle) - manual endpoint for noisy environments
-        // where Silero VAD never auto-detects the end of speech. Stops
-        // listening, flushes the buffered audio through the model, commits it.
+        // Stop button (middle) - manual endpoint for noisy environments where
+        // Silero VAD never auto-detects the end of speech. Stops listening,
+        // flushes the buffered audio through the model, and shows the result
+        // for review (insertion happens via the Commit button).
         stopSendButton = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -374,10 +375,10 @@ class VoiceInputView @JvmOverloads constructor(
                 stopPulseAnimation()
             }
             State.STOPPED -> {
-                // Capture finished (manual Stop & Send). The flushed transcript
-                // is shown for review; the user edits via Reset or inserts it
-                // with Commit. No mic pulse and no Stop & Send — we're no
-                // longer listening.
+                // Capture finished (manual Stop). The flushed transcript is
+                // shown for review; the user edits via Reset or inserts it with
+                // Commit. No mic pulse and no Stop button — we're no longer
+                // listening.
                 visibility = View.VISIBLE
                 statusIcon?.text = "✓"
                 statusText?.text = context.getString(R.string.voice_stopped)

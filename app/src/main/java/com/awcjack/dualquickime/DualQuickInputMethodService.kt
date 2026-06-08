@@ -225,7 +225,7 @@ class DualQuickInputMethodService : InputMethodService() {
                 clearVoiceTranscript()
             }
             setOnFinishListener {
-                // Stop & Send: stop listening, flush buffered audio, commit
+                // Stop: stop listening, flush buffered audio, show for review
                 finishVoiceInput()
             }
             setOnCommitListener { text ->
