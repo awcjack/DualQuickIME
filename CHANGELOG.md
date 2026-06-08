@@ -5,6 +5,11 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.2] - 2026-06-08
+### Added
+- **Manual "Stop" for voice input**: A Stop button now appears while listening so you can end capture yourself instead of waiting for automatic silence detection. In noisy places the recognizer often never hears a clear pause and would otherwise leave your speech untranscribed — tapping Stop flushes the buffered audio through the model and shows the result for review, ready to Commit or Reset
+- **Noise suppression for voice input**: Voice capture now runs through the speech-tuned audio path with the device's noise-suppression, auto-gain and echo-cancellation effects to improve recognition in noisy environments. Toggleable in Settings (on by default) if you prefer the raw microphone
+
 ## [1.9.1] - 2026-06-06
 ### Fixed
 - Voice input button now shows a "Loading…" indicator immediately on tap instead of staying silent while the recognizer initializes — the first tap no longer looks dead during the Qwen3-ASR cold start
