@@ -105,6 +105,7 @@
     <string name="settings_voice_permission_granted">Permission granted</string>
     <string name="voice_listening">Listening...</string>
     <string name="voice_processing">Processing...</string>
+    <string name="voice_stopped">Stopped</string>
     <string name="voice_cancel">Cancel</string>
     <string name="voice_reset">Reset</string>
     <string name="voice_stop_send">Stop &amp; Send</string>

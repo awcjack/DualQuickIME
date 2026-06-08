@@ -105,6 +105,7 @@
     <string name="settings_voice_permission_granted">已授予权限</string>
     <string name="voice_listening">正在聆听...</string>
     <string name="voice_processing">处理中...</string>
+    <string name="voice_stopped">已停止</string>
     <string name="voice_cancel">取消</string>
     <string name="voice_stop_send">停止并发送</string>
     <string name="voice_loading_model">正在加载语音模型...</string>

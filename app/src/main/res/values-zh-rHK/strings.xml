@@ -105,6 +105,7 @@
     <string name="settings_voice_permission_granted">已授予權限</string>
     <string name="voice_listening">聽緊...</string>
     <string name="voice_processing">處理緊...</string>
+    <string name="voice_stopped">已停止</string>
     <string name="voice_cancel">取消</string>
     <string name="voice_stop_send">停止並送出</string>
     <string name="voice_loading_model">載入緊語音模型...</string>

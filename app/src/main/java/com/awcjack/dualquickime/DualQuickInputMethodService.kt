@@ -1095,9 +1095,11 @@ class DualQuickInputMethodService : InputMethodService() {
 
     /**
      * Stop listening immediately and force-transcribe whatever audio is still
-     * buffered, then commit the result. This is the manual escape hatch for
-     * noisy environments where automatic endpoint detection never fires and
-     * the speech would otherwise stay stranded in the VAD buffer.
+     * buffered, then show the result in the transcript field for review. This
+     * is the manual escape hatch for noisy environments where automatic
+     * endpoint detection never fires and the speech would otherwise stay
+     * stranded in the VAD buffer. The text is not inserted yet — the user
+     * reviews it and taps Commit (or Reset) from the stopped state.
      */
     private fun finishVoiceInput() {
         val manager = voiceInputManager ?: run {
@@ -1109,7 +1111,8 @@ class DualQuickInputMethodService : InputMethodService() {
         voiceInputView?.setState(VoiceInputView.State.PROCESSING)
         manager.finishRecording { finalText ->
             mainHandler.post {
-                commitVoiceText(finalText)
+                voiceInputView?.setState(VoiceInputView.State.STOPPED)
+                voiceInputView?.setTranscript(finalText)
             }
         }
     }

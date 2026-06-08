@@ -20,6 +20,7 @@ class VoiceInputView @JvmOverloads constructor(
         LOADING,
         LISTENING,
         PROCESSING,
+        STOPPED,
         ERROR
     }
 

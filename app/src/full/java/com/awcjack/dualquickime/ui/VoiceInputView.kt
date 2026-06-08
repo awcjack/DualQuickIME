@@ -36,6 +36,7 @@ class VoiceInputView @JvmOverloads constructor(
         LOADING,
         LISTENING,
         PROCESSING,
+        STOPPED,
         ERROR
     }
 
@@ -370,6 +371,23 @@ class VoiceInputView @JvmOverloads constructor(
                 // Hide the buttons during the blocking decode so the user
                 // can't double-trigger stop/commit while we transcribe.
                 buttonContainer?.visibility = View.GONE
+                stopPulseAnimation()
+            }
+            State.STOPPED -> {
+                // Capture finished (manual Stop & Send). The flushed transcript
+                // is shown for review; the user edits via Reset or inserts it
+                // with Commit. No mic pulse and no Stop & Send — we're no
+                // longer listening.
+                visibility = View.VISIBLE
+                statusIcon?.text = "✓"
+                statusText?.text = context.getString(R.string.voice_stopped)
+                progressBar?.visibility = View.GONE
+                progressText?.visibility = View.GONE
+                transcriptText?.visibility = View.VISIBLE
+                buttonContainer?.visibility = View.VISIBLE
+                stopSendButton?.visibility = View.GONE
+                commitButton?.visibility = View.VISIBLE
+                updateButtonStates()
                 stopPulseAnimation()
             }
             State.ERROR -> {
