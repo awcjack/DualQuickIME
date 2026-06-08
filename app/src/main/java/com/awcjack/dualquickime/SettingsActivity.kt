@@ -48,6 +48,7 @@ class SettingsActivity : AppCompatActivity() {
 
     // Voice input settings
     private lateinit var switchVoiceEnabled: SwitchCompat
+    private lateinit var switchVoiceNoiseSuppression: SwitchCompat
     private lateinit var btnVoiceModel: Button
     private lateinit var textVoiceModelStatus: TextView
     private lateinit var btnVoicePermission: Button
@@ -73,6 +74,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // Voice input settings
         switchVoiceEnabled = findViewById(R.id.switchVoiceEnabled)
+        switchVoiceNoiseSuppression = findViewById(R.id.switchVoiceNoiseSuppression)
         btnVoiceModel = findViewById(R.id.btnVoiceModel)
         textVoiceModelStatus = findViewById(R.id.textVoiceModelStatus)
         btnVoicePermission = findViewById(R.id.btnVoicePermission)
@@ -208,6 +210,12 @@ class SettingsActivity : AppCompatActivity() {
         // Listen for changes
         switchVoiceEnabled.setOnCheckedChangeListener { _, isChecked ->
             ThemeManager.setVoiceInputEnabled(this, isChecked)
+        }
+
+        // Noise suppression toggle
+        switchVoiceNoiseSuppression.isChecked = ThemeManager.getVoiceNoiseSuppressionEnabled(this)
+        switchVoiceNoiseSuppression.setOnCheckedChangeListener { _, isChecked ->
+            ThemeManager.setVoiceNoiseSuppressionEnabled(this, isChecked)
         }
 
         // Model selection button

@@ -9,10 +9,14 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.awcjack.dualquickime.BuildConfig
+import com.awcjack.dualquickime.theme.ThemeManager
 import com.k2fsa.sherpa.onnx.*
 import openccjava.OpenCC
 import java.io.File
@@ -42,7 +46,13 @@ class VoiceInputManager(private val context: Context) {
         private const val SAMPLE_RATE = 16000
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
-        private const val AUDIO_SOURCE = MediaRecorder.AudioSource.MIC
+
+        // Max time finishRecording() waits for the recording thread to flush
+        // the VAD buffer and decode the trailing segment. Generous because a
+        // Qwen3-ASR decode of a full 30 s un-endpointed segment can run several
+        // seconds; after this we deliver whatever transcript we have rather
+        // than block the caller forever.
+        private const val FINISH_FLUSH_TIMEOUT_MS = 20_000L
 
         // Model directory name (for compatibility with ModelDownloadManager)
         const val MODEL_DIR = ModelDownloadManager.SENSEVOICE_MODEL_DIR
@@ -234,6 +244,13 @@ class VoiceInputManager(private val context: Context) {
 
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
+
+    // Platform audio effects attached to the capture session to raise SNR
+    // before audio reaches the VAD and recognizer. All three are optional and
+    // vendor-dependent; held here so they can be released with the AudioRecord.
+    private var noiseSuppressor: NoiseSuppressor? = null
+    private var automaticGainControl: AutomaticGainControl? = null
+    private var acousticEchoCanceler: AcousticEchoCanceler? = null
 
     @Volatile
     private var isRecording = false
@@ -832,8 +849,19 @@ class VoiceInputManager(private val context: Context) {
                 AUDIO_FORMAT
             )
 
+            // When noise suppression is on, capture through VOICE_RECOGNITION —
+            // the platform audio path tuned for ASR — and attach the vendor
+            // noise/gain/echo effects below. When off, use the raw MIC source so
+            // the user can A/B against an unprocessed signal.
+            val noiseSuppressionEnabled = ThemeManager.getVoiceNoiseSuppressionEnabled(context)
+            val audioSource = if (noiseSuppressionEnabled) {
+                MediaRecorder.AudioSource.VOICE_RECOGNITION
+            } else {
+                MediaRecorder.AudioSource.MIC
+            }
+
             audioRecord = AudioRecord(
-                AUDIO_SOURCE,
+                audioSource,
                 SAMPLE_RATE,
                 CHANNEL_CONFIG,
                 AUDIO_FORMAT,
@@ -843,6 +871,10 @@ class VoiceInputManager(private val context: Context) {
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 onErrorCallback?.invoke("Failed to initialize audio recorder")
                 return false
+            }
+
+            if (noiseSuppressionEnabled) {
+                attachAudioEffects(audioRecord!!.audioSessionId)
             }
 
             isRecording = true
@@ -889,6 +921,8 @@ class VoiceInputManager(private val context: Context) {
             }
         }
 
+        releaseAudioEffects()
+
         recordingThread?.join(1000)
         recordingThread = null
 
@@ -900,6 +934,111 @@ class VoiceInputManager(private val context: Context) {
         if (BuildConfig.DEBUG) {
             Log.i(TAG, "Recording stopped")
         }
+    }
+
+    /**
+     * Manual "stop and send" for noisy environments. Silero VAD only emits a
+     * segment once it sees a silence endpoint; in a noisy room that endpoint
+     * may never arrive, so the captured speech sits in the VAD buffer and is
+     * never transcribed. This stops capture and forces that buffered audio
+     * through the model.
+     *
+     * Flips [isRecording] off (unblocking the capture loop), stops the mic,
+     * then waits — up to [FINISH_FLUSH_TIMEOUT_MS] — for the recording thread
+     * to run its VAD flush and decode the trailing segment(s) before reading
+     * the final transcript, so we never commit truncated text. (By contrast
+     * [stopRecording]'s 1 s join can return mid-decode.) The full accumulated
+     * transcript is delivered to [onComplete] on a background thread. Safe to
+     * call when not recording — returns the last known text immediately.
+     */
+    fun finishRecording(onComplete: (String) -> Unit) {
+        if (!isRecording) {
+            onComplete(lastRecognizedText)
+            return
+        }
+        isRecording = false
+        thread(name = "VoiceFinishThread") {
+            try {
+                // Stop the mic so the capture loop's blocking read() returns and
+                // the thread proceeds into its VAD-flush path.
+                try {
+                    audioRecord?.stop()
+                } catch (e: Exception) {
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Error stopping audio record: ${e.message}")
+                }
+                // Wait for the full flush + trailing-segment decode to finish.
+                recordingThread?.join(FINISH_FLUSH_TIMEOUT_MS)
+                recordingThread = null
+                try {
+                    audioRecord?.release()
+                } catch (e: Exception) {
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Error releasing audio record: ${e.message}")
+                }
+                audioRecord = null
+                releaseAudioEffects()
+                markActivity()
+            } finally {
+                onComplete(lastRecognizedText)
+            }
+        }
+    }
+
+    /**
+     * Best-effort attach of the platform noise-suppression / auto-gain / echo
+     * effects to the capture session. Each effect is optional and vendor-
+     * dependent — the `isAvailable()` guards gate them and failures are
+     * swallowed — so a missing effect never blocks recording. Any partially
+     * created effects are torn down on failure.
+     */
+    private fun attachAudioEffects(sessionId: Int) {
+        try {
+            // setEnabled() returns an int status (not Unit), so it isn't a Kotlin
+            // property — call it explicitly. Ignoring the status is fine; a
+            // failure to enable just leaves the raw signal, same as no effect.
+            if (NoiseSuppressor.isAvailable()) {
+                noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply { setEnabled(true) }
+            }
+            if (AutomaticGainControl.isAvailable()) {
+                automaticGainControl = AutomaticGainControl.create(sessionId)?.apply { setEnabled(true) }
+            }
+            if (AcousticEchoCanceler.isAvailable()) {
+                acousticEchoCanceler = AcousticEchoCanceler.create(sessionId)?.apply { setEnabled(true) }
+            }
+            if (BuildConfig.DEBUG) {
+                Log.i(
+                    TAG,
+                    "Audio effects: NS=${noiseSuppressor != null}, " +
+                        "AGC=${automaticGainControl != null}, AEC=${acousticEchoCanceler != null}"
+                )
+            }
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "Failed to attach audio effects: ${e.message}")
+            releaseAudioEffects()
+        }
+    }
+
+    /**
+     * Release any attached audio effects. Idempotent; safe when none exist.
+     */
+    private fun releaseAudioEffects() {
+        try {
+            noiseSuppressor?.release()
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "NoiseSuppressor release threw: ${e.message}")
+        }
+        try {
+            automaticGainControl?.release()
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "AutomaticGainControl release threw: ${e.message}")
+        }
+        try {
+            acousticEchoCanceler?.release()
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "AcousticEchoCanceler release threw: ${e.message}")
+        }
+        noiseSuppressor = null
+        automaticGainControl = null
+        acousticEchoCanceler = null
     }
 
     /**

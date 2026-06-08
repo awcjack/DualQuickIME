@@ -16,6 +16,7 @@ object ThemeManager {
     private const val KEY_USE_EXTENDED_CHARSET = "use_extended_charset"
     private const val KEY_VOICE_INPUT_ENABLED = "voice_input_enabled"
     private const val KEY_VOICE_MODEL_TYPE = "voice_model_type"
+    private const val KEY_VOICE_NOISE_SUPPRESSION = "voice_noise_suppression"
     private const val KEY_RECENT_CANDIDATES_ENABLED = "recent_candidates_enabled"
     private const val KEY_HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled"
     private const val KEY_DEFAULT_SKIN_TONE = "default_skin_tone"
@@ -42,6 +43,7 @@ object ThemeManager {
     private var cachedUseExtendedCharset: Boolean? = null
     private var cachedVoiceInputEnabled: Boolean? = null
     private var cachedVoiceModelType: String? = null
+    private var cachedVoiceNoiseSuppression: Boolean? = null
     private var cachedRecentCandidatesEnabled: Boolean? = null
     private var cachedHapticFeedbackEnabled: Boolean? = null
     private var cachedDefaultSkinTone: Int = -1
@@ -130,6 +132,21 @@ object ThemeManager {
     fun setVoiceModelType(context: Context, modelTypeId: String) {
         cachedVoiceModelType = modelTypeId
         getPrefs(context).edit().putString(KEY_VOICE_MODEL_TYPE, modelTypeId).apply()
+    }
+
+    // Voice noise suppression (default: true). When on, voice capture uses the
+    // VOICE_RECOGNITION audio source plus the platform noise/gain/echo effects
+    // to improve recognition in noisy environments.
+    fun getVoiceNoiseSuppressionEnabled(context: Context): Boolean {
+        if (cachedVoiceNoiseSuppression == null) {
+            cachedVoiceNoiseSuppression = getPrefs(context).getBoolean(KEY_VOICE_NOISE_SUPPRESSION, true)
+        }
+        return cachedVoiceNoiseSuppression!!
+    }
+
+    fun setVoiceNoiseSuppressionEnabled(context: Context, enabled: Boolean) {
+        cachedVoiceNoiseSuppression = enabled
+        getPrefs(context).edit().putBoolean(KEY_VOICE_NOISE_SUPPRESSION, enabled).apply()
     }
 
     // Recent candidates settings (default: false to disable)
@@ -247,6 +264,7 @@ object ThemeManager {
         cachedUseExtendedCharset = null
         cachedVoiceInputEnabled = null
         cachedVoiceModelType = null
+        cachedVoiceNoiseSuppression = null
         cachedRecentCandidatesEnabled = null
         cachedHapticFeedbackEnabled = null
         cachedDefaultSkinTone = -1

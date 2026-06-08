@@ -84,6 +84,8 @@
     <string name="settings_voice_input">語音輸入</string>
     <string name="settings_voice_enable">啟用語音輸入</string>
     <string name="settings_voice_enable_desc">使用離線語音辨識（粵語/中文/英文）</string>
+    <string name="settings_voice_noise_suppression">噪音抑制</string>
+    <string name="settings_voice_noise_suppression_desc">過濾背景雜音，喺嘈雜環境下辨識得更清楚</string>
     <string name="settings_voice_select_model">選擇模型</string>
     <string name="settings_voice_selected_model">已選模型</string>
     <string name="settings_voice_download_model">下載語音模型</string>

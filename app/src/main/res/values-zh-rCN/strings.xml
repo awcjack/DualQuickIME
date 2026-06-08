@@ -84,6 +84,8 @@
     <string name="settings_voice_input">语音输入</string>
     <string name="settings_voice_enable">启用语音输入</string>
     <string name="settings_voice_enable_desc">使用离线语音识别（粤语/中文/英文）</string>
+    <string name="settings_voice_noise_suppression">噪音抑制</string>
+    <string name="settings_voice_noise_suppression_desc">过滤背景杂音，在嘈杂环境中识别更清晰</string>
     <string name="settings_voice_select_model">选择模型</string>
     <string name="settings_voice_selected_model">已选模型</string>
     <string name="settings_voice_download_model">下载语音模型</string>

@@ -7,6 +7,11 @@
     <!-- Audio recording for voice input (dangerous permission, requested at runtime) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Attach noise-suppression / auto-gain / echo-canceler audio effects to the
+         capture session for clearer recognition in noisy environments (normal
+         permission, auto-granted) -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <application>
         <!--
             Qwen3-ASR runs in its own :voice process so the ~700 MB recognizer
