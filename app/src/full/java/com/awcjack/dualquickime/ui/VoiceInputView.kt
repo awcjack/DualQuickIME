@@ -18,9 +18,11 @@ import com.awcjack.dualquickime.theme.ThemeManager
 
 /**
  * Voice input overlay UI showing recording status and transcription results.
- * Has two buttons:
+ * Has three buttons while listening:
  * - Reset/Cancel: Clears pending text (Reset) or closes voice input (Cancel)
- * - Commit: Commits the recognized text to the input field
+ * - Stop & Send: Stops listening and force-transcribes the buffered audio
+ *   (manual endpoint for noisy rooms where VAD never auto-detects the end)
+ * - Commit: Commits the already-recognized text to the input field
  */
 class VoiceInputView @JvmOverloads constructor(
     context: Context,
@@ -49,6 +51,7 @@ class VoiceInputView @JvmOverloads constructor(
     private var progressText: TextView? = null
     private var buttonContainer: LinearLayout? = null
     private var resetCancelButton: TextView? = null
+    private var stopSendButton: TextView? = null
     private var commitButton: TextView? = null
 
     private var pulseAnimator: ObjectAnimator? = null
@@ -59,6 +62,7 @@ class VoiceInputView @JvmOverloads constructor(
     // Callbacks
     private var onCancelCallback: (() -> Unit)? = null
     private var onResetCallback: (() -> Unit)? = null
+    private var onFinishCallback: (() -> Unit)? = null
     private var onCommitCallback: ((String) -> Unit)? = null
 
     init {
@@ -178,9 +182,9 @@ class VoiceInputView @JvmOverloads constructor(
                 dpToPx(44),
                 1f
             ).apply {
-                marginEnd = dpToPx(8)
+                marginEnd = dpToPx(4)
             }
-            setPadding(dpToPx(16), 0, dpToPx(16), 0)
+            setPadding(dpToPx(8), 0, dpToPx(8), 0)
             gravity = Gravity.CENTER
             textSize = 16f
             text = context.getString(R.string.voice_cancel)
@@ -199,6 +203,31 @@ class VoiceInputView @JvmOverloads constructor(
         }
         buttonContainer?.addView(resetCancelButton)
 
+        // Stop & Send button (middle) - manual endpoint for noisy environments
+        // where Silero VAD never auto-detects the end of speech. Stops
+        // listening, flushes the buffered audio through the model, commits it.
+        stopSendButton = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                dpToPx(44),
+                1f
+            ).apply {
+                marginStart = dpToPx(4)
+                marginEnd = dpToPx(4)
+            }
+            setPadding(dpToPx(8), 0, dpToPx(8), 0)
+            gravity = Gravity.CENTER
+            textSize = 16f
+            text = context.getString(R.string.voice_stop_send)
+            setTextColor(colors.keyTextPrimary)
+            background = createButtonBackground()
+
+            setOnClickListener {
+                onFinishCallback?.invoke()
+            }
+        }
+        buttonContainer?.addView(stopSendButton)
+
         // Commit button (right)
         commitButton = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -206,9 +235,9 @@ class VoiceInputView @JvmOverloads constructor(
                 dpToPx(44),
                 1f
             ).apply {
-                marginStart = dpToPx(8)
+                marginStart = dpToPx(4)
             }
-            setPadding(dpToPx(16), 0, dpToPx(16), 0)
+            setPadding(dpToPx(8), 0, dpToPx(8), 0)
             gravity = Gravity.CENTER
             textSize = 16f
             text = context.getString(R.string.voice_commit)
@@ -272,6 +301,10 @@ class VoiceInputView @JvmOverloads constructor(
         onResetCallback = callback
     }
 
+    fun setOnFinishListener(callback: () -> Unit) {
+        onFinishCallback = callback
+    }
+
     fun setOnCommitListener(callback: (String) -> Unit) {
         onCommitCallback = callback
     }
@@ -295,6 +328,7 @@ class VoiceInputView @JvmOverloads constructor(
                 buttonContainer?.visibility = View.VISIBLE
                 // During download, only show Cancel button
                 resetCancelButton?.text = context.getString(R.string.voice_cancel)
+                stopSendButton?.visibility = View.GONE
                 commitButton?.visibility = View.GONE
                 stopPulseAnimation()
             }
@@ -310,6 +344,7 @@ class VoiceInputView @JvmOverloads constructor(
                 transcriptText?.visibility = View.GONE
                 buttonContainer?.visibility = View.VISIBLE
                 resetCancelButton?.text = context.getString(R.string.voice_cancel)
+                stopSendButton?.visibility = View.GONE
                 commitButton?.visibility = View.GONE
                 stopPulseAnimation()
             }
@@ -322,6 +357,7 @@ class VoiceInputView @JvmOverloads constructor(
                 transcriptText?.visibility = View.VISIBLE
                 transcriptText?.text = ""
                 buttonContainer?.visibility = View.VISIBLE
+                stopSendButton?.visibility = View.VISIBLE
                 commitButton?.visibility = View.VISIBLE
                 currentTranscript = ""
                 updateButtonStates()
@@ -331,6 +367,9 @@ class VoiceInputView @JvmOverloads constructor(
                 visibility = View.VISIBLE
                 statusIcon?.text = "⏳"
                 statusText?.text = context.getString(R.string.voice_processing)
+                // Hide the buttons during the blocking decode so the user
+                // can't double-trigger stop/commit while we transcribe.
+                buttonContainer?.visibility = View.GONE
                 stopPulseAnimation()
             }
             State.ERROR -> {
@@ -340,6 +379,7 @@ class VoiceInputView @JvmOverloads constructor(
                 progressText?.visibility = View.GONE
                 buttonContainer?.visibility = View.VISIBLE
                 resetCancelButton?.text = context.getString(R.string.voice_cancel)
+                stopSendButton?.visibility = View.GONE
                 commitButton?.visibility = View.GONE
                 stopPulseAnimation()
             }

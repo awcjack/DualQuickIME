@@ -20,6 +20,7 @@ class VoiceInputManager(private val context: Context) {
     fun setOnErrorListener(callback: (String) -> Unit) {}
     fun startRecording(): Boolean = false
     fun stopRecording() {}
+    fun finishRecording(onComplete: (String) -> Unit) { onComplete("") }
     fun isRecording(): Boolean = false
     fun release() {}
     fun getLastRecognizedText(): String = ""

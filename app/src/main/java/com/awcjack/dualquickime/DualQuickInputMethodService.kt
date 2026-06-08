@@ -224,6 +224,10 @@ class DualQuickInputMethodService : InputMethodService() {
                 // Reset: clear the pending text but keep listening
                 clearVoiceTranscript()
             }
+            setOnFinishListener {
+                // Stop & Send: stop listening, flush buffered audio, commit
+                finishVoiceInput()
+            }
             setOnCommitListener { text ->
                 // Commit: commit the text and close voice input
                 commitVoiceText(text)
@@ -1087,6 +1091,27 @@ class DualQuickInputMethodService : InputMethodService() {
         // thread will still finish and harmlessly post LISTENING back, which
         // is benign because the voice overlay is hidden again.
         voiceStartInProgress = false
+    }
+
+    /**
+     * Stop listening immediately and force-transcribe whatever audio is still
+     * buffered, then commit the result. This is the manual escape hatch for
+     * noisy environments where automatic endpoint detection never fires and
+     * the speech would otherwise stay stranded in the VAD buffer.
+     */
+    private fun finishVoiceInput() {
+        val manager = voiceInputManager ?: run {
+            closeVoiceInput()
+            return
+        }
+        // Show a processing indicator while the trailing audio is decoded — for
+        // Qwen3-ASR this blocking decode can take several seconds.
+        voiceInputView?.setState(VoiceInputView.State.PROCESSING)
+        manager.finishRecording { finalText ->
+            mainHandler.post {
+                commitVoiceText(finalText)
+            }
+        }
     }
 
     /**

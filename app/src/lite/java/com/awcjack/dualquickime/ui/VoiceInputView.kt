@@ -29,6 +29,7 @@ class VoiceInputView @JvmOverloads constructor(
 
     fun setOnCancelListener(callback: () -> Unit) {}
     fun setOnResetListener(callback: () -> Unit) {}
+    fun setOnFinishListener(callback: () -> Unit) {}
     fun setOnCommitListener(callback: (String) -> Unit) {}
     fun setState(state: State) {}
     fun setTranscript(text: String) {}
