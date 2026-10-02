@@ -5,6 +5,13 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.4] - 2026-10-02
+### Added
+- **Long-press number variants**: Hold a digit in the quick number row or symbol keyboard to choose superscripts, fractions, and related symbols; normal taps still enter the digit
+
+### Fixed
+- CI Android SDK setup no longer attempts to install the obsolete `tools` package
+
 ## [1.9.3] - 2026-08-02
 ### Added
 - **Live voice transcripts**: SenseVoice and U2pp-Conformer-Yue now show provisional text while you speak instead of waiting for a pause; slower models show a Transcribing indicator while processing

@@ -20,8 +20,8 @@ android {
         applicationId = "com.awcjack.dualquickime"
         minSdk = 24
         targetSdk = 34
-        versionCode = 28
-        versionName = "1.9.3"
+        versionCode = 29
+        versionName = "1.9.4"
     }
 
     // Release signing configuration (only if keystore.properties exists)
