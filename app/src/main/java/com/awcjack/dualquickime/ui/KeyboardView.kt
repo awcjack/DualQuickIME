@@ -375,12 +375,63 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private var numberVariantsPopup: PopupWindow? = null
+    private val numberVariantCells = mutableListOf<TextView>()
+    private var selectedNumberVariant: TextView? = null
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun attachNumberVariants(key: TextView, digit: Char) {
         val variants = NUMBER_VARIANTS[digit] ?: return
+        var choosingVariant = false
         key.setOnLongClickListener { anchor ->
+            choosingVariant = true
+            anchor.parent?.requestDisallowInterceptTouchEvent(true)
             showNumberVariants(anchor, variants)
-            true // Consume the long press so releasing does not also enter the digit.
+            true
+        }
+        // Keep the original key as the touch target throughout the gesture, even
+        // when the finger moves outside its bounds and into the popup.
+        key.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    choosingVariant = false
+                    false // Let TextView handle normal taps and long-press timing.
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (choosingVariant) updateNumberVariantSelection(event.rawX, event.rawY)
+                    choosingVariant
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (choosingVariant) {
+                        if (event.actionMasked == MotionEvent.ACTION_UP) {
+                            updateNumberVariantSelection(event.rawX, event.rawY)
+                        }
+                        val variant = if (event.actionMasked == MotionEvent.ACTION_UP) {
+                            selectedNumberVariant?.text?.singleOrNull()
+                        } else null
+                        choosingVariant = false
+                        view.isPressed = false
+                        view.parent?.requestDisallowInterceptTouchEvent(false)
+                        numberVariantsPopup?.dismiss()
+                        variant?.let { onKeyPress?.invoke(KeyEvent.Symbol(it)) }
+                        true // Never also send the original digit.
+                    } else false
+                }
+                else -> choosingVariant
+            }
+        }
+    }
+
+    private fun updateNumberVariantSelection(screenX: Float, screenY: Float) {
+        val location = IntArray(2)
+        val selected = numberVariantCells.firstOrNull { cell ->
+            cell.getLocationOnScreen(location)
+            screenX >= location[0] && screenX < location[0] + cell.width &&
+                screenY >= location[1] && screenY < location[1] + cell.height
+        }
+        if (selected !== selectedNumberVariant) {
+            selectedNumberVariant?.isPressed = false
+            selectedNumberVariant = selected
+            selected?.isPressed = true
         }
     }
 
@@ -411,6 +462,7 @@ class KeyboardView @JvmOverloads constructor(
                             numberVariantsPopup?.dismiss()
                             onKeyPress?.invoke(KeyEvent.Symbol(variant))
                         }
+                        numberVariantCells.add(this)
                     })
                 }
             })
@@ -421,12 +473,20 @@ class KeyboardView @JvmOverloads constructor(
         )
         val location = IntArray(2)
         anchor.getLocationInWindow(location)
-        numberVariantsPopup = PopupWindow(content, content.measuredWidth, content.measuredHeight, true).apply {
+        // A focusable popup can cancel the key's active touch stream. Keep it
+        // non-focusable so sliding and releasing are handled by the original key.
+        numberVariantsPopup = PopupWindow(content, content.measuredWidth, content.measuredHeight, false).apply {
             setBackgroundDrawable(content.background)
             elevation = dpToPx(8).toFloat()
             isOutsideTouchable = true
             inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
-            setOnDismissListener { numberVariantsPopup = null }
+            setOnDismissListener {
+                selectedNumberVariant?.isPressed = false
+                selectedNumberVariant = null
+                numberVariantCells.clear()
+                anchor.parent?.requestDisallowInterceptTouchEvent(false)
+                numberVariantsPopup = null
+            }
             showAtLocation(
                 anchor,
                 Gravity.NO_GRAVITY,
