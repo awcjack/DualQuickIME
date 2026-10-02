@@ -392,7 +392,7 @@ class KeyboardView @JvmOverloads constructor(
             orientation = VERTICAL
             setPadding(padding, padding, padding, padding)
             background = GradientDrawable().apply {
-                setColor(colors.candidateBarBackground)
+                setColor(this@KeyboardView.colors.candidateBarBackground)
                 cornerRadius = dpToPx(16).toFloat()
             }
         }
