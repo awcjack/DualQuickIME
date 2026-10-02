@@ -5,6 +5,10 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.5] - 2026-10-02
+### Changed
+- **Hold-and-slide number variants**: After holding a digit, slide to highlight a variant and release to insert it without an extra tap; release outside the chooser to cancel
+
 ## [1.9.4] - 2026-10-02
 ### Added
 - **Long-press number variants**: Hold a digit in the quick number row or symbol keyboard to choose superscripts, fractions, and related symbols; normal taps still enter the digit
