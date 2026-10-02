@@ -168,6 +168,7 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun buildKeyboard() {
+        numberVariantsPopup?.dismiss()
         removeAllViews()
 
         // Check if we're in candidate grid mode (view all candidates)
@@ -370,6 +371,70 @@ class KeyboardView @JvmOverloads constructor(
                     true
                 }
             }
+        }
+    }
+
+    private var numberVariantsPopup: PopupWindow? = null
+
+    private fun attachNumberVariants(key: TextView, digit: Char) {
+        val variants = NUMBER_VARIANTS[digit] ?: return
+        key.setOnLongClickListener { anchor ->
+            showNumberVariants(anchor, variants)
+            true // Consume the long press so releasing does not also enter the digit.
+        }
+    }
+
+    private fun showNumberVariants(anchor: View, variants: String) {
+        numberVariantsPopup?.dismiss()
+        val padding = dpToPx(8)
+        val cellWidth = minOf(dpToPx(48), (resources.displayMetrics.widthPixels - padding * 2) / 5)
+        val content = LinearLayout(context).apply {
+            orientation = VERTICAL
+            setPadding(padding, padding, padding, padding)
+            background = GradientDrawable().apply {
+                setColor(colors.candidateBarBackground)
+                cornerRadius = dpToPx(16).toFloat()
+            }
+        }
+        variants.chunked(5).forEach { group ->
+            content.addView(LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                group.forEach { variant ->
+                    addView(TextView(context).apply {
+                        layoutParams = LayoutParams(cellWidth, dpToPx(48))
+                        gravity = Gravity.CENTER
+                        text = variant.toString()
+                        textSize = 24f
+                        setTextColor(colors.keyTextPrimary)
+                        background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
+                        setOnClickListener {
+                            numberVariantsPopup?.dismiss()
+                            onKeyPress?.invoke(KeyEvent.Symbol(variant))
+                        }
+                    })
+                }
+            })
+        }
+        content.measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val location = IntArray(2)
+        anchor.getLocationInWindow(location)
+        numberVariantsPopup = PopupWindow(content, content.measuredWidth, content.measuredHeight, true).apply {
+            setBackgroundDrawable(content.background)
+            elevation = dpToPx(8).toFloat()
+            isOutsideTouchable = true
+            inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+            setOnDismissListener { numberVariantsPopup = null }
+            showAtLocation(
+                anchor,
+                Gravity.NO_GRAVITY,
+                (location[0] + anchor.width / 2 - content.measuredWidth / 2).coerceIn(
+                    0, (resources.displayMetrics.widthPixels - content.measuredWidth).coerceAtLeast(0)
+                ),
+                (location[1] - content.measuredHeight).coerceAtLeast(0)
+            )
         }
     }
 
@@ -829,6 +894,7 @@ class KeyboardView @JvmOverloads constructor(
                     background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
                     elevation = dpToPx(1).toFloat()
                     text = digit.toString()
+                    attachNumberVariants(this, digit)
 
                     setOnClickListener {
                         onKeyPress?.invoke(KeyEvent.Number(digit.digitToInt()))
@@ -1177,6 +1243,7 @@ class KeyboardView @JvmOverloads constructor(
                 }
                 gravity = Gravity.CENTER
                 text = char.toString()
+                attachNumberVariants(this, char)
                 textSize = 22f
                 setTextColor(colors.keyTextPrimary)
                 background = createKeyBackground(colors.keyBackground, colors.keyBackgroundPressed)
@@ -1502,6 +1569,8 @@ class KeyboardView @JvmOverloads constructor(
         longPressRunnable = null
         convertDirectionPopup?.dismiss()
         convertDirectionPopup = null
+        numberVariantsPopup?.dismiss()
+        numberVariantsPopup = null
     }
 
     private fun dpToPx(dp: Int): Int {
@@ -1530,6 +1599,19 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     companion object {
+        private val NUMBER_VARIANTS = mapOf(
+            '1' to "¹½⅓¼⅕⅙⅐⅛⅑⅒",
+            '2' to "²⅔⅖",
+            '3' to "³⅗¾⅜",
+            '4' to "⁴⅘",
+            '5' to "⁵⅝⅚",
+            '6' to "⁶",
+            '7' to "⁷⅞",
+            '8' to "⁸",
+            '9' to "⁹",
+            '0' to "∅ⁿ⁰"
+        )
+
         private const val BACKSPACE_INITIAL_DELAY = 400L  // ms before first repeat
         private const val BACKSPACE_REPEAT_INTERVAL = 50L  // ms between subsequent repeats
         private const val LONG_PRESS_DELAY = 300L  // ms before long-press triggers
