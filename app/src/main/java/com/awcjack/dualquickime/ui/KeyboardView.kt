@@ -77,7 +77,7 @@ class KeyboardView @JvmOverloads constructor(
     private var compositionText: TextView? = null
     private var candidateRow: LinearLayout? = null
     private var pageIndicator: TextView? = null
-    private val candidateSlots = mutableListOf<TextView>()
+    private val candidateSlots = mutableListOf<CandidateTextView>()
     private var englishPill: TextView? = null
     private var maskToggle: TextView? = null
     private var onMaskToggled: (() -> Unit)? = null
@@ -580,10 +580,11 @@ class KeyboardView @JvmOverloads constructor(
 
         // Use FrameLayout as wrapper to allow overlaying number row on candidate row
         val wrapper = FrameLayout(context).apply {
-            // Reserve pronunciation space once. Long suggestions must not
-            // increase the strip height or change the keyboard's position.
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT,
-                dpToPx(if (pronunciationMode == PronunciationMode.NONE) 46 else 60))
+            // Reserve both lines using actual font metrics, including the
+            // user's font scale. Page content must never change strip height.
+            val height = if (pronunciationMode == PronunciationMode.NONE) dpToPx(46)
+                else maxOf(dpToPx(60), CandidatePronunciation.minimumCellHeight(context, 18f, 4) + dpToPx(12))
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, height)
         }
 
         candidateContainer = LinearLayout(context).apply {
@@ -674,8 +675,8 @@ class KeyboardView @JvmOverloads constructor(
         return wrapper
     }
 
-    private fun createCandidatePillSlot(): TextView {
-        return TextView(context).apply {
+    private fun createCandidatePillSlot(): CandidateTextView {
+        return CandidateTextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
                 setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             }
@@ -687,10 +688,9 @@ class KeyboardView @JvmOverloads constructor(
             elevation = dpToPx(1).toFloat()
             visibility = View.INVISIBLE  // Hidden by default
             // Only the explicit pronunciation/word newline is allowed.
-            setHorizontallyScrolling(true)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setLineSpacing(0f, 0.9f)
+            CandidatePronunciation.configureLineMetrics(this)
         }
     }
 
@@ -808,9 +808,8 @@ class KeyboardView @JvmOverloads constructor(
         candidateSlots.forEachIndexed { index, slot ->
             if (index < candidates.size) {
                 val candidate = candidates[index]
-                slot.text = CandidatePronunciation.label(context, candidate, pronunciationMode,
-                    colors.keyTextSecondary, pronunciationContext)
-                slot.maxLines = if (slot.text.contains('\n')) 2 else 1
+                slot.bindLabel(CandidatePronunciation.label(context, candidate, pronunciationMode,
+                    colors.keyTextSecondary, pronunciationContext))
                 // A suggestion wider than an entire page occupies one bounded
                 // pill. Other overflow suggestions continue on the next page.
                 slot.maxWidth = (availableWidth - horizontalMargin).coerceAtLeast(1)
@@ -835,12 +834,12 @@ class KeyboardView @JvmOverloads constructor(
                     // Display a contiguous prefix so pagination cannot skip
                     // a wider pronunciation label then show a narrower one.
                     pageFull = true
-                    slot.text = ""
+                    slot.bindLabel("")
                     slot.visibility = View.INVISIBLE
                     slot.setOnClickListener(null)
                 }
             } else {
-                slot.text = ""
+                slot.bindLabel("")
                 slot.visibility = View.INVISIBLE
                 slot.setOnClickListener(null)
             }
@@ -907,14 +906,14 @@ class KeyboardView @JvmOverloads constructor(
 
         // Clear all candidate slots
         candidateSlots.forEach { slot ->
-            slot.text = ""
+            slot.bindLabel("")
             slot.visibility = View.INVISIBLE
             slot.setOnClickListener(null)
         }
 
         // Show "無此字" in first slot
         candidateSlots.firstOrNull()?.let { slot ->
-            slot.text = "無此字"
+            slot.bindLabel("無此字")
             slot.visibility = View.VISIBLE
             slot.setTextColor(colors.noMatchText)
             slot.setOnClickListener(null)
@@ -1544,7 +1543,7 @@ class KeyboardView @JvmOverloads constructor(
     fun clearCandidateSlotsOnly() {
         hideNumberRow()
         candidateSlots.forEach { slot ->
-            slot.text = ""
+            slot.bindLabel("")
             slot.visibility = View.INVISIBLE
             slot.setOnClickListener(null)
         }

@@ -5,6 +5,10 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Fixed
+- **Pronunciation cell sizing**: Measure both text lines using Android font metrics and the selected font size, keeping pronunciation labels and Chinese characters fully inside candidate pills in the strip and expanded grid
+
 ## [1.9.6] - 2026-10-17
 ### Added
 - **Candidate pronunciation labels**: Choose off (default), Cantonese Jyutping, or Hanyu pinyin in Settings. One reading appears in grey above characters and suggested words in the candidate strip and expanded grid

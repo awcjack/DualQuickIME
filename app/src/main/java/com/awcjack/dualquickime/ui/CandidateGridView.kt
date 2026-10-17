@@ -112,12 +112,12 @@ class CandidateGridView @JvmOverloads constructor(
 
         val candidates = currentPageCandidates
         var candidateIndex = 0
+        val rowHeight = if (pronunciationMode == PronunciationMode.NONE) dpToPx(44)
+            else maxOf(dpToPx(54), CandidatePronunciation.minimumCellHeight(context, 20f, 2) + dpToPx(4))
 
         for (row in 0 until gridRows) {
             val rowLayout = LinearLayout(context).apply {
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(
-                    if (pronunciationMode == PronunciationMode.NONE) 44 else 54
-                ))
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, rowHeight)
                 orientation = HORIZONTAL
                 gravity = Gravity.CENTER
             }
@@ -140,14 +140,14 @@ class CandidateGridView @JvmOverloads constructor(
     }
 
     private fun createCandidateCell(candidate: String): TextView {
-        return TextView(context).apply {
+        return CandidateTextView(context).apply {
             val charCount = candidate.codePointCount(0, candidate.length)
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
                 setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             }
             gravity = Gravity.CENTER
-            text = CandidatePronunciation.label(context, candidate, pronunciationMode, colors.keyTextSecondary,
-                pronunciationContext)
+            bindLabel(CandidatePronunciation.label(context, candidate, pronunciationMode, colors.keyTextSecondary,
+                pronunciationContext))
             // Adjust text size based on phrase length to fit in fixed cell
             textSize = when {
                 charCount <= 1 -> 20f
@@ -158,11 +158,10 @@ class CandidateGridView @JvmOverloads constructor(
             setTextColor(colors.candidateText)
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
-            // Single line, scale text to fit
+            // One reading line above one character/word line, without wrapping.
             maxLines = if (text.contains('\n')) 2 else 1
-            setHorizontallyScrolling(true)
             ellipsize = TextUtils.TruncateAt.END
-            setLineSpacing(0f, 0.9f)
+            CandidatePronunciation.configureLineMetrics(this)
             setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
 
             setOnClickListener {
