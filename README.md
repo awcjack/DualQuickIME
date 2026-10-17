@@ -63,6 +63,7 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 - **Symbol-mode util bar** - emoji, clipboard, 簡⇄繁, and voice buttons live above the number row for one-tap access
 - **Configurable candidate spacing** - tune pill padding (2–14 dp) to fit more candidates per row
 - **Optional pronunciation labels** - Settings → Candidate Bar → Pronunciation above candidates: off (default), Cantonese Jyutping, or Hanyu pinyin. Shows one sourced reading in grey above characters and suggested words in the strip and expanded grid, fully offline.
+- **Stable suggestion strip** - words stay on one row below their pronunciation; overflow suggestions move to the next page without increasing the strip height.
 - **Caps lock** - double-tap shift for continuous uppercase
 - **Hold to delete** - continuous backspace deletion on key hold
 

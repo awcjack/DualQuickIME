@@ -18,6 +18,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
+import android.text.TextUtils
 import com.awcjack.dualquickime.BuildConfig
 import com.awcjack.dualquickime.convert.ChineseConverter
 import com.awcjack.dualquickime.theme.KeyboardColors
@@ -579,11 +580,14 @@ class KeyboardView @JvmOverloads constructor(
 
         // Use FrameLayout as wrapper to allow overlaying number row on candidate row
         val wrapper = FrameLayout(context).apply {
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            // Reserve pronunciation space once. Long suggestions must not
+            // increase the strip height or change the keyboard's position.
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT,
+                dpToPx(if (pronunciationMode == PronunciationMode.NONE) 46 else 60))
         }
 
         candidateContainer = LinearLayout(context).apply {
-            layoutParams = FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            layoutParams = FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
             minimumHeight = dpToPx(46)
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -682,8 +686,10 @@ class KeyboardView @JvmOverloads constructor(
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
             visibility = View.INVISIBLE  // Hidden by default
-            // Allow text wrapping for long phrases
-            maxLines = 2
+            // Only the explicit pronunciation/word newline is allowed.
+            setHorizontallyScrolling(true)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
             setLineSpacing(0f, 0.9f)
         }
     }
@@ -757,9 +763,8 @@ class KeyboardView @JvmOverloads constructor(
      * Set candidates to display in the candidate bar.
      * Measures text width and only displays candidates that fit; remaining
      * candidates roll forward to the next page via the returned displayed
-     * count, and the page indicator is updated with a corrected total based
-     * on what actually fit (the original totalPages argument is only an
-     * upper-bound estimate — overflow makes the real count larger).
+     * count, and the page indicator is updated with an estimate based on
+     * what actually fits.
      *
      * @param candidates List of candidates to display on this page
      * @param currentPage Current page number (1-based for display)
@@ -778,14 +783,12 @@ class KeyboardView @JvmOverloads constructor(
         // Hide number row when showing candidates
         hideNumberRow()
 
-        // Pre-set page indicator text with a worst-case-width estimate so the
-        // width reservation below is enough even if the real total grows after
-        // overflow. We pick the larger of the naive estimate and currentPage+1
-        // so we always reserve at least 2 digits for the total.
+        // Reserve navigation even for a short suggestion list: it may fit in
+        // the configured slot count but still overflow the available width.
         val naiveTotalEstimate = if (candidates.isEmpty()) currentPage
             else (totalCandidates + candidates.size - 1) / maxOf(candidates.size, 1)
         val measurementTotal = maxOf(naiveTotalEstimate, currentPage + 1)
-        val showPageIndicator = totalCandidates > candidates.size || currentPage > 1
+        val showPageIndicator = totalCandidates > 1 || currentPage > 1
         pageIndicator?.let { pi ->
             if (showPageIndicator) {
                 pi.text = "$currentPage/$measurementTotal"
@@ -799,6 +802,7 @@ class KeyboardView @JvmOverloads constructor(
 
         var usedWidth = 0
         var displayedCount = 0
+        var pageFull = false
         val horizontalMargin = dpToPx(2) * 2   // slot left + right margin
 
         candidateSlots.forEachIndexed { index, slot ->
@@ -807,6 +811,9 @@ class KeyboardView @JvmOverloads constructor(
                 slot.text = CandidatePronunciation.label(context, candidate, pronunciationMode,
                     colors.keyTextSecondary, pronunciationContext)
                 slot.maxLines = if (slot.text.contains('\n')) 2 else 1
+                // A suggestion wider than an entire page occupies one bounded
+                // pill. Other overflow suggestions continue on the next page.
+                slot.maxWidth = (availableWidth - horizontalMargin).coerceAtLeast(1)
                 slot.setTextColor(colors.candidateText)
                 slot.measure(
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -817,7 +824,7 @@ class KeyboardView @JvmOverloads constructor(
                 // Fit check: always show at least one candidate, even if it's wider than the row,
                 // so the user can still page forward. Otherwise require the pill to fit fully;
                 // remaining candidates roll over to the next page via displayedCount.
-                if (displayedCount == 0 || usedWidth + textWidth <= availableWidth) {
+                if (!pageFull && (displayedCount == 0 || usedWidth + textWidth <= availableWidth)) {
                     slot.visibility = View.VISIBLE
                     slot.setOnClickListener {
                         onCandidateSelected?.invoke(candidate)
@@ -825,6 +832,9 @@ class KeyboardView @JvmOverloads constructor(
                     usedWidth += textWidth
                     displayedCount++
                 } else {
+                    // Display a contiguous prefix so pagination cannot skip
+                    // a wider pronunciation label then show a narrower one.
+                    pageFull = true
                     slot.text = ""
                     slot.visibility = View.INVISIBLE
                     slot.setOnClickListener(null)
@@ -847,6 +857,7 @@ class KeyboardView @JvmOverloads constructor(
             val remainingPages = (remaining + perPage - 1) / perPage
             val actualTotal = (currentPage + remainingPages).coerceAtLeast(currentPage)
             pageIndicator?.text = "$currentPage/$actualTotal"
+            pageIndicator?.visibility = if (remaining > 0 || currentPage > 1) View.VISIBLE else View.GONE
         }
 
         return displayedCount
@@ -887,7 +898,7 @@ class KeyboardView @JvmOverloads constructor(
         // Small buffer to absorb rounding between measure and layout.
         used += dpToPx(2)
 
-        return (containerWidth - used).coerceAtLeast(dpToPx(80))
+        return (containerWidth - used).coerceAtLeast(1)
     }
 
     fun showNoMatch() {

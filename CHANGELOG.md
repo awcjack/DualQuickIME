@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Candidate pronunciation setting: off (default), Cantonese Jyutping, or Hanyu pinyin. One offline reading appears in grey above characters and suggested words in the strip and expanded grid, using Unicode Unihan and Rime dictionaries, including the preceding character for suggested continuations.
 
+### Fixed
+- Keep suggestions on one row in a fixed-height strip; move overflow to the next page instead of wrapping words and expanding the keyboard.
+
 ## [1.9.5] - 2026-10-02
 ### Changed
 - **Hold-and-slide number variants**: After holding a digit, slide to highlight a variant and release to insert it without an extra tap; release outside the chooser to cancel
