@@ -5,12 +5,13 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.6] - 2026-10-17
 ### Added
-- Candidate pronunciation setting: off (default), Cantonese Jyutping, or Hanyu pinyin. One offline reading appears in grey above characters and suggested words in the strip and expanded grid, using Unicode Unihan and Rime dictionaries, including the preceding character for suggested continuations.
+- **Candidate pronunciation labels**: Choose off (default), Cantonese Jyutping, or Hanyu pinyin in Settings. One reading appears in grey above characters and suggested words in the candidate strip and expanded grid
+- **Offline pronunciation dictionaries**: Readings come from Unicode Unihan and Rime dictionaries, using Mandarin usage frequencies where available and the preceding character for suggested word continuations
 
 ### Fixed
-- Keep suggestions on one row in a fixed-height strip; move overflow to the next page instead of wrapping words and expanding the keyboard.
+- **Stable suggestion strip**: Keep suggestions on one row in a fixed-height strip; move overflow to the next page instead of wrapping words and expanding the keyboard
 
 ## [1.9.5] - 2026-10-02
 ### Changed
