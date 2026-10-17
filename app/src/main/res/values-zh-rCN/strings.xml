@@ -124,4 +124,11 @@
     <string name="voice_model_u2pp_conformer_yue_desc">最佳精度体积比（5.05% MER，130M 参数）- 推荐</string>
     <string name="voice_model_qwen3_asr_name">Qwen3-ASR（最佳粤语）</string>
     <string name="voice_model_qwen3_asr_desc">粤语精度最高（~4.12% WER），支持粤英混合输入。需下载 942 MB，识别较慢。</string>
+
+    <!-- Candidate pronunciation -->
+    <string name="settings_pronunciation">候选字词拼音</string>
+    <string name="settings_pronunciation_desc">在候选字及联想词上方以灰色显示一个读音。离线可用；字典未收录的字不显示拼音。</string>
+    <string name="settings_pronunciation_none">不显示</string>
+    <string name="settings_pronunciation_cantonese">粤语拼音（粤拼）</string>
+    <string name="settings_pronunciation_mandarin">汉语拼音（普通话）</string>
 </resources>

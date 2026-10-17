@@ -694,7 +694,8 @@ class DualQuickInputMethodService : InputMethodService() {
                 candidates = currentPagePhrases,
                 currentPage = associatedPhrasesPage + 1,
                 totalCandidates = associatedPhrases.size,
-                startOffset = startIndex
+                startOffset = startIndex,
+                pronunciationContext = lastCommittedChar
             )
             // Track how many were actually displayed for dynamic pagination
             associatedPhrasesDisplayedCount = displayedCount
@@ -707,7 +708,7 @@ class DualQuickInputMethodService : InputMethodService() {
     private fun handleAssociatedPhraseSelected(phrase: String) {
         commitText(phrase)
         // Show associated phrases for the last character of the selected phrase
-        val lastChar = phrase.lastOrNull()?.toString() ?: ""
+        val lastChar = if (phrase.isEmpty()) "" else phrase.substring(phrase.offsetByCodePoints(phrase.length, -1))
         showAssociatedPhrases(lastChar)
     }
 

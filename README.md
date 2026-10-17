@@ -62,6 +62,7 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 - **Full emoji keyboard** - 9 categories; long-press any person emoji to pick a Fitzpatrick skin tone (saved as your default, shown once per base emoji with no duplicates)
 - **Symbol-mode util bar** - emoji, clipboard, 簡⇄繁, and voice buttons live above the number row for one-tap access
 - **Configurable candidate spacing** - tune pill padding (2–14 dp) to fit more candidates per row
+- **Optional pronunciation labels** - Settings → Candidate Bar → Pronunciation above candidates: off (default), Cantonese Jyutping, or Hanyu pinyin. Shows one sourced reading in grey above characters and suggested words in the strip and expanded grid, fully offline.
 - **Caps lock** - double-tap shift for continuous uppercase
 - **Hold to delete** - continuous backspace deletion on key hold
 
@@ -148,6 +149,8 @@ cd DualQuickIME
 ```
 
 ## Data Source
+
+Pronunciation data comes from the Unicode Consortium's [Unihan 17.0.0 database](https://www.unicode.org/Public/17.0.0/ucd/Unihan.zip): `kCantonese` for customary Jyutping readings, and the highest-frequency `kHanyuPinlu` reading for Mandarin where available, falling back to customary `kMandarin` (mainland preference). Suggested words also use [Rime Cantonese](https://github.com/rime/rime-cantonese) and [Terra Pinyin](https://github.com/rime/rime-terra-pinyin) word readings, including the preceding character for continuations. Characters without a sourced reading remain unlabelled. See [dictionary provenance, licenses, selection rules, and regeneration instructions](app/src/main/assets/pronunciation/README.md).
 
 Character data from [OpenVanilla](https://github.com/openvanilla/openvanilla):
 - **simplex-ext.cin** - Extended set with 63,190 characters (default)

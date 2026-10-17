@@ -22,6 +22,7 @@ import com.awcjack.dualquickime.BuildConfig
 import com.awcjack.dualquickime.convert.ChineseConverter
 import com.awcjack.dualquickime.theme.KeyboardColors
 import com.awcjack.dualquickime.theme.ThemeManager
+import com.awcjack.dualquickime.data.PronunciationMode
 import com.awcjack.dualquickime.util.KeyMapping
 
 /**
@@ -67,6 +68,8 @@ class KeyboardView @JvmOverloads constructor(
     private var showComposition = true
     private var candidatesPerPage = 6
     private var candidatePillPaddingDp = 8  // Horizontal padding inside each candidate pill (dp)
+    private var pronunciationMode = PronunciationMode.NONE
+    private var candidatePronunciationContext = ""
 
     // Candidate bar components (embedded, Gboard-style) - now with fixed slots
     private var candidateContainer: LinearLayout? = null
@@ -135,6 +138,7 @@ class KeyboardView @JvmOverloads constructor(
         showComposition = ThemeManager.getShowComposition(context)
         candidatesPerPage = ThemeManager.getCandidatesPerPage(context)
         candidatePillPaddingDp = ThemeManager.getCandidatePillPadding(context)
+        pronunciationMode = ThemeManager.getPronunciationMode(context)
         setBackgroundColor(colors.keyboardBackground)
         setPadding(dpToPx(3), dpToPx(6), dpToPx(3), dpToPx(8))
     }
@@ -767,8 +771,10 @@ class KeyboardView @JvmOverloads constructor(
         candidates: List<String>,
         currentPage: Int,
         totalCandidates: Int,
-        startOffset: Int
+        startOffset: Int,
+        pronunciationContext: String = ""
     ): Int {
+        candidatePronunciationContext = pronunciationContext
         // Hide number row when showing candidates
         hideNumberRow()
 
@@ -798,7 +804,10 @@ class KeyboardView @JvmOverloads constructor(
         candidateSlots.forEachIndexed { index, slot ->
             if (index < candidates.size) {
                 val candidate = candidates[index]
-                slot.text = candidate
+                slot.text = CandidatePronunciation.label(context, candidate, pronunciationMode,
+                    colors.keyTextSecondary, pronunciationContext)
+                slot.maxLines = if (slot.text.contains('\n')) 2 else 1
+                slot.setTextColor(colors.candidateText)
                 slot.measure(
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
@@ -1539,7 +1548,7 @@ class KeyboardView @JvmOverloads constructor(
     fun showCandidateGrid(allCandidates: List<String>, initialPage: Int = 0) {
         isCandidateGridMode = true
         buildKeyboard()
-        candidateGridView?.setCandidates(allCandidates, initialPage)
+        candidateGridView?.setCandidates(allCandidates, initialPage, candidatePronunciationContext)
     }
 
     /**

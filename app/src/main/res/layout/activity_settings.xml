@@ -160,6 +160,47 @@
 
                 </LinearLayout>
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_pronunciation"
+                    android:textSize="15sp"
+                    android:textColor="?android:textColorPrimary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_pronunciation_desc"
+                    android:textSize="12sp"
+                    android:textColor="?android:textColorSecondary"
+                    android:layout_marginTop="4dp" />
+
+                <RadioGroup
+                    android:id="@+id/pronunciationRadioGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="16dp">
+
+                    <RadioButton
+                        android:id="@+id/radioPronunciationNone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_pronunciation_none" />
+
+                    <RadioButton
+                        android:id="@+id/radioPronunciationCantonese"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_pronunciation_cantonese" />
+
+                    <RadioButton
+                        android:id="@+id/radioPronunciationMandarin"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_pronunciation_mandarin" />
+                </RadioGroup>
+
                 <!-- Candidates Per Page -->
                 <TextView
                     android:layout_width="wrap_content"

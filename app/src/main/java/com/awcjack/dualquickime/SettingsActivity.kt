@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import com.awcjack.dualquickime.convert.ChineseConverter
 import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.RecentCandidateManager
+import com.awcjack.dualquickime.data.PronunciationMode
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.voice.ModelDownloadManager
 import com.awcjack.dualquickime.voice.VoiceModelType
@@ -88,6 +89,7 @@ class SettingsActivity : AppCompatActivity() {
         setupCompositionToggle()
         setupCandidatesSeekBar()
         setupCandidatePaddingSeekBar()
+        setupPronunciationSelection()
         setupRecentCandidatesSettings()
         setupCharacterSetSettings()
         setupKeyboardBehaviorSettings()
@@ -118,6 +120,23 @@ class SettingsActivity : AppCompatActivity() {
         // Update voice settings UI when returning to activity
         if (BuildConfig.VOICE_INPUT_ENABLED) {
             updateVoiceSettingsUI()
+        }
+    }
+
+    private fun setupPronunciationSelection() {
+        val group = findViewById<RadioGroup>(R.id.pronunciationRadioGroup)
+        group.check(when (ThemeManager.getPronunciationMode(this)) {
+            PronunciationMode.NONE -> R.id.radioPronunciationNone
+            PronunciationMode.CANTONESE -> R.id.radioPronunciationCantonese
+            PronunciationMode.MANDARIN -> R.id.radioPronunciationMandarin
+        })
+        group.setOnCheckedChangeListener { _, checkedId ->
+            val mode = when (checkedId) {
+                R.id.radioPronunciationCantonese -> PronunciationMode.CANTONESE
+                R.id.radioPronunciationMandarin -> PronunciationMode.MANDARIN
+                else -> PronunciationMode.NONE
+            }
+            ThemeManager.setPronunciationMode(this, mode)
         }
     }
 

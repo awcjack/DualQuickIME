@@ -108,4 +108,11 @@
     <string name="voice_model_whisper_cantonese_desc">Optimized for Cantonese (7.93% CER) with HK English support</string>
     <string name="voice_model_u2pp_conformer_yue_name">U2pp-Conformer Yue</string>
     <string name="voice_model_u2pp_conformer_yue_desc">Best accuracy-to-size ratio (5.05% MER, 130M params) - Recommended</string>
+
+    <!-- Candidate pronunciation -->
+    <string name="settings_pronunciation">Pronunciation above candidates</string>
+    <string name="settings_pronunciation_desc">Show one reading in grey above characters and suggested words. Readings are available offline; characters without a dictionary entry have no label.</string>
+    <string name="settings_pronunciation_none">Do not display</string>
+    <string name="settings_pronunciation_cantonese">Cantonese pinyin (Jyutping)</string>
+    <string name="settings_pronunciation_mandarin">Hanyu pinyin (Mandarin)</string>
 </resources>

@@ -10,8 +10,10 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.text.TextUtils
 import com.awcjack.dualquickime.theme.KeyboardColors
 import com.awcjack.dualquickime.theme.ThemeManager
+import com.awcjack.dualquickime.data.PronunciationMode
 
 /**
  * Full-screen candidate grid view that covers the entire keyboard space.
@@ -30,6 +32,8 @@ class CandidateGridView @JvmOverloads constructor(
     private var onBackPressed: (() -> Unit)? = null
 
     private lateinit var colors: KeyboardColors
+    private var pronunciationMode = PronunciationMode.NONE
+    private var pronunciationContext = ""
 
     private var allCandidates: List<String> = emptyList()
     private var currentPage: Int = 0
@@ -51,6 +55,7 @@ class CandidateGridView @JvmOverloads constructor(
 
     private fun loadTheme() {
         colors = ThemeManager.getColors(context)
+        pronunciationMode = ThemeManager.getPronunciationMode(context)
         setBackgroundColor(colors.keyboardBackground)
         setPadding(dpToPx(3), dpToPx(6), dpToPx(3), dpToPx(8))
     }
@@ -67,7 +72,8 @@ class CandidateGridView @JvmOverloads constructor(
      * @param candidates All candidates to display.
      * @param initialPage The page to show initially (0-based).
      */
-    fun setCandidates(candidates: List<String>, initialPage: Int = 0) {
+    fun setCandidates(candidates: List<String>, initialPage: Int = 0, pronunciationContext: String = "") {
+        this.pronunciationContext = pronunciationContext
         allCandidates = candidates
         currentPage = initialPage.coerceIn(0, maxOf(0, totalPages - 1))
         buildView()
@@ -109,7 +115,9 @@ class CandidateGridView @JvmOverloads constructor(
 
         for (row in 0 until gridRows) {
             val rowLayout = LinearLayout(context).apply {
-                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(44))
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(
+                    if (pronunciationMode == PronunciationMode.NONE) 44 else 54
+                ))
                 orientation = HORIZONTAL
                 gravity = Gravity.CENTER
             }
@@ -133,12 +141,13 @@ class CandidateGridView @JvmOverloads constructor(
 
     private fun createCandidateCell(candidate: String): TextView {
         return TextView(context).apply {
-            val charCount = candidate.length
+            val charCount = candidate.codePointCount(0, candidate.length)
             layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
                 setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             }
             gravity = Gravity.CENTER
-            text = candidate
+            text = CandidatePronunciation.label(context, candidate, pronunciationMode, colors.keyTextSecondary,
+                pronunciationContext)
             // Adjust text size based on phrase length to fit in fixed cell
             textSize = when {
                 charCount <= 1 -> 20f
@@ -150,7 +159,10 @@ class CandidateGridView @JvmOverloads constructor(
             background = createPillBackground(colors.candidatePillBackground, colors.candidatePillBackgroundPressed)
             elevation = dpToPx(1).toFloat()
             // Single line, scale text to fit
-            maxLines = 1
+            maxLines = if (text.contains('\n')) 2 else 1
+            setHorizontallyScrolling(true)
+            ellipsize = TextUtils.TruncateAt.END
+            setLineSpacing(0f, 0.9f)
             setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
 
             setOnClickListener {

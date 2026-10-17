@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Color
+import com.awcjack.dualquickime.data.PronunciationMode
 
 /**
  * Manages keyboard theme settings (light/dark/auto).
@@ -23,6 +24,7 @@ object ThemeManager {
     private const val KEY_DEFAULT_SKIN_TONE = "default_skin_tone"
     private const val KEY_CHINESE_CONVERT_ENABLED = "chinese_convert_enabled"
     private const val KEY_CANDIDATE_PILL_PADDING = "candidate_pill_padding"
+    private const val KEY_PRONUNCIATION_MODE = "pronunciation_mode"
 
     const val THEME_LIGHT = 0
     const val THEME_DARK = 1
@@ -231,6 +233,13 @@ object ThemeManager {
     fun setCandidatePillPadding(context: Context, dp: Int) {
         cachedCandidatePillPadding = dp.coerceIn(CANDIDATE_PADDING_MIN, CANDIDATE_PADDING_MAX)
         getPrefs(context).edit().putInt(KEY_CANDIDATE_PILL_PADDING, cachedCandidatePillPadding).apply()
+    }
+
+    fun getPronunciationMode(context: Context): PronunciationMode =
+        PronunciationMode.fromPreference(getPrefs(context).getString(KEY_PRONUNCIATION_MODE, null))
+
+    fun setPronunciationMode(context: Context, mode: PronunciationMode) {
+        getPrefs(context).edit().putString(KEY_PRONUNCIATION_MODE, mode.preferenceValue).apply()
     }
 
     /**
