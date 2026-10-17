@@ -5,9 +5,10 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.7] - 2026-10-17
 ### Fixed
 - **Pronunciation cell sizing**: Measure both text lines using Android font metrics and the selected font size, keeping pronunciation labels and Chinese characters fully inside candidate pills in the strip and expanded grid
+- **Candidate text centering**: Keep each text line within the actual cell width, shortening oversized labels while still inserting the full selected word
 
 ## [1.9.6] - 2026-10-17
 ### Added
