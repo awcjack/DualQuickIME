@@ -27,6 +27,7 @@ class CandidateSizingTest {
     private fun contextAt(scale: Float): Context {
         val app = RuntimeEnvironment.getApplication()
         val config = Configuration(app.resources.configuration).apply { fontScale = scale }
+        CandidatePronunciation.resumeLoading()
         CandidatePronunciation.preload(app, PronunciationMode.CANTONESE).get(10, TimeUnit.SECONDS)
         CandidatePronunciation.preload(app, PronunciationMode.MANDARIN).get(10, TimeUnit.SECONDS)
         return app.createConfigurationContext(config)

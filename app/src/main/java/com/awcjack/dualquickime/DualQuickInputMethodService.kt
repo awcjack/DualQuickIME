@@ -1,6 +1,8 @@
 package com.awcjack.dualquickime
 
 import android.Manifest
+import android.app.ActivityManager
+import android.content.ComponentCallbacks2
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -22,6 +24,7 @@ import com.awcjack.dualquickime.data.CompositionState
 import com.awcjack.dualquickime.data.RecentCandidateManager
 import com.awcjack.dualquickime.data.SimplexTable
 import com.awcjack.dualquickime.data.PronunciationMode
+import com.awcjack.dualquickime.data.KeyboardDataWorker
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.ui.KeyboardView
 import com.awcjack.dualquickime.ui.CandidatePronunciation
@@ -31,6 +34,8 @@ import com.awcjack.dualquickime.voice.VoiceInputManager
 import com.awcjack.dualquickime.voice.VoiceModelType
 import kotlin.concurrent.thread
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CancellationException
+import java.util.concurrent.CompletionException
 
 /**
  * Quick (速成) Input Method Service for Android.
@@ -46,8 +51,14 @@ import java.util.concurrent.CompletableFuture
  */
 class DualQuickInputMethodService : InputMethodService() {
 
-    private lateinit var simplexTable: SimplexTable
-    private lateinit var associatedPhrasesTable: AssociatedPhrasesTable
+    private var simplexTable = SimplexTable(emptyList())
+    private var associatedPhrasesTable = AssociatedPhrasesTable.EMPTY
+    private var associatedPhrasesLoad: CompletableFuture<AssociatedPhrasesTable>? = null
+    private var pendingAssociatedCharacter: String? = null
+    @Volatile private var optionalGeneration = 0
+    @Volatile private var memoryConstrained = false
+    @Volatile private var allocationFailed = false
+    @Volatile private var destroyed = false
     private var composition = CompositionState.EMPTY
 
     private var keyboardView: KeyboardView? = null
@@ -78,6 +89,7 @@ class DualQuickInputMethodService : InputMethodService() {
 
     // Track which character set is currently loaded
     private var currentCharsetExtended: Boolean? = null
+    private var usingFallbackCharset = false
 
     // System clipboard manager and listener
     private var clipboardManager: ClipboardManager? = null
@@ -88,18 +100,16 @@ class DualQuickInputMethodService : InputMethodService() {
     private var rootContainer: FrameLayout? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pronunciationMode = PronunciationMode.NONE
-    private var pronunciationPreload: CompletableFuture<Void>? = null
+    private var pronunciationPreload: CompletableFuture<*>? = null
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
         handleSystemClipboardChange()
     }
 
     override fun onCreate() {
         super.onCreate()
-        preloadPronunciations()
+        memoryConstrained = isSystemMemoryLow()
         // Load simplex data based on user setting (extended by default)
         loadSimplexTable()
-        // Load associated phrases table
-        loadAssociatedPhrasesTable()
 
         // Register clipboard listener to capture system clipboard changes
         clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -110,9 +120,24 @@ class DualQuickInputMethodService : InputMethodService() {
      * Load the simplex table based on user's character set preference.
      */
     private fun loadSimplexTable() {
-        val filename = ThemeManager.getSimplexFilename(this)
+        currentCharsetExtended = ThemeManager.getUseExtendedCharset(this)
+        val filename = if (memoryConstrained) "simplex.cin" else ThemeManager.getSimplexFilename(this)
+        usingFallbackCharset = memoryConstrained && currentCharsetExtended == true
+        // Do not retain the previous large table while allocating its replacement.
+        simplexTable = SimplexTable(emptyList())
         try {
             simplexTable = CinParser().parse(assets.open(filename))
+        } catch (e: OutOfMemoryError) {
+            usingFallbackCharset = true
+            allocationFailed = true
+            releaseOptionalMemory()
+            if (filename != "simplex.cin") {
+                try {
+                    simplexTable = CinParser().parse(assets.open("simplex.cin"))
+                } catch (_: OutOfMemoryError) {
+                    // English keys remain usable even if the basic table cannot fit.
+                } catch (_: Exception) { }
+            }
         } catch (e: Exception) {
             // Fallback to empty table if loading fails
             simplexTable = SimplexTable(emptyList())
@@ -132,12 +157,87 @@ class DualQuickInputMethodService : InputMethodService() {
      * Load the associated phrases table from assets.
      */
     private fun loadAssociatedPhrasesTable() {
+        if (memoryConstrained || destroyed || associatedPhrasesLoad != null) return
+        val token = optionalGeneration
+        val future = CompletableFuture<AssociatedPhrasesTable>()
+        associatedPhrasesLoad = future
         try {
-            associatedPhrasesTable = AssociatedPhrasesParser().parse(assets.open("associated-phrases.cin"))
+            KeyboardDataWorker.executor.execute {
+                try {
+                    val active = { !destroyed && !memoryConstrained && optionalGeneration == token }
+                    if (!active()) return@execute
+                    val table = AssociatedPhrasesParser().parse(assets.open("associated-phrases.cin"), active)
+                    if (active()) future.complete(table)
+                } catch (_: CancellationException) {
+                    future.cancel(false)
+                } catch (e: OutOfMemoryError) {
+                    // Stop pronunciation work queued behind this allocation failure.
+                    memoryConstrained = true
+                    allocationFailed = true
+                    CandidatePronunciation.releaseMemory()
+                    future.completeExceptionally(e)
+                } catch (e: Exception) {
+                    future.completeExceptionally(e)
+                }
+            }
+        } catch (e: OutOfMemoryError) {
+            memoryConstrained = true
+            allocationFailed = true
+            CandidatePronunciation.releaseMemory()
+            future.completeExceptionally(e)
         } catch (e: Exception) {
-            // Fallback to empty table if loading fails
-            associatedPhrasesTable = AssociatedPhrasesTable.EMPTY
+            future.completeExceptionally(e)
         }
+        future.whenCompleteAsync({ table, error ->
+            if (destroyed || optionalGeneration != token) return@whenCompleteAsync
+            if (memoryConstrained) {
+                releaseOptionalMemory()
+            } else if (error == null) {
+                associatedPhrasesTable = table
+                pendingAssociatedCharacter?.let { character ->
+                    pendingAssociatedCharacter = null
+                    showAssociatedPhrases(character)
+                }
+            } else {
+                associatedPhrasesLoad = null
+            }
+        }, { task -> mainHandler.post(task) })
+    }
+
+    private fun isSystemMemoryLow(): Boolean {
+        val manager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+        return ActivityManager.MemoryInfo().also { manager.getMemoryInfo(it) }.lowMemory
+    }
+
+    private fun releaseOptionalMemory(rebuildKeyboard: Boolean = true) {
+        memoryConstrained = true
+        optionalGeneration++
+        associatedPhrasesLoad?.cancel(false)
+        associatedPhrasesLoad = null
+        associatedPhrasesTable = AssociatedPhrasesTable.EMPTY
+        pendingAssociatedCharacter = null
+        pronunciationPreload?.cancel(false)
+        pronunciationPreload = null
+        CandidatePronunciation.releaseMemory()
+        keyboardView?.setMemoryConstrained(true, rebuild = rebuildKeyboard)
+        clearAssociatedPhrases()
+        if (!rebuildKeyboard) return
+        when {
+            isEmailSuggestionsMode -> updateEmailSuggestionsView()
+            composition.hasCandidates -> updateCandidateView()
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            releaseOptionalMemory(rebuildKeyboard = level < ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        releaseOptionalMemory(rebuildKeyboard = isInputViewShown)
     }
 
     /**
@@ -161,7 +261,7 @@ class DualQuickInputMethodService : InputMethodService() {
         // Create root container to hold keyboard and voice input overlay
         rootContainer = FrameLayout(this)
 
-        keyboardView = KeyboardView(this).apply {
+        keyboardView = KeyboardView(this, initiallyMemoryConstrained = memoryConstrained).apply {
             setOnKeyPressListener { event ->
                 handleKeyEvent(event)
             }
@@ -218,6 +318,7 @@ class DualQuickInputMethodService : InputMethodService() {
                 updateCandidateView()
             }
         }
+        honorViewMemoryFallback()
         rootContainer?.addView(keyboardView)
 
         // Create voice input overlay (initially hidden)
@@ -260,17 +361,20 @@ class DualQuickInputMethodService : InputMethodService() {
         ThemeManager.invalidateCache()
         ClipboardHistoryManager.invalidateCache()
         RecentCandidateManager.invalidateCache()
-        preloadPronunciations()
+        memoryConstrained = isSystemMemoryLow() || allocationFailed
+        allocationFailed = false
+        if (memoryConstrained) releaseOptionalMemory(rebuildKeyboard = false)
+        else CandidatePronunciation.resumeLoading()
+        keyboardView?.setMemoryConstrained(memoryConstrained, rebuild = false)
 
         // Pre-bind the :voice process if the user has Qwen3-ASR selected.
         // Saves the 500 ms – 2 s bindService cold start off the mic-tap path,
         // while still leaving the 700 MB model load lazy.
-        maybePreBindVoiceService()
+        if (!memoryConstrained) maybePreBindVoiceService()
 
         // Check if character set setting changed - reload if needed
         val useExtended = ThemeManager.getUseExtendedCharset(this)
-        if (currentCharsetExtended != useExtended) {
-            currentCharsetExtended = useExtended
+        if (currentCharsetExtended != useExtended || (usingFallbackCharset && !memoryConstrained)) {
             loadSimplexTable()
         }
 
@@ -278,6 +382,7 @@ class DualQuickInputMethodService : InputMethodService() {
         isPasswordMaskEnabled = true
         // Refresh theme in case it changed in settings
         keyboardView?.refreshTheme()
+        honorViewMemoryFallback()
         // Clear composition when starting new input
         clearComposition()
         // Clear associated phrases mode
@@ -296,9 +401,19 @@ class DualQuickInputMethodService : InputMethodService() {
             isSymbolMode = false
             keyboardView?.setLetterMode()
         }
+        // Create the typing view before starting optional asset parsing. A
+        // shared serial worker avoids simultaneous dictionary allocations.
+        val token = optionalGeneration
+        keyboardView?.postOnAnimation {
+            if (!destroyed && !memoryConstrained && token == optionalGeneration) {
+                loadAssociatedPhrasesTable()
+                preloadPronunciations()
+            }
+        }
     }
 
     private fun preloadPronunciations() {
+        if (memoryConstrained || destroyed) return
         val mode = ThemeManager.getPronunciationMode(this)
         if (mode == pronunciationMode && pronunciationPreload?.isCompletedExceptionally == false) return
         // Cancel this service's notification, not the shared dictionary load.
@@ -306,14 +421,30 @@ class DualQuickInputMethodService : InputMethodService() {
         pronunciationMode = mode
         pronunciationPreload = null
         if (mode == PronunciationMode.NONE) return
-        pronunciationPreload = CandidatePronunciation.preload(this, mode).thenRunAsync({
-            if (ThemeManager.getPronunciationMode(this) != mode) return@thenRunAsync
-            if (keyboardView?.refreshCandidateGridPronunciations() == true) return@thenRunAsync
+        val token = optionalGeneration
+        pronunciationPreload = CandidatePronunciation.preload(this, mode).handleAsync({ _, error ->
+            if (destroyed || token != optionalGeneration) return@handleAsync null
+            if (generateSequence(error) { it.cause }.any { it is OutOfMemoryError }) {
+                allocationFailed = true
+                releaseOptionalMemory()
+                return@handleAsync null
+            }
+            if (error != null) throw CompletionException(error)
+            if (memoryConstrained || ThemeManager.getPronunciationMode(this) != mode) return@handleAsync null
+            if (keyboardView?.refreshCandidateGridPronunciations() == true) return@handleAsync null
             when {
                 isAssociatedPhrasesMode -> updateAssociatedPhrasesView()
                 composition.hasCandidates -> updateCandidateView()
             }
+            null
         }, { task -> mainHandler.post(task) })
+    }
+
+    private fun honorViewMemoryFallback() {
+        if (!memoryConstrained && keyboardView?.isUsingMemoryFallback() == true) {
+            allocationFailed = true
+            releaseOptionalMemory()
+        }
     }
 
     /**
@@ -341,6 +472,7 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun handleKeyEvent(event: KeyboardView.KeyEvent) {
+        pendingAssociatedCharacter = null
         when (event) {
             is KeyboardView.KeyEvent.Letter -> handleLetter(event.char)
             is KeyboardView.KeyEvent.Number -> handleNumber(event.digit)
@@ -664,6 +796,11 @@ class DualQuickInputMethodService : InputMethodService() {
             return
         }
 
+        if (associatedPhrasesTable === AssociatedPhrasesTable.EMPTY && !memoryConstrained) {
+            pendingAssociatedCharacter = character
+            return
+        }
+
         val phrases = associatedPhrasesTable.lookup(character)
         if (phrases.isEmpty()) {
             clearAssociatedPhrases()
@@ -685,6 +822,7 @@ class DualQuickInputMethodService : InputMethodService() {
      * Clear associated phrases mode and return to normal input.
      */
     private fun clearAssociatedPhrases() {
+        pendingAssociatedCharacter = null
         isAssociatedPhrasesMode = false
         associatedPhrases = emptyList()
         associatedPhrasesPage = 0
@@ -828,6 +966,7 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     private fun clearComposition() {
+        pendingAssociatedCharacter = null
         composition = CompositionState.EMPTY
         letterCases.clear()
         keyboardView?.clearCandidates()
@@ -1178,6 +1317,10 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        destroyed = true
+        optionalGeneration++
+        associatedPhrasesLoad?.cancel(false)
+        associatedPhrasesLoad = null
         pronunciationPreload?.cancel(false)
         pronunciationPreload = null
         super.onDestroy()

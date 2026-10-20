@@ -31,6 +31,7 @@ class CandidatePronunciationTest {
     @Before fun resetPreferences() {
         context.getSharedPreferences("dualquick_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         ThemeManager.invalidateCache()
+        CandidatePronunciation.resumeLoading()
         CandidatePronunciation.preload(context, PronunciationMode.CANTONESE).get(10, TimeUnit.SECONDS)
         CandidatePronunciation.preload(context, PronunciationMode.MANDARIN).get(10, TimeUnit.SECONDS)
     }

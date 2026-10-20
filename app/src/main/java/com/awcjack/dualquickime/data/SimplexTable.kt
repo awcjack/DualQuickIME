@@ -6,18 +6,21 @@ import com.awcjack.dualquickime.util.KeyMapping
  * Lookup table for 速成 (Quick/Simplified Cangjie) input method.
  * Maps input codes to lists of Chinese characters, preserving frequency order.
  */
-class SimplexTable(entries: List<SimplexEntry>) {
+class SimplexTable private constructor(private val codeToChars: Map<String, List<String>>) {
 
     // Map from code -> list of characters (ordered by frequency from .cin file)
-    private val codeToChars: Map<String, List<String>>
-
-    init {
+    constructor(entries: List<SimplexEntry>) : this(
         // Group entries by code, preserving order within each group
-        codeToChars = entries
+        entries
             .groupBy { it.code }
             .mapValues { (_, entries) ->
                 entries.sortedBy { it.order }.map { it.character }
             }
+    )
+
+    companion object {
+        /** Parser-owned lists already follow source frequency order. */
+        internal fun fromOrderedCharacters(characters: Map<String, List<String>>) = SimplexTable(characters)
     }
 
     /**

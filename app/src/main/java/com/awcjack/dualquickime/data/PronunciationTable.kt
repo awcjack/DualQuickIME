@@ -1,6 +1,7 @@
 package com.awcjack.dualquickime.data
 
 import java.io.InputStream
+import java.util.concurrent.CancellationException
 
 /** One sourced, customary reading per Unicode code point. No guessed fallbacks. */
 class PronunciationTable private constructor(
@@ -27,10 +28,12 @@ class PronunciationTable private constructor(
     }
 
     companion object {
-        fun parse(input: InputStream, wordInput: InputStream? = null): PronunciationTable {
+        fun parse(input: InputStream, wordInput: InputStream? = null,
+                  shouldContinue: () -> Boolean = { true }): PronunciationTable {
             val readings = HashMap<Int, String>()
             input.bufferedReader(Charsets.UTF_8).useLines { lines ->
                 lines.filter { it.isNotBlank() && !it.startsWith("#") }.forEach { line ->
+                    if (!shouldContinue()) throw CancellationException("Pronunciation loading canceled")
                     val fields = line.split('\t', limit = 2)
                     require(fields.size == 2 && fields[1].isNotBlank()) { "Invalid pronunciation entry" }
                     val codePoint = fields[0].toInt(16)
@@ -41,6 +44,7 @@ class PronunciationTable private constructor(
             val words = HashMap<String, String>()
             wordInput?.bufferedReader(Charsets.UTF_8)?.useLines { lines ->
                 lines.filter { it.isNotBlank() && !it.startsWith("#") }.forEach { line ->
+                    if (!shouldContinue()) throw CancellationException("Pronunciation loading canceled")
                     val fields = line.split('\t', limit = 2)
                     require(fields.size == 2 && fields[0].isNotEmpty()) { "Invalid word pronunciation entry" }
                     require(fields[1].split(' ').size == fields[0].codePointCount(0, fields[0].length)) {

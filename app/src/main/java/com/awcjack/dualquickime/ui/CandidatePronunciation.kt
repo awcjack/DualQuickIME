@@ -15,8 +15,9 @@ import android.widget.TextView
 import com.awcjack.dualquickime.data.PronunciationMode
 import com.awcjack.dualquickime.data.PronunciationRepository
 import com.awcjack.dualquickime.data.PronunciationTable
+import com.awcjack.dualquickime.data.KeyboardDataWorker
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Executors
+import java.util.concurrent.CancellationException
 
 /** Shared label formatting for the candidate strip and expanded grid. */
 object CandidatePronunciation {
@@ -31,20 +32,16 @@ object CandidatePronunciation {
             repository ?: run {
                 // Retain only the application, never a keyboard view/service.
                 val app = context.applicationContext
-                val worker = Executors.newSingleThreadExecutor { task ->
-                    Thread({
-                        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
-                        task.run()
-                    }, "PronunciationLoader").apply { isDaemon = true }
-                }
-                PronunciationRepository(worker) { mode ->
+                PronunciationRepository(KeyboardDataWorker.executor) { mode, shouldContinue ->
                     val assetName = requireNotNull(mode.assetName)
                     try {
                         app.assets.open("pronunciation/$assetName").use { characters ->
                             app.assets.open("pronunciation/${assetName.removeSuffix(".tsv")}-words.tsv").use { words ->
-                                PronunciationTable.parse(characters, words)
+                                PronunciationTable.parse(characters, words, shouldContinue)
                             }
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         Log.e("CandidatePronunciation", "Unable to load $assetName", e)
                         throw e
@@ -54,9 +51,17 @@ object CandidatePronunciation {
         }
     }
 
-    fun preload(context: Context, mode: PronunciationMode): CompletableFuture<PronunciationTable?> =
-        if (mode == PronunciationMode.NONE) CompletableFuture.completedFuture(null)
-        else repository(context).preload(mode)
+    fun preload(context: Context, mode: PronunciationMode): CompletableFuture<PronunciationTable?> {
+        if (mode == PronunciationMode.NONE) return CompletableFuture.completedFuture(null)
+        return repository(context).preload(mode)
+    }
+
+    fun resumeLoading() { repository?.resume() }
+
+    fun releaseMemory() {
+        repository?.releaseMemory()
+        cellHeights.evictAll()
+    }
 
     fun label(candidate: String, mode: PronunciationMode, grey: Int,
               precedingCharacter: String = ""): CharSequence {

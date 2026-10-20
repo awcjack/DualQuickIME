@@ -22,8 +22,7 @@ class CinParser {
      * @return A SimplexTable containing all parsed entries
      */
     fun parse(inputStream: InputStream): SimplexTable {
-        val entries = mutableListOf<SimplexEntry>()
-        var order = 0
+        val characters = mutableMapOf<String, MutableList<String>>()
         var inChardef = false
 
         inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
@@ -39,18 +38,14 @@ class CinParser {
                     }
                     inChardef && trimmed.isNotBlank() -> {
                         // Parse character definition line: <code> <character>
-                        val parts = trimmed.split(Regex("\\s+"), limit = 2)
-                        if (parts.size == 2) {
-                            val code = parts[0].lowercase()
-                            val character = parts[1]
+                        val separator = trimmed.indexOfFirst { it.isWhitespace() }
+                        if (separator > 0) {
+                            val code = trimmed.substring(0, separator).lowercase()
+                            val character = trimmed.substring(separator).trimStart()
 
                             // Only accept 1-2 character codes (a-z only)
-                            if (code.length in 1..2 && code.all { it in 'a'..'z' }) {
-                                entries.add(SimplexEntry(
-                                    code = code,
-                                    character = character,
-                                    order = order++
-                                ))
+                            if (character.isNotEmpty() && code.length in 1..2 && code.all { it in 'a'..'z' }) {
+                                characters.getOrPut(code) { mutableListOf() }.add(character)
                             }
                         }
                     }
@@ -58,7 +53,9 @@ class CinParser {
             }
         }
 
-        return SimplexTable(entries)
+        // Avoid building and regrouping tens of thousands of intermediate
+        // SimplexEntry objects just to recover the original file order.
+        return SimplexTable.fromOrderedCharacters(characters)
     }
 
     companion object {

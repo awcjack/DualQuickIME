@@ -34,8 +34,11 @@ import com.awcjack.dualquickime.util.KeyMapping
 class KeyboardView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = 0
+    defStyleAttr: Int = 0,
+    initiallyMemoryConstrained: Boolean = false
 ) : LinearLayout(context, attrs, defStyleAttr) {
+
+    private var memoryConstrained = initiallyMemoryConstrained
 
     private var onKeyPress: ((KeyEvent) -> Unit)? = null
     private var onModeChange: ((Boolean) -> Unit)? = null
@@ -139,7 +142,7 @@ class KeyboardView @JvmOverloads constructor(
         showComposition = ThemeManager.getShowComposition(context)
         candidatesPerPage = ThemeManager.getCandidatesPerPage(context)
         candidatePillPaddingDp = ThemeManager.getCandidatePillPadding(context)
-        pronunciationMode = ThemeManager.getPronunciationMode(context)
+        pronunciationMode = if (memoryConstrained) PronunciationMode.NONE else ThemeManager.getPronunciationMode(context)
         setBackgroundColor(colors.keyboardBackground)
         setPadding(dpToPx(3), dpToPx(6), dpToPx(3), dpToPx(8))
     }
@@ -149,6 +152,30 @@ class KeyboardView @JvmOverloads constructor(
      */
     fun refreshTheme() {
         safeRebuild("refreshTheme")
+    }
+
+    fun isUsingMemoryFallback(): Boolean = memoryConstrained
+
+    /** Shed optional views and decorations without changing saved settings. */
+    fun setMemoryConstrained(constrained: Boolean, rebuild: Boolean = true) {
+        val changed = memoryConstrained != constrained
+        val hadOptionalPanel = isCandidateGridMode || symbolPage == 99 || symbolPage == 100
+        memoryConstrained = constrained
+        if (constrained) {
+            // A hidden panel must release its attached tree too. The service
+            // rebuilds the typing layout when the input view is shown again.
+            if (hadOptionalPanel && !rebuild) removeAllViews()
+            candidateGridView = null
+            emojiKeyboardView = null
+            clipboardKeyboardView = null
+            isCandidateGridMode = false
+            if (symbolPage == 99 || symbolPage == 100) {
+                symbolPage = 0
+                isSymbolMode = false
+                onModeChange?.invoke(false)
+            }
+        }
+        if ((changed || (constrained && hadOptionalPanel)) && rebuild) safeRebuild("memory pressure")
     }
 
     // If loadTheme or buildKeyboard throws, removeAllViews() has already run and the
@@ -163,6 +190,8 @@ class KeyboardView @JvmOverloads constructor(
             isSymbolMode = false
             symbolPage = 0
             isCandidateGridMode = false
+            CandidatePronunciation.releaseMemory()
+            setMemoryConstrained(true, rebuild = false)
             try {
                 loadTheme()
                 buildKeyboard()

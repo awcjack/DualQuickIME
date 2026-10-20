@@ -1,6 +1,7 @@
 package com.awcjack.dualquickime.data
 
 import java.io.InputStream
+import java.util.concurrent.CancellationException
 
 /**
  * Represents the associated phrases table loaded from OpenVanilla's associated-phrases.cin.
@@ -70,12 +71,13 @@ class AssociatedPhrasesParser {
      * @param inputStream The input stream to read from
      * @return An AssociatedPhrasesTable containing all parsed entries
      */
-    fun parse(inputStream: InputStream): AssociatedPhrasesTable {
+    fun parse(inputStream: InputStream, shouldContinue: () -> Boolean = { true }): AssociatedPhrasesTable {
         val phraseMap = mutableMapOf<String, MutableList<String>>()
         var inChardef = false
 
         inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
             for (line in lines) {
+                if (!shouldContinue()) throw CancellationException("Suggestion loading canceled")
                 val trimmed = line.trim()
 
                 when {
@@ -87,13 +89,13 @@ class AssociatedPhrasesParser {
                     }
                     inChardef && trimmed.isNotBlank() && !trimmed.startsWith("%") -> {
                         // Parse character definition line: <prefix> <phrase>
-                        val parts = trimmed.split(Regex("\\s+"), limit = 2)
-                        if (parts.size == 2) {
-                            val prefix = parts[0]
-                            val phrase = parts[1]
+                        val separator = trimmed.indexOfFirst { it.isWhitespace() }
+                        if (separator > 0) {
+                            val prefix = trimmed.substring(0, separator)
+                            val phrase = trimmed.substring(separator).trimStart()
 
                             // Add to the list for this prefix character
-                            phraseMap.getOrPut(prefix) { mutableListOf() }.add(phrase)
+                            if (phrase.isNotEmpty()) phraseMap.getOrPut(prefix) { mutableListOf() }.add(phrase)
                         }
                     }
                 }
