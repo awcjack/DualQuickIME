@@ -5,6 +5,11 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.9] - 2026-10-20
+### Fixed
+- **Keyboard availability under memory pressure**: Load the core Quick table once with fewer temporary allocations, defer optional dictionaries to a shared background worker, cancel and release suggestions and pronunciation data when memory is tight, and retry a simpler keyboard layout without changing saved settings
+- **Dictionary allocation failures**: Contain optional dictionary out-of-memory errors instead of terminating the keyboard process; fall back to the standard character set if the extended Quick table cannot fit
+
 ## [1.9.8] - 2026-10-20
 ### Fixed
 - **Keyboard responsiveness with pronunciation enabled**: Preload dictionaries on a background worker instead of parsing them while drawing the first candidates; refresh readings when ready and reuse font measurements and fitted labels during keyboard rebuilds
