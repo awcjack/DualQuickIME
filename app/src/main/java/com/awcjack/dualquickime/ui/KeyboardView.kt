@@ -808,7 +808,7 @@ class KeyboardView @JvmOverloads constructor(
         candidateSlots.forEachIndexed { index, slot ->
             if (index < candidates.size) {
                 val candidate = candidates[index]
-                slot.bindLabel(CandidatePronunciation.label(context, candidate, pronunciationMode,
+                slot.bindLabel(CandidatePronunciation.label(candidate, pronunciationMode,
                     colors.keyTextSecondary, pronunciationContext))
                 // A suggestion wider than an entire page occupies one bounded
                 // pill. Other overflow suggestions continue on the next page.
@@ -1548,6 +1548,14 @@ class KeyboardView @JvmOverloads constructor(
             slot.setOnClickListener(null)
         }
         pageIndicator?.visibility = View.GONE
+    }
+
+    /** Refresh an open grid after background loading without resetting its page. */
+    fun refreshCandidateGridPronunciations(): Boolean {
+        if (!isCandidateGridMode) return false
+        // Rebuild the existing grid without changing its page or word context.
+        candidateGridView?.refreshTheme()
+        return true
     }
 
     /**

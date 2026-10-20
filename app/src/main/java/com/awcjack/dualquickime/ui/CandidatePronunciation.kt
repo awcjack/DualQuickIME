@@ -1,46 +1,69 @@
 package com.awcjack.dualquickime.ui
 
 import android.content.Context
+import android.content.res.Configuration
 import android.os.Build
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.util.Log
+import android.util.LruCache
 import android.util.TypedValue
 import android.view.View
 import android.widget.TextView
 import com.awcjack.dualquickime.data.PronunciationMode
+import com.awcjack.dualquickime.data.PronunciationRepository
 import com.awcjack.dualquickime.data.PronunciationTable
-import java.io.IOException
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
 
 /** Shared label formatting for the candidate strip and expanded grid. */
 object CandidatePronunciation {
-    private val tables = mutableMapOf<PronunciationMode, PronunciationTable?>()
+    @Volatile private var repository: PronunciationRepository? = null
+    private data class CellMetricsKey(val configuration: Configuration, val density: Float,
+                                      val textSizeSp: Float, val paddingDp: Int)
+    private val cellHeights = LruCache<CellMetricsKey, Int>(8)
 
-    fun label(context: Context, candidate: String, mode: PronunciationMode, grey: Int,
-              precedingCharacter: String = ""): CharSequence {
-        val assetName = mode.assetName ?: return candidate
-        val table = synchronized(tables) {
-            if (!tables.containsKey(mode)) {
-                tables[mode] = try {
-                    context.assets.open("pronunciation/$assetName").use { characters ->
-                        context.assets.open("pronunciation/${assetName.removeSuffix(".tsv")}-words.tsv").use { words ->
-                            PronunciationTable.parse(characters, words)
-                        }
-                    }
-                } catch (e: IOException) {
-                    // A missing asset must never make the keyboard unusable.
-                    Log.e("CandidatePronunciation", "Unable to load $assetName", e)
-                    null
-                } catch (e: IllegalArgumentException) {
-                    Log.e("CandidatePronunciation", "Invalid pronunciation data in $assetName", e)
-                    null
+    private fun repository(context: Context): PronunciationRepository {
+        repository?.let { return it }
+        return synchronized(this) {
+            repository ?: run {
+                // Retain only the application, never a keyboard view/service.
+                val app = context.applicationContext
+                val worker = Executors.newSingleThreadExecutor { task ->
+                    Thread({
+                        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+                        task.run()
+                    }, "PronunciationLoader").apply { isDaemon = true }
                 }
+                PronunciationRepository(worker) { mode ->
+                    val assetName = requireNotNull(mode.assetName)
+                    try {
+                        app.assets.open("pronunciation/$assetName").use { characters ->
+                            app.assets.open("pronunciation/${assetName.removeSuffix(".tsv")}-words.tsv").use { words ->
+                                PronunciationTable.parse(characters, words)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("CandidatePronunciation", "Unable to load $assetName", e)
+                        throw e
+                    }
+                }.also { repository = it }
             }
-            tables[mode]
         }
-        val reading = table?.readingFor(candidate, precedingCharacter) ?: return candidate
+    }
+
+    fun preload(context: Context, mode: PronunciationMode): CompletableFuture<PronunciationTable?> =
+        if (mode == PronunciationMode.NONE) CompletableFuture.completedFuture(null)
+        else repository(context).preload(mode)
+
+    fun label(candidate: String, mode: PronunciationMode, grey: Int,
+              precedingCharacter: String = ""): CharSequence {
+        if (mode == PronunciationMode.NONE) return candidate
+        // A cold dictionary must never hold up typing. The service refreshes
+        // visible candidates when its background preload completes.
+        val reading = repository?.readingFor(candidate, mode, precedingCharacter) ?: return candidate
         return styledLabel(candidate, reading, grey)
     }
 
@@ -67,6 +90,9 @@ object CandidatePronunciation {
      * including the user's font size, rather than assuming a fixed dp height.
      */
     fun minimumCellHeight(context: Context, characterSizeSp: Float, verticalPaddingDp: Int): Int {
+        val key = CellMetricsKey(Configuration(context.resources.configuration),
+            context.resources.displayMetrics.density, characterSizeSp, verticalPaddingDp)
+        cellHeights.get(key)?.let { return it }
         val probe = TextView(context).apply {
             textSize = characterSizeSp
             // Include both common and supplementary Han fallback fonts.
@@ -77,7 +103,7 @@ object CandidatePronunciation {
         }
         val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         probe.measure(unspecified, unspecified)
-        return probe.measuredHeight + dp(context, 4)
+        return (probe.measuredHeight + dp(context, 4)).also { cellHeights.put(key, it) }
     }
 
     private fun dp(context: Context, value: Int): Int = TypedValue.applyDimension(

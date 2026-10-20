@@ -5,6 +5,10 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Fixed
+- **Keyboard responsiveness with pronunciation enabled**: Preload dictionaries on a background worker instead of parsing them while drawing the first candidates; refresh readings when ready and reuse font measurements and fitted labels during keyboard rebuilds
+
 ## [1.9.7] - 2026-10-17
 ### Fixed
 - **Pronunciation cell sizing**: Measure both text lines using Android font metrics and the selected font size, keeping pronunciation labels and Chinese characters fully inside candidate pills in the strip and expanded grid

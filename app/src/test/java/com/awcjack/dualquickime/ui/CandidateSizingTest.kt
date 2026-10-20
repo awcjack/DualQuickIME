@@ -17,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.TimeUnit
 
 /** Real font metrics, including Android's CJK fallback fonts. */
 @RunWith(RobolectricTestRunner::class)
@@ -26,6 +27,8 @@ class CandidateSizingTest {
     private fun contextAt(scale: Float): Context {
         val app = RuntimeEnvironment.getApplication()
         val config = Configuration(app.resources.configuration).apply { fontScale = scale }
+        CandidatePronunciation.preload(app, PronunciationMode.CANTONESE).get(10, TimeUnit.SECONDS)
+        CandidatePronunciation.preload(app, PronunciationMode.MANDARIN).get(10, TimeUnit.SECONDS)
         return app.createConfigurationContext(config)
     }
 
@@ -84,6 +87,35 @@ class CandidateSizingTest {
                 assertFits(grid, "$mode grid at font scale $scale")
             }
         }
+    }
+
+    @Test fun fittedLabelsAreReusedButRefreshAfterResizingOrChangingText() {
+        val context = contextAt(1f)
+        val pill = CandidateTextView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            textSize = 18f
+            CandidatePronunciation.configureLineMetrics(this)
+            bindLabel(CandidatePronunciation.label("一".repeat(40), PronunciationMode.CANTONESE, 0))
+        }
+        fun measure(width: Int) {
+            pill.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            pill.layout(0, 0, width, pill.measuredHeight)
+        }
+        measure(200)
+        val narrow = pill.text
+        pill.forceLayout()
+        measure(200)
+        assertSame(narrow, pill.text)
+        measure(400)
+        assertTrue(pill.text.length > narrow.length)
+        val wide = pill.text
+        pill.textSize = 36f
+        measure(400)
+        assertTrue(pill.text.length < wide.length)
+        pill.bindLabel(CandidatePronunciation.label("我", PronunciationMode.CANTONESE, 0))
+        measure(400)
+        assertEquals("ngo5\n我", pill.text.toString())
     }
 
     private fun assertFits(view: View, description: String) {

@@ -1,6 +1,7 @@
 package com.awcjack.dualquickime.ui
 
 import android.content.Context
+import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextUtils
@@ -10,9 +11,15 @@ import android.widget.TextView
 /** Centered reading and character lines, each kept inside the actual cell. */
 class CandidateTextView(context: Context) : TextView(context) {
     private var fullLabel: CharSequence = ""
+    private var fittedWidth = -1f
+    private var fittedTextSize = -1f
+    private var fittedTypeface: Typeface? = null
+    private var fittedScaleX = -1f
+    private var fittedLetterSpacing = Float.NaN
 
     fun bindLabel(label: CharSequence) {
         fullLabel = label
+        fittedWidth = -1f
         maxLines = if (label.contains('\n')) 2 else 1
         text = label
     }
@@ -21,6 +28,19 @@ class CandidateTextView(context: Context) : TextView(context) {
         val width = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) maxWidth
             else minOf(maxWidth, MeasureSpec.getSize(widthMeasureSpec))
         val contentWidth = (width - compoundPaddingLeft - compoundPaddingRight).coerceAtLeast(0).toFloat()
+        if (contentWidth != fittedWidth || textSize != fittedTextSize || typeface != fittedTypeface ||
+            textScaleX != fittedScaleX || letterSpacing != fittedLetterSpacing) {
+            fitLabel(contentWidth)
+            fittedWidth = contentWidth
+            fittedTextSize = textSize
+            fittedTypeface = typeface
+            fittedScaleX = textScaleX
+            fittedLetterSpacing = letterSpacing
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    private fun fitLabel(contentWidth: Float) {
         val newline = fullLabel.indexOf('\n')
         val fitted = if (newline < 0) {
             TextUtils.ellipsize(fullLabel, paint, contentWidth, TextUtils.TruncateAt.END, false, null)
@@ -39,6 +59,5 @@ class CandidateTextView(context: Context) : TextView(context) {
         if (!TextUtils.equals(text, fitted)) text = fitted
         // Horizontal scrolling gives centered TextViews a huge virtual layout
         // width. Bound each line above instead, so both stay visibly centered.
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 }

@@ -21,13 +21,16 @@ import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.CompositionState
 import com.awcjack.dualquickime.data.RecentCandidateManager
 import com.awcjack.dualquickime.data.SimplexTable
+import com.awcjack.dualquickime.data.PronunciationMode
 import com.awcjack.dualquickime.theme.ThemeManager
 import com.awcjack.dualquickime.ui.KeyboardView
+import com.awcjack.dualquickime.ui.CandidatePronunciation
 import com.awcjack.dualquickime.ui.VoiceInputView
 import com.awcjack.dualquickime.voice.ModelDownloadManager
 import com.awcjack.dualquickime.voice.VoiceInputManager
 import com.awcjack.dualquickime.voice.VoiceModelType
 import kotlin.concurrent.thread
+import java.util.concurrent.CompletableFuture
 
 /**
  * Quick (速成) Input Method Service for Android.
@@ -84,12 +87,15 @@ class DualQuickInputMethodService : InputMethodService() {
     private var voiceInputView: VoiceInputView? = null
     private var rootContainer: FrameLayout? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var pronunciationMode = PronunciationMode.NONE
+    private var pronunciationPreload: CompletableFuture<Void>? = null
     private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
         handleSystemClipboardChange()
     }
 
     override fun onCreate() {
         super.onCreate()
+        preloadPronunciations()
         // Load simplex data based on user setting (extended by default)
         loadSimplexTable()
         // Load associated phrases table
@@ -254,6 +260,7 @@ class DualQuickInputMethodService : InputMethodService() {
         ThemeManager.invalidateCache()
         ClipboardHistoryManager.invalidateCache()
         RecentCandidateManager.invalidateCache()
+        preloadPronunciations()
 
         // Pre-bind the :voice process if the user has Qwen3-ASR selected.
         // Saves the 500 ms – 2 s bindService cold start off the mic-tap path,
@@ -289,6 +296,24 @@ class DualQuickInputMethodService : InputMethodService() {
             isSymbolMode = false
             keyboardView?.setLetterMode()
         }
+    }
+
+    private fun preloadPronunciations() {
+        val mode = ThemeManager.getPronunciationMode(this)
+        if (mode == pronunciationMode && pronunciationPreload?.isCompletedExceptionally == false) return
+        // Cancel this service's notification, not the shared dictionary load.
+        pronunciationPreload?.cancel(false)
+        pronunciationMode = mode
+        pronunciationPreload = null
+        if (mode == PronunciationMode.NONE) return
+        pronunciationPreload = CandidatePronunciation.preload(this, mode).thenRunAsync({
+            if (ThemeManager.getPronunciationMode(this) != mode) return@thenRunAsync
+            if (keyboardView?.refreshCandidateGridPronunciations() == true) return@thenRunAsync
+            when {
+                isAssociatedPhrasesMode -> updateAssociatedPhrasesView()
+                composition.hasCandidates -> updateCandidateView()
+            }
+        }, { task -> mainHandler.post(task) })
     }
 
     /**
@@ -1153,6 +1178,8 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        pronunciationPreload?.cancel(false)
+        pronunciationPreload = null
         super.onDestroy()
         // Release voice input resources off the main thread: release() makes a
         // synchronous cross-process releaseModel() Binder call that can block on

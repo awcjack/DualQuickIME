@@ -21,6 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -30,11 +31,13 @@ class CandidatePronunciationTest {
     @Before fun resetPreferences() {
         context.getSharedPreferences("dualquick_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         ThemeManager.invalidateCache()
+        CandidatePronunciation.preload(context, PronunciationMode.CANTONESE).get(10, TimeUnit.SECONDS)
+        CandidatePronunciation.preload(context, PronunciationMode.MANDARIN).get(10, TimeUnit.SECONDS)
     }
 
     @Test fun pronunciationIsSmallerAndGreyAboveTheCharacter() {
         for ((mode, expected) in listOf(PronunciationMode.CANTONESE to "ngo5", PronunciationMode.MANDARIN to "wǒ")) {
-            val label = CandidatePronunciation.label(context, "我", mode, Color.GRAY) as Spanned
+            val label = CandidatePronunciation.label("我", mode, Color.GRAY) as Spanned
             assertEquals("$expected\n我", label.toString())
             val color = label.getSpans(0, expected.length, ForegroundColorSpan::class.java).single()
             assertEquals(Color.GRAY, color.foregroundColor)
@@ -45,8 +48,8 @@ class CandidatePronunciationTest {
     }
 
     @Test fun offAndUnknownReadingsLeaveLabelsUntouched() {
-        assertEquals("我", CandidatePronunciation.label(context, "我", PronunciationMode.NONE, Color.GRAY))
-        assertEquals("hi", CandidatePronunciation.label(context, "hi", PronunciationMode.CANTONESE, Color.GRAY))
+        assertEquals("我", CandidatePronunciation.label("我", PronunciationMode.NONE, Color.GRAY))
+        assertEquals("hi", CandidatePronunciation.label("hi", PronunciationMode.CANTONESE, Color.GRAY))
     }
 
     @Test fun allThreeModesPersistAndRefreshOnTheSameKeyboard() {

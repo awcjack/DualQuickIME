@@ -146,7 +146,7 @@ class CandidateGridView @JvmOverloads constructor(
                 setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
             }
             gravity = Gravity.CENTER
-            bindLabel(CandidatePronunciation.label(context, candidate, pronunciationMode, colors.keyTextSecondary,
+            bindLabel(CandidatePronunciation.label(candidate, pronunciationMode, colors.keyTextSecondary,
                 pronunciationContext))
             // Adjust text size based on phrase length to fit in fixed cell
             textSize = when {
