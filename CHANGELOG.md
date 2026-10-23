@@ -5,6 +5,15 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.11] - 2026-10-23
+### Fixed
+- Pronunciation changes now update the Settings keyboard preview, including after dictionaries finish loading
+- Qwen model reloads run off the keyboard UI thread; cancelling startup prevents stale results from reopening the voice overlay, and startup and cleanup run in order
+- Concurrent Qwen service pre-binding and microphone startup share the same connection wait, avoiding missed connection notifications
+
+### Changed
+- Updated Sherpa-ONNX to 1.13.8, whose Qwen file loader opens model paths directly instead of making temporary full-file copies; debug logs include model loading duration
+
 ## [1.9.10] - 2026-10-23
 ### Added
 - **Qwen3-ASR 1.7B voice model**: Select a larger offline model alongside Qwen3-ASR 0.6B and SenseVoice. The community INT8 export requires a roughly 2.4 GB download, 64-bit Android, and substantial available RAM; downloads use a pinned revision and SHA-256 verification

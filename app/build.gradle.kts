@@ -20,8 +20,8 @@ android {
         applicationId = "com.awcjack.dualquickime"
         minSdk = 24
         targetSdk = 34
-        versionCode = 35
-        versionName = "1.9.10"
+        versionCode = 36
+        versionName = "1.9.11"
     }
 
     // Release signing configuration (only if keystore.properties exists)
@@ -114,7 +114,7 @@ dependencies {
     // Sherpa-ONNX for offline voice recognition (Cantonese/Chinese/English)
     // Using official k2-fsa AAR which includes VAD support
     // Only included in the full flavor
-    "fullImplementation"(files("libs/sherpa-onnx-1.12.34.aar"))
+    "fullImplementation"(files("libs/sherpa-onnx-1.13.8.aar"))
 
     // OpenCC for Simplified to Traditional Chinese conversion
     // Pure Java library, no JNI needed - used for voice input post-processing

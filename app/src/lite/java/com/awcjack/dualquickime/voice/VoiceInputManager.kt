@@ -19,7 +19,7 @@ class VoiceInputManager(private val context: Context) {
     fun setOnResultListener(callback: (String, Boolean) -> Unit) {}
     fun setOnErrorListener(callback: (String) -> Unit) {}
     fun setOnProcessingStateListener(callback: (Boolean) -> Unit) {}
-    fun startRecording(): Boolean = false
+    fun startRecording(shouldStart: () -> Boolean = { true }): Boolean = false
     fun stopRecording() {}
     fun finishRecording(onComplete: (String) -> Unit) { onComplete("") }
     fun isRecording(): Boolean = false

@@ -3,6 +3,7 @@ package com.awcjack.dualquickime.voice
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import com.awcjack.dualquickime.BuildConfig
 import com.k2fsa.sherpa.onnx.*
@@ -50,6 +51,7 @@ class VoiceService : Service() {
                 // A new manager can bind before the old service is destroyed.
                 // Switching between 0.6B and 1.7B must replace the old weights.
                 releaseModel()
+                val loadStarted = SystemClock.elapsedRealtime()
                 return try {
                     val qwen3Config = OfflineQwen3AsrModelConfig(
                         convFrontend = "$modelDir/conv_frontend.onnx",
@@ -68,14 +70,13 @@ class VoiceService : Service() {
                         modelConfig = modelConfig,
                         decodingMethod = "greedy_search"
                     )
-                    // No warmup: the 0.5–2 s graph-optimization tax is paid by
-                    // the first real utterance instead. This shifts the cost
-                    // from a silent "Loading…" wait (bad UX) to the moment the
-                    // user has already spoken and is expecting some processing.
+                    // Use the file-based constructor: Sherpa 1.13.8 opens the
+                    // ONNX paths directly, avoiding temporary full-file copies.
+                    // Do not add a dummy decode to the startup path.
                     recognizer = OfflineRecognizer(config = config)
                     loadedModelDir = modelDir
                     if (BuildConfig.DEBUG) {
-                        Log.i(TAG, "Qwen3-ASR loaded in :voice process (numThreads=$numThreads, maxNewTokens=$maxNewTokens)")
+                        Log.i(TAG, "Qwen3-ASR loaded in ${SystemClock.elapsedRealtime() - loadStarted}ms (numThreads=$numThreads, maxNewTokens=$maxNewTokens)")
                     }
                     true
                 } catch (e: Exception) {

@@ -37,8 +37,8 @@ jobs:
       - name: Download sherpa-onnx AAR
         run: |
           mkdir -p app/libs
-          curl -L -o app/libs/sherpa-onnx-1.12.34.aar \
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.34/sherpa-onnx-1.12.34.aar"
+          curl -L -o app/libs/sherpa-onnx-1.13.8.aar \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar"
           ls -la app/libs/
 
       - name: Clean Gradle caches
@@ -379,8 +379,8 @@ jobs:
       - name: Download sherpa-onnx AAR
         run: |
           mkdir -p app/libs
-          curl -L -o app/libs/sherpa-onnx-1.12.34.aar \
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.34/sherpa-onnx-1.12.34.aar"
+          curl -L -o app/libs/sherpa-onnx-1.13.8.aar \
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar"
           ls -la app/libs/
 
       - name: Clean Gradle caches

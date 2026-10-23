@@ -31,6 +31,7 @@ import com.awcjack.dualquickime.ui.CandidatePronunciation
 import com.awcjack.dualquickime.ui.VoiceInputView
 import com.awcjack.dualquickime.voice.ModelDownloadManager
 import com.awcjack.dualquickime.voice.VoiceInputManager
+import com.awcjack.dualquickime.voice.VoiceSessionWorker
 import com.awcjack.dualquickime.voice.VoiceModelType
 import kotlin.concurrent.thread
 import java.util.concurrent.CompletableFuture
@@ -1128,10 +1129,11 @@ class DualQuickInputMethodService : InputMethodService() {
     }
 
     // Guards against tapping the mic twice while the previous start is still
-    // initializing — Qwen3-ASR's 2–5 s bind+load+warmup window otherwise lets
+    // initializing — Qwen3-ASR's bind and model load otherwise let
     // a second tap queue another full init in parallel.
     @Volatile
     private var voiceStartInProgress = false
+    private val voiceSessionWorker = VoiceSessionWorker()
 
     // One-shot per IME-process lifetime. Once we've kicked off a Qwen3-ASR
     // service pre-bind we don't repeat it on every onStartInputView. Reset
@@ -1143,7 +1145,7 @@ class DualQuickInputMethodService : InputMethodService() {
      * Speculatively bind the :voice process while the user is still typing,
      * so that when they eventually tap the mic the bindService cold start
      * (typically 0.5 – 2 s on the user-visible path) is already paid. Cheap
-     * — the bind brings up the process but doesn't load the 700 MB model.
+     * — the bind brings up the process but doesn't load the model weights.
      *
      * Triggered from [onStartInputView] the first time it runs in a given
      * IME lifecycle. No-op if voice is disabled, the selected model isn't
@@ -1169,7 +1171,7 @@ class DualQuickInputMethodService : InputMethodService() {
     private fun startVoiceRecognition() {
         // Debounce: if a start is already in flight, ignore. The Cancel button
         // on the voice overlay is the way out, not a second mic tap.
-        if (voiceStartInProgress) return
+        if (destroyed || voiceStartInProgress) return
         voiceStartInProgress = true
 
         // Show LOADING immediately so the user knows the keyboard responded.
@@ -1190,65 +1192,55 @@ class DualQuickInputMethodService : InputMethodService() {
             return
         }
 
-        // Initialize recognizer on background thread. setModelType is included
-        // because switching to a different model triggers release()+initialize()
-        // internally — for Qwen3-ASR that's bind + 700 MB load + warmup, which
-        // would block the IME UI thread for seconds if left on the caller.
-        thread {
+        // Both initialize() and startRecording() can load the native model:
+        // the latter reloads weights after the idle memory release.
+        voiceSessionWorker.start { isCurrent ->
             try {
                 manager.setModelType(selectedModelType)
                 val initialized = manager.initialize()
-
-                mainHandler.post {
-                    try {
-                        if (!initialized) {
-                            voiceInputView?.setState(VoiceInputView.State.ERROR)
-                            voiceInputView?.setErrorMessage(getString(R.string.voice_init_failed))
-                            return@post
+                if (!isCurrent()) return@start
+                if (initialized) {
+                    manager.setOnResultListener { text, isFinal ->
+                        mainHandler.post {
+                            if (isCurrent()) voiceInputView?.setTranscript(text, isFinal)
                         }
-
-                        // Set up callbacks
-                        manager.setOnResultListener { text, isFinal ->
-                            mainHandler.post {
-                                // Update the transcript display (don't auto-commit).
-                                // Interim (pseudo-streaming) results arrive with
-                                // isFinal=false and are shown dimmed.
-                                voiceInputView?.setTranscript(text, isFinal)
-                            }
-                        }
-
-                        manager.setOnErrorListener { error ->
-                            mainHandler.post {
+                    }
+                    manager.setOnErrorListener { error ->
+                        mainHandler.post {
+                            if (isCurrent()) {
                                 voiceInputView?.setState(VoiceInputView.State.ERROR)
                                 voiceInputView?.setErrorMessage(error)
                             }
                         }
-
-                        // Surface per-segment decode state as a "Transcribing…"
-                        // hint while still listening, so the gap between speech
-                        // end and text (several seconds for Qwen3-ASR) doesn't
-                        // look like a frozen keyboard.
-                        manager.setOnProcessingStateListener { processing ->
-                            mainHandler.post {
-                                voiceInputView?.setListeningStatus(processing)
-                            }
+                    }
+                    manager.setOnProcessingStateListener { processing ->
+                        mainHandler.post {
+                            if (isCurrent()) voiceInputView?.setListeningStatus(processing)
                         }
-
-                        // Start recording
-                        if (manager.startRecording()) {
-                            voiceInputView?.setState(VoiceInputView.State.LISTENING)
-                        } else {
-                            voiceInputView?.setState(VoiceInputView.State.ERROR)
-                            voiceInputView?.setErrorMessage(getString(R.string.voice_start_failed))
-                        }
-                    } finally {
-                        voiceStartInProgress = false
+                    }
+                }
+                val started = initialized && manager.startRecording(isCurrent)
+                // Cancel may arrive during a blocking native reload. Cleanup is
+                // serialized before any subsequent session starts.
+                if (!isCurrent()) {
+                    if (started) manager.stopRecording()
+                    return@start
+                }
+                mainHandler.post {
+                    if (!isCurrent()) return@post
+                    voiceStartInProgress = false
+                    if (started) {
+                        voiceInputView?.setState(VoiceInputView.State.LISTENING)
+                    } else {
+                        voiceInputView?.setState(VoiceInputView.State.ERROR)
+                        voiceInputView?.setErrorMessage(getString(
+                            if (initialized) R.string.voice_start_failed else R.string.voice_init_failed
+                        ))
                     }
                 }
             } catch (e: Exception) {
-                // Background thread crashed before posting back — clear the
-                // debounce flag so the user can retry.
                 mainHandler.post {
+                    if (!isCurrent()) return@post
                     voiceStartInProgress = false
                     voiceInputView?.setState(VoiceInputView.State.ERROR)
                     voiceInputView?.setErrorMessage(getString(R.string.voice_init_failed))
@@ -1257,20 +1249,11 @@ class DualQuickInputMethodService : InputMethodService() {
         }
     }
 
-    /**
-     * Close voice input without committing any pending text.
-     */
+    /** Close voice input without committing any pending text. */
     private fun closeVoiceInput() {
-        // stopRecording() does a blocking join on the capture thread (which may
-        // be mid-decode for Qwen3-ASR); run it off the UI thread so Cancel never
-        // janks the keyboard. Hiding the overlay immediately keeps Cancel feeling
-        // instant.
-        voiceInputManager?.let { manager -> thread { manager.stopRecording() } }
+        val manager = voiceInputManager
+        voiceSessionWorker.cancel { manager?.stopRecording() }
         voiceInputView?.setState(VoiceInputView.State.HIDDEN)
-        // Clear the start-debounce flag so the user can immediately retry if
-        // they cancelled while we were still loading. The in-flight init
-        // thread will still finish and harmlessly post LISTENING back, which
-        // is benign because the voice overlay is hidden again.
         voiceStartInProgress = false
     }
 
@@ -1330,7 +1313,8 @@ class DualQuickInputMethodService : InputMethodService() {
         // (several seconds for Qwen3-ASR). Doing it on the UI thread here would
         // be an ANR-class teardown stall. The :voice process memory is reclaimed
         // by the OS regardless.
-        voiceInputManager?.let { manager -> thread { manager.release() } }
+        val manager = voiceInputManager
+        voiceSessionWorker.close { manager?.release() }
         voiceInputManager = null
         // Unregister clipboard listener to avoid memory leaks
         clipboardManager?.removePrimaryClipChangedListener(clipboardListener)

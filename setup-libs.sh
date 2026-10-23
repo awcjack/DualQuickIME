@@ -4,7 +4,7 @@
 
 set -e
 
-SHERPA_VERSION="1.12.34"
+SHERPA_VERSION="1.13.8"
 LIBS_DIR="app/libs"
 AAR_FILE="sherpa-onnx-${SHERPA_VERSION}.aar"
 AAR_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/${AAR_FILE}"

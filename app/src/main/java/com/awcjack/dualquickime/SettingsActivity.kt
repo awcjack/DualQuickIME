@@ -25,6 +25,8 @@ import com.awcjack.dualquickime.data.ClipboardHistoryManager
 import com.awcjack.dualquickime.data.RecentCandidateManager
 import com.awcjack.dualquickime.data.PronunciationMode
 import com.awcjack.dualquickime.theme.ThemeManager
+import com.awcjack.dualquickime.ui.CandidatePronunciation
+import com.awcjack.dualquickime.ui.CandidateTextView
 import com.awcjack.dualquickime.voice.ModelDownloadManager
 import com.awcjack.dualquickime.voice.VoiceModelType
 
@@ -41,6 +43,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var themeRadioGroup: RadioGroup
     private lateinit var previewContainer: LinearLayout
     private lateinit var previewKeyRow: LinearLayout
+    private lateinit var previewCandidateRow: LinearLayout
+    private var previewGeneration = 0
     private lateinit var switchShowComposition: SwitchCompat
     private lateinit var seekBarCandidates: SeekBar
     private lateinit var textCandidatesValue: TextView
@@ -69,6 +73,7 @@ class SettingsActivity : AppCompatActivity() {
         themeRadioGroup = findViewById(R.id.themeRadioGroup)
         previewContainer = findViewById(R.id.previewContainer)
         previewKeyRow = findViewById(R.id.previewKeyRow)
+        previewCandidateRow = findViewById(R.id.previewCandidateRow)
         switchShowComposition = findViewById(R.id.switchShowComposition)
         seekBarCandidates = findViewById(R.id.seekBarCandidates)
         textCandidatesValue = findViewById(R.id.textCandidatesValue)
@@ -125,6 +130,11 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        previewGeneration++ // Ignore dictionary results for a closed preview.
+        super.onDestroy()
+    }
+
     private fun setupPronunciationSelection() {
         val group = findViewById<RadioGroup>(R.id.pronunciationRadioGroup)
         group.check(when (ThemeManager.getPronunciationMode(this)) {
@@ -139,6 +149,7 @@ class SettingsActivity : AppCompatActivity() {
                 else -> PronunciationMode.NONE
             }
             ThemeManager.setPronunciationMode(this, mode)
+            updatePreview()
         }
     }
 
@@ -504,6 +515,7 @@ class SettingsActivity : AppCompatActivity() {
                 textCandidatePaddingValue.text = value.toString()
                 if (fromUser) {
                     ThemeManager.setCandidatePillPadding(this@SettingsActivity, value)
+                    updatePreview()
                 }
             }
 
@@ -540,6 +552,24 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun updatePreview() {
         val colors = ThemeManager.getColors(this)
+        val generation = ++previewGeneration
+
+        updatePreviewCandidates()
+        val mode = ThemeManager.getPronunciationMode(this)
+        if (mode != PronunciationMode.NONE) {
+            // Use the same dictionaries as the keyboard, without parsing them
+            // on the UI thread. Cold previews refresh when the readings arrive.
+            CandidatePronunciation.resumeLoading()
+            CandidatePronunciation.preload(applicationContext, mode).whenComplete { table, error ->
+                if (table != null && error == null) {
+                    runOnUiThread {
+                        if (!isFinishing && !isDestroyed && generation == previewGeneration) {
+                            updatePreviewCandidates()
+                        }
+                    }
+                }
+            }
+        }
 
         // Update preview container background
         previewContainer.setBackgroundColor(colors.keyboardBackground)
@@ -558,6 +588,28 @@ class SettingsActivity : AppCompatActivity() {
 
         sampleKeys.forEach { (letter, radical) ->
             previewKeyRow.addView(createPreviewKey(letter, radical, colors))
+        }
+    }
+
+    private fun updatePreviewCandidates() {
+        val colors = ThemeManager.getColors(this)
+        val mode = ThemeManager.getPronunciationMode(this)
+        val padding = dpToPx(ThemeManager.getCandidatePillPadding(this))
+        previewCandidateRow.removeAllViews()
+        previewCandidateRow.setBackgroundColor(colors.candidateBarBackground)
+        listOf("我", "你", "好").forEach { candidate ->
+            previewCandidateRow.addView(CandidateTextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    setMargins(dpToPx(2), dpToPx(2), dpToPx(2), dpToPx(2))
+                }
+                gravity = Gravity.CENTER
+                textSize = 18f
+                setPadding(padding, dpToPx(4), padding, dpToPx(4))
+                setTextColor(colors.candidateText)
+                background = createKeyBackground(colors.candidatePillBackground, colors.keyShadowColor)
+                CandidatePronunciation.configureLineMetrics(this)
+                bindLabel(CandidatePronunciation.label(candidate, mode, colors.keyTextSecondary))
+            })
         }
     }
 

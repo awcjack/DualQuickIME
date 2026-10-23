@@ -952,10 +952,21 @@
             <LinearLayout
                 android:id="@+id/previewContainer"
                 android:layout_width="match_parent"
-                android:layout_height="200dp"
+                android:layout_height="wrap_content"
+                android:minHeight="200dp"
                 android:orientation="vertical"
                 android:gravity="center"
                 android:padding="16dp">
+
+                <!-- Preview candidates, including the selected pronunciation -->
+                <LinearLayout
+                    android:id="@+id/previewCandidateRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="4dp"
+                    android:layout_marginBottom="8dp" />
 
                 <!-- Preview keyboard row simulation -->
                 <LinearLayout

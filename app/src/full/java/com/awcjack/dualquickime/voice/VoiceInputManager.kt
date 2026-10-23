@@ -361,16 +361,19 @@ class VoiceInputManager(private val context: Context) {
     private var voiceServiceBinder: IVoiceRecognizer? = null
     @Volatile
     private var isVoiceServiceBound = false
-    // Latched on each fresh bind so initialize() can wait synchronously for
-    // onServiceConnected. Reset on every bindVoiceService() call so we don't
-    // re-await a stale latch after a disconnect.
+    // Share one latch across concurrent pre-bind and microphone startup.
+    // Replacing it while a connection arrives can lose the wakeup.
+    private val serviceBindingLock = Any()
     @Volatile
     private var serviceConnectionLatch: CountDownLatch = CountDownLatch(0)
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
-            voiceServiceBinder = IVoiceRecognizer.Stub.asInterface(service)
-            serviceConnectionLatch.countDown()
+            synchronized(serviceBindingLock) {
+                if (!isVoiceServiceBound) return
+                voiceServiceBinder = IVoiceRecognizer.Stub.asInterface(service)
+                serviceConnectionLatch.countDown()
+            }
             if (BuildConfig.DEBUG) Log.i(TAG, ":voice service connected")
         }
 
@@ -378,7 +381,10 @@ class VoiceInputManager(private val context: Context) {
             // Process was killed (LMK, crash, OS reclaim). The system will
             // restart it on the next bind because we used BIND_AUTO_CREATE,
             // so we just drop the stale binder here.
-            voiceServiceBinder = null
+            synchronized(serviceBindingLock) {
+                voiceServiceBinder = null
+                serviceConnectionLatch = CountDownLatch(1)
+            }
             if (BuildConfig.DEBUG) Log.w(TAG, ":voice service disconnected; binder dropped")
         }
     }
@@ -663,26 +669,25 @@ class VoiceInputManager(private val context: Context) {
      * Idempotent on an active binding.
      */
     private fun bindVoiceService(): Boolean {
-        if (voiceServiceBinder != null) return true
-        // Reset the latch before we kick off a new bind so we don't return
-        // immediately on a stale count-down from a previous session.
-        serviceConnectionLatch = CountDownLatch(1)
-        if (!isVoiceServiceBound) {
-            val intent = Intent(context, VoiceService::class.java)
-            isVoiceServiceBound = try {
-                context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-            } catch (e: SecurityException) {
-                if (BuildConfig.DEBUG) Log.e(TAG, "bindService threw SecurityException: ${e.message}")
-                false
-            }
+        val connectionLatch = synchronized(serviceBindingLock) {
+            if (voiceServiceBinder != null) return true
             if (!isVoiceServiceBound) {
-                if (BuildConfig.DEBUG) Log.e(TAG, "bindService returned false; :voice process not reachable")
-                return false
+                serviceConnectionLatch = CountDownLatch(1)
+                val intent = Intent(context, VoiceService::class.java)
+                isVoiceServiceBound = try {
+                    context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+                } catch (e: SecurityException) {
+                    if (BuildConfig.DEBUG) Log.e(TAG, "bindService failed", e)
+                    false
+                }
+                if (!isVoiceServiceBound) return false
             }
+            serviceConnectionLatch
         }
+        // Never hold the binding lock while waiting: onServiceConnected uses it.
         return try {
-            val ok = serviceConnectionLatch.await(SERVICE_BIND_TIMEOUT_SEC, TimeUnit.SECONDS)
-            ok && voiceServiceBinder != null
+            connectionLatch.await(SERVICE_BIND_TIMEOUT_SEC, TimeUnit.SECONDS) &&
+                voiceServiceBinder != null
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
             false
@@ -690,14 +695,17 @@ class VoiceInputManager(private val context: Context) {
     }
 
     private fun unbindVoiceService() {
-        if (!isVoiceServiceBound) return
-        try {
-            context.unbindService(serviceConnection)
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.w(TAG, "unbindService threw: ${e.message}")
+        synchronized(serviceBindingLock) {
+            if (!isVoiceServiceBound) return
+            try {
+                context.unbindService(serviceConnection)
+            } catch (e: Exception) {
+                if (BuildConfig.DEBUG) Log.w(TAG, "unbindService threw: ${e.message}")
+            }
+            isVoiceServiceBound = false
+            voiceServiceBinder = null
+            serviceConnectionLatch.countDown()
         }
-        isVoiceServiceBound = false
-        voiceServiceBinder = null
     }
 
     /**
@@ -896,7 +904,8 @@ class VoiceInputManager(private val context: Context) {
      * Start voice recording and recognition.
      * @return true if started successfully
      */
-    fun startRecording(): Boolean {
+    fun startRecording(shouldStart: () -> Boolean = { true }): Boolean {
+        if (!shouldStart()) return false
         if (!isInitialized) {
             onErrorCallback?.invoke("Recognizer not initialized")
             return false
@@ -918,6 +927,7 @@ class VoiceInputManager(private val context: Context) {
             onErrorCallback?.invoke("Failed to reload recognizer")
             return false
         }
+        if (!shouldStart()) return false
         markActivity()
 
         try {
@@ -970,6 +980,10 @@ class VoiceInputManager(private val context: Context) {
             // Reset VAD state to clear any leftover segments from previous recordings
             vad?.reset()
 
+            if (!shouldStart()) {
+                stopRecording()
+                return false
+            }
             recorder.startRecording()
 
             val captureThread = thread(name = "VoiceInputThread") {

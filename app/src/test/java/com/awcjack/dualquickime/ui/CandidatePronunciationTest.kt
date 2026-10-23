@@ -2,6 +2,7 @@ package com.awcjack.dualquickime.ui
 
 import android.content.Context
 import android.graphics.Color
+import android.os.Looper
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
@@ -9,9 +10,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.RadioGroup
+import android.widget.LinearLayout
 import com.awcjack.dualquickime.R
 import com.awcjack.dualquickime.SettingsActivity
 import com.awcjack.dualquickime.data.PronunciationMode
+import com.awcjack.dualquickime.data.KeyboardDataWorker
 import com.awcjack.dualquickime.theme.ThemeManager
 import org.junit.Assert.*
 import org.junit.Before
@@ -20,6 +23,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 
@@ -75,18 +79,53 @@ class CandidatePronunciationTest {
 
     @Test fun settingsSelectionSavesTheModeAndRestoresItWhenReopened() {
         val controller = Robolectric.buildActivity(SettingsActivity::class.java).setup()
-        val group = controller.get().findViewById<RadioGroup>(R.id.pronunciationRadioGroup)
+        val activity = controller.get()
+        val group = activity.findViewById<RadioGroup>(R.id.pronunciationRadioGroup)
         assertEquals(R.id.radioPronunciationNone, group.checkedRadioButtonId)
+        assertEquals("我", previewCandidate(activity))
         group.check(R.id.radioPronunciationCantonese)
         assertEquals(PronunciationMode.CANTONESE, ThemeManager.getPronunciationMode(context))
+        assertEquals("ngo5\n我", previewCandidate(activity))
         group.check(R.id.radioPronunciationMandarin)
         assertEquals(PronunciationMode.MANDARIN, ThemeManager.getPronunciationMode(context))
+        assertEquals("wǒ\n我", previewCandidate(activity))
+        group.check(R.id.radioPronunciationNone)
+        assertEquals("我", previewCandidate(activity))
+        group.check(R.id.radioPronunciationMandarin)
         controller.pause().stop().destroy()
         val reopened = Robolectric.buildActivity(SettingsActivity::class.java).setup()
         assertEquals(R.id.radioPronunciationMandarin,
             reopened.get().findViewById<RadioGroup>(R.id.pronunciationRadioGroup).checkedRadioButtonId)
+        assertEquals("wǒ\n我", previewCandidate(reopened.get()))
         reopened.pause().stop().destroy()
     }
+
+    @Test fun previewRefreshesAfterColdLoadAndKeepsTheLatestSelection() {
+        CandidatePronunciation.releaseMemory()
+        ThemeManager.setPronunciationMode(context, PronunciationMode.CANTONESE)
+        val controller = Robolectric.buildActivity(SettingsActivity::class.java).setup()
+        try {
+            val activity = controller.get()
+            // The serial worker barrier waits for both loading and completion
+            // callbacks, then lets the queued preview refresh run on the UI.
+            KeyboardDataWorker.executor.submit {}.get(10, TimeUnit.SECONDS)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals("ngo5\n我", previewCandidate(activity))
+
+            CandidatePronunciation.releaseMemory()
+            val group = activity.findViewById<RadioGroup>(R.id.pronunciationRadioGroup)
+            group.check(R.id.radioPronunciationMandarin)
+            group.check(R.id.radioPronunciationNone)
+            KeyboardDataWorker.executor.submit {}.get(10, TimeUnit.SECONDS)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals("我", previewCandidate(activity))
+        } finally {
+            controller.pause().stop().destroy()
+        }
+    }
+
+    private fun previewCandidate(activity: SettingsActivity): String =
+        (activity.findViewById<LinearLayout>(R.id.previewCandidateRow).getChildAt(0) as TextView).text.toString()
 
     @Test fun expandedGridLabelsStillCommitOnlyTheCharacter() {
         ThemeManager.setPronunciationMode(context, PronunciationMode.CANTONESE)
