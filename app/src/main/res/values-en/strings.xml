@@ -72,6 +72,15 @@
     <string name="settings_voice_enable_desc">Speak to type using offline recognition (Cantonese/Chinese/English)</string>
     <string name="settings_voice_noise_suppression">Noise suppression</string>
     <string name="settings_voice_noise_suppression_desc">Filter background noise for clearer recognition in noisy places</string>
+    <string name="settings_voice_model_unload_timeout">Unload Qwen model after</string>
+    <string name="settings_voice_model_unload_timeout_desc">Keeping the model ready uses more RAM but avoids reloading between voice sessions. It unloads sooner when memory is low or the screen locks, after recording and transcription finish.</string>
+    <string-array name="voice_model_unload_timeouts">
+        <item>30 seconds</item>
+        <item>1 minute</item>
+        <item>2 minutes (default)</item>
+        <item>5 minutes</item>
+        <item>10 minutes</item>
+    </string-array>
     <string name="settings_voice_select_model">Select model</string>
     <string name="settings_voice_selected_model">Selected model</string>
     <string name="settings_voice_download_model">Download voice model</string>

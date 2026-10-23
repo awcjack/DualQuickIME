@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Color
 import com.awcjack.dualquickime.data.PronunciationMode
+import com.awcjack.dualquickime.voice.VoiceModelRetentionPolicy
 
 /**
  * Manages keyboard theme settings (light/dark/auto).
@@ -19,6 +20,7 @@ object ThemeManager {
     private const val KEY_VOICE_MODEL_TYPE = "voice_model_type"
     private const val KEY_VOICE_NOISE_SUPPRESSION = "voice_noise_suppression"
     private const val KEY_VOICE_DOWNLOAD_WIFI_ONLY = "voice_download_wifi_only"
+    private const val KEY_VOICE_MODEL_UNLOAD_SECONDS = "voice_model_unload_seconds"
     private const val KEY_RECENT_CANDIDATES_ENABLED = "recent_candidates_enabled"
     private const val KEY_HAPTIC_FEEDBACK_ENABLED = "haptic_feedback_enabled"
     private const val KEY_DEFAULT_SKIN_TONE = "default_skin_tone"
@@ -166,6 +168,22 @@ object ThemeManager {
     fun setVoiceDownloadWifiOnly(context: Context, enabled: Boolean) {
         cachedVoiceDownloadWifiOnly = enabled
         getPrefs(context).edit().putBoolean(KEY_VOICE_DOWNLOAD_WIFI_ONLY, enabled).apply()
+    }
+
+    // Read without a separate cache so an active voice manager sees edits on
+    // its next retention check without restarting the keyboard.
+    fun getVoiceModelUnloadSeconds(context: Context): Int {
+        val saved = getPrefs(context).getInt(
+            KEY_VOICE_MODEL_UNLOAD_SECONDS, VoiceModelRetentionPolicy.DEFAULT_TIMEOUT_SECONDS
+        )
+        return saved.takeIf { it in VoiceModelRetentionPolicy.timeoutOptionsSeconds }
+            ?: VoiceModelRetentionPolicy.DEFAULT_TIMEOUT_SECONDS
+    }
+
+    fun setVoiceModelUnloadSeconds(context: Context, seconds: Int) {
+        val value = seconds.takeIf { it in VoiceModelRetentionPolicy.timeoutOptionsSeconds }
+            ?: VoiceModelRetentionPolicy.DEFAULT_TIMEOUT_SECONDS
+        getPrefs(context).edit().putInt(KEY_VOICE_MODEL_UNLOAD_SECONDS, value).apply()
     }
 
     // Recent candidates settings (default: false to disable)

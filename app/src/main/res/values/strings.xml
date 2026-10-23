@@ -90,6 +90,15 @@
     <string name="settings_voice_download_wifi_only_desc">Voice models are large (up to ~2.4 GB). Turn off to allow downloads over mobile data.</string>
     <string name="voice_download_metered_blocked">Voice model download is set to Wi-Fi only. Connect to Wi-Fi, or allow mobile-data downloads in Settings.</string>
     <string name="voice_download_insufficient_space">Not enough free storage to download the voice model.</string>
+    <string name="settings_voice_model_unload_timeout">Unload Qwen model after</string>
+    <string name="settings_voice_model_unload_timeout_desc">Keeping the model ready uses more RAM but avoids reloading between voice sessions. It unloads sooner when memory is low or the screen locks, after recording and transcription finish.</string>
+    <string-array name="voice_model_unload_timeouts">
+        <item>30 seconds</item>
+        <item>1 minute</item>
+        <item>2 minutes (default)</item>
+        <item>5 minutes</item>
+        <item>10 minutes</item>
+    </string-array>
     <string name="settings_voice_select_model">Select voice model</string>
     <string name="settings_voice_selected_model">Selected model</string>
     <string name="settings_voice_download_model">Download voice model</string>

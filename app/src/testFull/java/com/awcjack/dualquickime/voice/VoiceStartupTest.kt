@@ -46,6 +46,11 @@ class VoiceStartupTest {
         try {
             val started = executor.submit<Boolean> { manager.startRecording { current.get() } }
             assertTrue(loading.await(5, TimeUnit.SECONDS))
+            // A retention check must not queue behind a slow startup and then
+            // release the newly loaded weights using a stale idle timestamp.
+            val retentionCheck = VoiceInputManager::class.java.getDeclaredMethod("checkIdleRelease")
+            retentionCheck.isAccessible = true
+            retentionCheck.invoke(manager)
             current.set(false)
             finishLoading.countDown()
             assertFalse(started.get(5, TimeUnit.SECONDS))

@@ -86,6 +86,15 @@
     <string name="settings_voice_enable_desc">使用離線語音辨識（粵語/中文/英文）</string>
     <string name="settings_voice_noise_suppression">噪音抑制</string>
     <string name="settings_voice_noise_suppression_desc">過濾背景雜音，喺嘈雜環境下辨識得更清楚</string>
+    <string name="settings_voice_model_unload_timeout">Qwen 模型閒置卸載時間</string>
+    <string name="settings_voice_model_unload_timeout_desc">保留模型會用多啲記憶體，但可以避免每次語音輸入都重新載入。記憶體不足或鎖屏時，會喺錄音同轉錄完成後提早卸載。</string>
+    <string-array name="voice_model_unload_timeouts">
+        <item>30 秒</item>
+        <item>1 分鐘</item>
+        <item>2 分鐘（預設）</item>
+        <item>5 分鐘</item>
+        <item>10 分鐘</item>
+    </string-array>
     <string name="settings_voice_select_model">選擇模型</string>
     <string name="settings_voice_selected_model">已選模型</string>
     <string name="settings_voice_download_model">下載語音模型</string>

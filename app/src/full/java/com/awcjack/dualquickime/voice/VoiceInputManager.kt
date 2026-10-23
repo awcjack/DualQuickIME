@@ -1,6 +1,8 @@
 package com.awcjack.dualquickime.voice
 
 import android.Manifest
+import android.app.ActivityManager
+import android.app.KeyguardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -13,6 +15,8 @@ import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.NoiseSuppressor
 import android.os.IBinder
+import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.awcjack.dualquickime.BuildConfig
@@ -26,6 +30,9 @@ import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
@@ -83,11 +90,6 @@ class VoiceInputManager(private val context: Context) {
         private const val QWEN3_ASR_NUM_THREADS = 4
         private const val QWEN3_ASR_MAX_NEW_TOKENS = 80
 
-        // Memory-pressure guards for both Qwen3-ASR model sizes.
-        // Release the model after this many ms of recording idle so the IME
-        // process doesn't sit on a gigabyte of weights while the user is
-        // typing normally. The next mic tap pays a ~1–2 s reload cost.
-        private const val QWEN3_ASR_IDLE_RELEASE_MS = 30_000L
         // How often the idle monitor thread wakes to check. Coarse-grained to
         // avoid burning battery on a tight loop.
         private const val IDLE_CHECK_INTERVAL_MS = 5_000L
@@ -338,15 +340,15 @@ class VoiceInputManager(private val context: Context) {
     @Volatile
     private var isInitialized = false
 
-    // Wall-clock of the last user-visible voice activity. Drives idle release
-    // of the Qwen3-ASR recognizer so the IME doesn't hold ~700 MB resident
-    // between sessions. Updated on init, start/stop recording, and segment
-    // recognition.
+    // Monotonic activity time, unaffected by changes to the device clock.
     @Volatile
     private var lastActivityMillis: Long = 0L
 
-    private var idleReleaseThread: Thread? = null
-    private val idleReleaseActive = AtomicBoolean(false)
+    @Volatile private var idleReleaseThread: Thread? = null
+    private val captureWorkers = AtomicInteger()
+    // Startup and native decoding must complete before retention can release
+    // weights. The timer uses tryLock so it never queues behind a slow load.
+    private val modelLifecycleLock = ReentrantLock()
     // Guards the recognizer field across the lazy-reload path and the idle
     // releaser thread — both can flip it between null and non-null.
     private val recognizerLock = Any()
@@ -456,7 +458,7 @@ class VoiceInputManager(private val context: Context) {
      * Initialize the recognizer. Must be called on a background thread.
      * @return true if initialization succeeded
      */
-    fun initialize(): Boolean {
+    fun initialize(): Boolean = modelLifecycleLock.withLock {
         if (isInitialized) return true
         if (currentModelType == VoiceModelType.QWEN3_ASR_1_7B && !android.os.Process.is64Bit()) return false
         if (!isModelAvailable()) {
@@ -715,71 +717,71 @@ class VoiceInputManager(private val context: Context) {
      */
     private fun usesIdleRelease(): Boolean = currentModelType.isQwen3Asr
 
-    /**
-     * Mark the recognizer as freshly used. Resets the idle clock so the
-     * background releaser holds onto the model for at least
-     * QWEN3_ASR_IDLE_RELEASE_MS more.
-     */
+    /** Restart the idle grace period after model or microphone activity. */
     private fun markActivity() {
-        lastActivityMillis = System.currentTimeMillis()
+        lastActivityMillis = SystemClock.elapsedRealtime()
     }
 
-    /**
-     * Start the background thread that releases the Qwen3-ASR recognizer
-     * after [QWEN3_ASR_IDLE_RELEASE_MS] of no voice activity. No-op for
-     * lighter models. Idempotent.
-     */
+    @Synchronized
     private fun startIdleReleaseMonitor() {
-        if (!usesIdleRelease()) return
-        if (!idleReleaseActive.compareAndSet(false, true)) return
-
-        idleReleaseThread = thread(name = "VoiceIdleReleaseThread") {
+        if (!usesIdleRelease() || idleReleaseThread != null) return
+        val monitor = thread(name = "VoiceIdleReleaseThread", start = false) {
+            val self = Thread.currentThread()
             try {
-                while (idleReleaseActive.get()) {
+                while (idleReleaseThread === self) {
                     try {
                         Thread.sleep(IDLE_CHECK_INTERVAL_MS)
                     } catch (e: InterruptedException) {
                         break
                     }
-
-                    val now = System.currentTimeMillis()
-                    val idleFor = now - lastActivityMillis
-                    // For Qwen3-ASR, "loaded" is owned by the :voice process —
-                    // query the binder. For other models it would be the
-                    // in-process recognizer, but we only run the monitor for
-                    // Qwen3-ASR so the in-process branch is unreachable.
-                    val isLoaded = try {
-                        voiceServiceBinder?.isLoaded == true
-                    } catch (e: Exception) {
-                        if (BuildConfig.DEBUG) Log.w(TAG, "isLoaded() across binder threw: ${e.message}")
-                        false
-                    }
-                    val canRelease = idleFor >= QWEN3_ASR_IDLE_RELEASE_MS &&
-                        !isRecording &&
-                        isLoaded
-
-                    if (canRelease) {
-                        if (BuildConfig.DEBUG) {
-                            Log.i(TAG, "${currentModelType.id} idle for ${idleFor}ms; releasing recognizer in :voice process")
-                        }
-                        releaseRecognizerOnly()
-                        // Keep the monitor running. The next mic tap triggers a lazy
-                        // reload which will arm us again via markActivity().
-                    }
+                    if (idleReleaseThread === self) checkIdleRelease()
                 }
             } finally {
-                idleReleaseActive.set(false)
+                synchronized(this@VoiceInputManager) {
+                    if (idleReleaseThread === self) idleReleaseThread = null
+                }
             }
+        }
+        idleReleaseThread = monitor
+        monitor.start()
+    }
+
+    /** Evaluate retention on the background monitor without waiting for native work. */
+    private fun checkIdleRelease() {
+        if (!usesIdleRelease() || !modelLifecycleLock.tryLock()) return
+        try {
+            // Capture can continue flushing VAD after isRecording becomes false.
+            if (isRecording || captureWorkers.get() != 0) return
+            val binder = voiceServiceBinder ?: return
+            if (!binder.isLoaded) return
+            val memory = ActivityManager.MemoryInfo()
+            (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.getMemoryInfo(memory)
+            val power = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            val reason = VoiceModelRetentionPolicy.releaseReason(
+                idleMillis = SystemClock.elapsedRealtime() - lastActivityMillis,
+                timeoutSeconds = ThemeManager.getVoiceModelUnloadSeconds(context),
+                busy = false, // Recording/flush checked above; startup/decode hold this lock.
+                screenLocked = power?.isInteractive == false || keyguard?.isKeyguardLocked == true,
+                lowMemory = memory.lowMemory,
+                availableBytes = memory.availMem,
+                totalBytes = memory.totalMem,
+                systemThresholdBytes = memory.threshold
+            ) ?: return
+            if (BuildConfig.DEBUG) Log.i(TAG, "${currentModelType.id}: releasing recognizer ($reason)")
+            releaseRecognizerOnly()
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "Voice retention check failed", e)
+        } finally {
+            modelLifecycleLock.unlock()
         }
     }
 
-    /**
-     * Stop the idle release monitor. Called on full release.
-     */
+    @Synchronized
     private fun stopIdleReleaseMonitor() {
-        idleReleaseActive.set(false)
-        idleReleaseThread?.interrupt()
+        val monitor = idleReleaseThread
         idleReleaseThread = null
+        monitor?.interrupt()
     }
 
     /**
@@ -792,7 +794,7 @@ class VoiceInputManager(private val context: Context) {
      * load doesn't have to wait for process startup again. The OS is free
      * to reclaim the empty process if memory pressure spikes.
      */
-    private fun releaseRecognizerOnly() {
+    private fun releaseRecognizerOnly() = modelLifecycleLock.withLock {
         if (usesOutOfProcessRecognizer()) {
             try {
                 voiceServiceBinder?.releaseModel()
@@ -904,7 +906,7 @@ class VoiceInputManager(private val context: Context) {
      * Start voice recording and recognition.
      * @return true if started successfully
      */
-    fun startRecording(shouldStart: () -> Boolean = { true }): Boolean {
+    fun startRecording(shouldStart: () -> Boolean = { true }): Boolean = modelLifecycleLock.withLock {
         if (!shouldStart()) return false
         if (!isInitialized) {
             onErrorCallback?.invoke("Recognizer not initialized")
@@ -986,10 +988,17 @@ class VoiceInputManager(private val context: Context) {
             }
             recorder.startRecording()
 
-            val captureThread = thread(name = "VoiceInputThread") {
-                processAudioWithVad()
+            val captureThread = thread(name = "VoiceInputThread", start = false) {
+                try {
+                    processAudioWithVad()
+                } finally {
+                    markActivity()
+                    captureWorkers.decrementAndGet()
+                }
             }
+            captureWorkers.incrementAndGet()
             synchronized(audioLock) { recordingThread = captureThread }
+            captureThread.start()
 
             if (BuildConfig.DEBUG) {
                 Log.i(TAG, "Recording started with ${currentModelType.id}")
@@ -1042,9 +1051,7 @@ class VoiceInputManager(private val context: Context) {
 
         releaseAudioEffects()
 
-        // Bump activity so the idle releaser holds the recognizer for the
-        // QWEN3_ASR_IDLE_RELEASE_MS grace window after a session ends —
-        // long enough to cover the user immediately tapping mic again.
+        // Restart the configured grace window after a session ends.
         markActivity()
 
         if (BuildConfig.DEBUG) {
@@ -1274,7 +1281,7 @@ class VoiceInputManager(private val context: Context) {
      * Qwen3-ASR chews through the autoregressive decoder. Returns empty
      * string if no recognizer is active or if the binder is gone.
      */
-    private fun recognizeSegment(samples: FloatArray): String {
+    private fun recognizeSegment(samples: FloatArray): String = modelLifecycleLock.withLock {
         markActivity()
         onProcessingStateCallback?.invoke(true)
         try {

@@ -29,6 +29,7 @@ import com.awcjack.dualquickime.ui.CandidatePronunciation
 import com.awcjack.dualquickime.ui.CandidateTextView
 import com.awcjack.dualquickime.voice.ModelDownloadManager
 import com.awcjack.dualquickime.voice.VoiceModelType
+import com.awcjack.dualquickime.voice.VoiceModelRetentionPolicy
 
 /**
  * Settings activity for the DualQuick IME.
@@ -259,6 +260,19 @@ class SettingsActivity : AppCompatActivity() {
         switchVoiceDownloadWifiOnly.isChecked = ThemeManager.getVoiceDownloadWifiOnly(this)
         switchVoiceDownloadWifiOnly.setOnCheckedChangeListener { _, isChecked ->
             ThemeManager.setVoiceDownloadWifiOnly(this, isChecked)
+        }
+
+        val unloadTimeout = findViewById<android.widget.Spinner>(R.id.voiceModelUnloadTimeoutSpinner)
+        val options = VoiceModelRetentionPolicy.timeoutOptionsSeconds
+        unloadTimeout.adapter = android.widget.ArrayAdapter.createFromResource(
+            this, R.array.voice_model_unload_timeouts, android.R.layout.simple_spinner_item
+        ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        unloadTimeout.setSelection(options.indexOf(ThemeManager.getVoiceModelUnloadSeconds(this)))
+        unloadTimeout.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                ThemeManager.setVoiceModelUnloadSeconds(this@SettingsActivity, options[position])
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
         }
 
         // Model selection button

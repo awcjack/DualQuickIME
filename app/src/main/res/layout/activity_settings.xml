@@ -809,6 +809,28 @@
 
                 </LinearLayout>
 
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_voice_model_unload_timeout"
+                    android:textSize="15sp"
+                    android:textColor="?android:textColorPrimary" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_voice_model_unload_timeout_desc"
+                    android:textSize="12sp"
+                    android:textColor="?android:textColorSecondary"
+                    android:layout_marginTop="2dp" />
+
+                <Spinner
+                    android:id="@+id/voiceModelUnloadTimeoutSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:contentDescription="@string/settings_voice_model_unload_timeout"
+                    android:layout_marginBottom="16dp" />
+
                 <!-- Model Selection -->
                 <LinearLayout
                     android:layout_width="match_parent"

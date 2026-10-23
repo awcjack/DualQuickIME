@@ -5,6 +5,17 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- Configurable Qwen model idle unload delay in Settings: 30 seconds, 1, 2 (default), 5, or 10 minutes; changes apply without restarting the keyboard
+
+### Changed
+- Unload idle Qwen models sooner when the screen locks or available memory is low, after recording and transcription finish
+- Debug voice logs include memory snapshots after loading and transcription
+
+### Fixed
+- Prevent the idle monitor from unloading weights during model startup or final audio processing, and keep old monitors from stopping a replacement monitor
+
 ## [1.9.11] - 2026-10-23
 ### Fixed
 - Pronunciation changes now update the Settings keyboard preview, including after dictionaries finish loading

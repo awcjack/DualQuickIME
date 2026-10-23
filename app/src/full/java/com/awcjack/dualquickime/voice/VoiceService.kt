@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.os.SystemClock
+import android.os.Debug
 import android.util.Log
 import com.awcjack.dualquickime.BuildConfig
 import com.k2fsa.sherpa.onnx.*
@@ -76,7 +77,7 @@ class VoiceService : Service() {
                     recognizer = OfflineRecognizer(config = config)
                     loadedModelDir = modelDir
                     if (BuildConfig.DEBUG) {
-                        Log.i(TAG, "Qwen3-ASR loaded in ${SystemClock.elapsedRealtime() - loadStarted}ms (numThreads=$numThreads, maxNewTokens=$maxNewTokens)")
+                        Log.i(TAG, "Qwen3-ASR loaded in ${SystemClock.elapsedRealtime() - loadStarted}ms (numThreads=$numThreads, maxNewTokens=$maxNewTokens, PSS=${Debug.getPss() / 1024}MiB)")
                     }
                     true
                 } catch (e: Exception) {
@@ -108,6 +109,7 @@ class VoiceService : Service() {
                 rec.decode(stream)
                 val text = rec.getResult(stream).text.trim()
                 stream.release()
+                if (BuildConfig.DEBUG) Log.i(TAG, "Qwen3-ASR after transcription: PSS=${Debug.getPss() / 1024}MiB")
                 text
             } catch (e: Exception) {
                 Log.e(TAG, "transcribe() failed", e)
