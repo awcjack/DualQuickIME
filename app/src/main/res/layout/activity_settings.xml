@@ -873,6 +873,18 @@
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_marginBottom="12dp" />
 
+                <!-- Cleanup for models removed from selection -->
+                <Button
+                    android:id="@+id/btnDeleteOldVoiceModels"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/settings_voice_delete_old_models"
+                    android:textSize="15sp"
+                    android:visibility="gone"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_marginBottom="12dp" />
+
                 <!-- Permission Status -->
                 <LinearLayout
                     android:id="@+id/voicePermissionRow"

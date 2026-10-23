@@ -52,8 +52,24 @@ The keyboard intelligently understands your intent and commits Chinese or Englis
 ### 🎤 Offline Voice Input
 - **Fully offline** - No internet required after model download
 - **Trilingual** - Cantonese, Mandarin Chinese, and English
-- **On-demand download** - 228 MB model downloaded only when needed
+- **Model selection** - SenseVoice and Qwen3-ASR 0.6B / 1.7B
+- **On-demand download** - Models downloaded only when needed; Qwen3-ASR 1.7B uses about 2.4 GB of storage
 - **Privacy-first** - Voice processed entirely on-device
+
+Qwen3-ASR models run in a separate voice process and release their weights after
+30 seconds of inactivity. They transcribe speech segments after a pause rather
+than showing live partial text. The 1.7B option has higher memory use and latency;
+it requires 64-bit Android and should be tested with several GB of available RAM.
+
+The 1.7B option uses the community [thieunv-asilla INT8 ONNX export](https://huggingface.co/thieunv-asilla/sherpa-onnx-qwen3-asr-1.7B-int8),
+pinned to revision `69eb686fd94a4a865bb5340a3d6ac0d7f1fec0d5` with SHA-256
+verification. Its quantized recognition quality can differ from the original
+Qwen model and should be evaluated with representative Cantonese-English speech.
+
+Whisper Cantonese and U2pp-Conformer Yue are retired. Existing selections fall
+back to SenseVoice. If their files are still present, Settings shows **Delete old
+voice models** to remove complete or unfinished downloads without deleting other
+models or the shared voice activity detector.
 
 ### 🎨 Modern Design
 - **Theme support** - System default, Light mode, Dark mode

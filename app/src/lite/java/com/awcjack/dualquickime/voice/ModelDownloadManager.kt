@@ -28,5 +28,6 @@ object ModelDownloadManager {
     }
     fun deleteModel(context: Context) {}
     fun deleteModel(context: Context, modelType: VoiceModelType) {}
+    fun getRetiredModelsWithFiles(context: Context): List<VoiceModelType> = emptyList()
     fun getModelSizeString(): String = "0 MB"
 }

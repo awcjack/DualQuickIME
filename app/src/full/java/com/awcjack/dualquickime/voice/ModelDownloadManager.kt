@@ -62,6 +62,11 @@ object ModelDownloadManager {
     // and we do not need version discovery like Whisper Cantonese).
     private const val QWEN3_ASR_BASE_URL = "https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/main"
 
+    // Community 1.7B INT8 export using the same three-stage Sherpa-ONNX layout.
+    // Pin the revision as well as hashes so upstream changes cannot silently
+    // replace an already-downloaded model. No external .onnx.data files needed.
+    private const val QWEN3_ASR_1_7B_BASE_URL = "https://huggingface.co/thieunv-asilla/sherpa-onnx-qwen3-asr-1.7B-int8/resolve/69eb686fd94a4a865bb5340a3d6ac0d7f1fec0d5"
+
     // Model version markers - increment to force re-download of existing files
     // This handles cases where model format changes but file sizes are similar
     private const val WHISPER_CANTONESE_VERSION = "v5"
@@ -146,8 +151,6 @@ object ModelDownloadManager {
     // placeholders pending the same checksum-rollout that's tracked for the
     // other models. The `tokenizer/` subdirectory is consumed by Sherpa-ONNX's
     // OfflineQwen3AsrModelConfig.tokenizer as a directory path.
-    // WER: ~4.12% on Cantonese (vs Whisper 7.93% CER, U2pp 5.05% MER).
-    // Supports native Cantonese-English code-switching.
     private val QWEN3_ASR_FILES = listOf(
         ModelFile("conv_frontend.onnx", 44_148_281L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00001"),
         ModelFile("encoder.int8.onnx", 182_491_662L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00002"),
@@ -155,6 +158,17 @@ object ModelDownloadManager {
         ModelFile("tokenizer/vocab.json", 2_776_833L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00004"),
         ModelFile("tokenizer/tokenizer_config.json", 12_487L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00005"),
         ModelFile("tokenizer/merges.txt", 1_671_853L, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f00006")
+    )
+
+    // Exact sizes and SHA-256 from the pinned repository's LFS metadata;
+    // tokenizer hashes computed from that revision's file contents.
+    private val QWEN3_ASR_1_7B_FILES = listOf(
+        ModelFile("conv_frontend.onnx", 48_080_441L, "3cb27a9fe94d95c938e476f2012b21aba2ec0bfceef33b0e58acd208946bafdd", verify = true),
+        ModelFile("encoder.int8.onnx", 314_222_162L, "a5deedae034ece715de8ed204378d8c77f889af3a60c2566581135e84cced7cd", verify = true),
+        ModelFile("decoder.int8.onnx", 2_037_458_645L, "c43c853fa6e97d08365cb8a5502b360b595cd43c00dc60e4d8ca7cc18cad460b", verify = true),
+        ModelFile("tokenizer/vocab.json", 2_776_833L, "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910", verify = true),
+        ModelFile("tokenizer/tokenizer_config.json", 12_487L, "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c", verify = true),
+        ModelFile("tokenizer/merges.txt", 1_671_853L, "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5", verify = true)
     )
 
     // VAD model file with checksum
@@ -166,6 +180,7 @@ object ModelDownloadManager {
     const val WHISPER_CANTONESE_TOTAL_SIZE = 415_000_000L  // ~395 MB (encoder + decoder + tokens + VAD)
     const val U2PP_CONFORMER_YUE_TOTAL_SIZE = 131_000_000L  // ~130 MB (CTC model + tokens + VAD)
     const val QWEN3_ASR_TOTAL_SIZE = 987_630_000L  // conv_frontend + encoder + decoder + tokenizer/* + VAD
+    const val QWEN3_ASR_1_7B_TOTAL_SIZE = 2_404_852_421L  // model files + shared VAD
 
     // Legacy constant for backward compatibility
     const val TOTAL_MODEL_SIZE = SENSEVOICE_TOTAL_SIZE
@@ -235,6 +250,7 @@ object ModelDownloadManager {
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_TOTAL_SIZE
             VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_TOTAL_SIZE
             VoiceModelType.QWEN3_ASR -> QWEN3_ASR_TOTAL_SIZE
+            VoiceModelType.QWEN3_ASR_1_7B -> QWEN3_ASR_1_7B_TOTAL_SIZE
         }
 
         if (modelDir.exists()) {
@@ -267,6 +283,16 @@ object ModelDownloadManager {
     fun downloadModel(context: Context, modelType: VoiceModelType, callback: DownloadCallback) {
         thread(name = "ModelDownloadThread") {
             try {
+                if (!modelType.isAvailable) {
+                    callback.onError(context.getString(R.string.voice_model_retired))
+                    return@thread
+                }
+                // The 1.7B weights and inference buffers exceed a 32-bit
+                // process address space. Reject before downloading 2.4 GB.
+                if (modelType == VoiceModelType.QWEN3_ASR_1_7B && !android.os.Process.is64Bit()) {
+                    callback.onError(context.getString(R.string.voice_model_requires_64_bit))
+                    return@thread
+                }
                 // Guard: don't silently spend ~1 GB of cellular data. The
                 // unmetered-only preference defaults to on; users can opt in to
                 // metered downloads in Settings.
@@ -287,6 +313,7 @@ object ModelDownloadManager {
                     VoiceModelType.WHISPER_CANTONESE -> getWhisperCantoneseBaseUrl()
                     VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_BASE_URL
                     VoiceModelType.QWEN3_ASR -> QWEN3_ASR_BASE_URL
+                    VoiceModelType.QWEN3_ASR_1_7B -> QWEN3_ASR_1_7B_BASE_URL
                 }
 
                 val totalSize = when (modelType) {
@@ -294,6 +321,7 @@ object ModelDownloadManager {
                     VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_TOTAL_SIZE
                     VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_TOTAL_SIZE
                     VoiceModelType.QWEN3_ASR -> QWEN3_ASR_TOTAL_SIZE
+                    VoiceModelType.QWEN3_ASR_1_7B -> QWEN3_ASR_1_7B_TOTAL_SIZE
                 }
 
                 // Guard: ensure there's room before writing up to ~1 GB to
@@ -487,6 +515,7 @@ object ModelDownloadManager {
             VoiceModelType.WHISPER_CANTONESE -> WHISPER_CANTONESE_FILES
             VoiceModelType.U2PP_CONFORMER_YUE -> U2PP_CONFORMER_YUE_FILES
             VoiceModelType.QWEN3_ASR -> QWEN3_ASR_FILES
+            VoiceModelType.QWEN3_ASR_1_7B -> QWEN3_ASR_1_7B_FILES
         }
     }
 
@@ -645,6 +674,19 @@ object ModelDownloadManager {
             cm?.isActiveNetworkMetered ?: false
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /**
+     * Retired models with any files, including incomplete .tmp downloads.
+     * Do not use isModelDownloaded: missing tokens, VAD, or version markers
+     * must not prevent a user from reclaiming the old model's storage.
+     */
+    fun getRetiredModelsWithFiles(context: Context): List<VoiceModelType> {
+        return VoiceModelType.entries.filter { model ->
+            !model.isAvailable && File(context.filesDir, model.modelDir).let { dir ->
+                dir.isDirectory && !dir.list().isNullOrEmpty()
+            }
         }
     }
 

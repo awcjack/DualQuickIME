@@ -46,7 +46,18 @@ enum class VoiceModelType(
         modelDir = "",
         sizeBytes = 0L,
         sizeDisplayMB = 0
+    ),
+    QWEN3_ASR_1_7B(
+        id = "qwen3_asr_1_7b",
+        displayNameResId = R.string.voice_model_qwen3_asr_1_7b_name,
+        descriptionResId = R.string.voice_model_qwen3_asr_1_7b_desc,
+        modelDir = "",
+        sizeBytes = 0L,
+        sizeDisplayMB = 0
     );
+
+    val isQwen3Asr: Boolean
+        get() = this == QWEN3_ASR || this == QWEN3_ASR_1_7B
 
     companion object {
         val DEFAULT = SENSE_VOICE

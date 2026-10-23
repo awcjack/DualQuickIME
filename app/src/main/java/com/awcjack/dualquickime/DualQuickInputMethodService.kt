@@ -1155,7 +1155,7 @@ class DualQuickInputMethodService : InputMethodService() {
         if (!ThemeManager.getVoiceInputEnabled(this)) return
 
         val selectedModel = VoiceModelType.fromId(ThemeManager.getVoiceModelType(this))
-        if (selectedModel != VoiceModelType.QWEN3_ASR) return
+        if (!selectedModel.isQwen3Asr) return
         if (!ModelDownloadManager.isModelDownloaded(this, selectedModel)) return
 
         voiceServicePreBindAttempted = true

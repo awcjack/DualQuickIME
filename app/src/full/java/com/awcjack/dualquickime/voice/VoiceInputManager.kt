@@ -34,10 +34,8 @@ import kotlin.math.abs
  *
  * Supported models:
  * - SenseVoice: Multilingual (Cantonese, Mandarin, English, Japanese, Korean)
- * - Whisper Cantonese: Optimized for Cantonese (7.93% CER)
- * - U2pp-Conformer-Yue: Best accuracy-to-size ratio (5.05% MER)
- * - Qwen3-ASR: Best Cantonese accuracy (~4.12% WER) via Sherpa-ONNX
- *   prebuilt INT8 export (PR #3409); autoregressive decode, higher latency.
+ * - Qwen3-ASR 0.6B / 1.7B: Multilingual INT8 exports via Sherpa-ONNX;
+ *   autoregressive decode, higher latency, hosted in a separate process.
  *
  * Uses Silero VAD for voice activity detection (shared across all models).
  */
@@ -85,7 +83,7 @@ class VoiceInputManager(private val context: Context) {
         private const val QWEN3_ASR_NUM_THREADS = 4
         private const val QWEN3_ASR_MAX_NEW_TOKENS = 80
 
-        // Memory-pressure guards for the 700 MB Qwen3-ASR recognizer.
+        // Memory-pressure guards for both Qwen3-ASR model sizes.
         // Release the model after this many ms of recording idle so the IME
         // process doesn't sit on a gigabyte of weights while the user is
         // typing normally. The next mic tap pays a ~1–2 s reload cost.
@@ -407,14 +405,14 @@ class VoiceInputManager(private val context: Context) {
      * Check if the model files are downloaded and available for the current model type.
      */
     fun isModelAvailable(): Boolean {
-        return ModelDownloadManager.isModelDownloaded(context, currentModelType)
+        return isModelAvailable(currentModelType)
     }
 
     /**
      * Check if a specific model type is available.
      */
     fun isModelAvailable(modelType: VoiceModelType): Boolean {
-        return ModelDownloadManager.isModelDownloaded(context, modelType)
+        return modelType.isAvailable && ModelDownloadManager.isModelDownloaded(context, modelType)
     }
 
     /**
@@ -454,6 +452,7 @@ class VoiceInputManager(private val context: Context) {
      */
     fun initialize(): Boolean {
         if (isInitialized) return true
+        if (currentModelType == VoiceModelType.QWEN3_ASR_1_7B && !android.os.Process.is64Bit()) return false
         if (!isModelAvailable()) {
             if (BuildConfig.DEBUG) {
                 Log.e(TAG, "Model files not available for ${currentModelType.id}")
@@ -495,7 +494,7 @@ class VoiceInputManager(private val context: Context) {
                 VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
                 VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
                 VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
-                VoiceModelType.QWEN3_ASR -> initQwen3AsrViaService(modelDir)
+                VoiceModelType.QWEN3_ASR, VoiceModelType.QWEN3_ASR_1_7B -> initQwen3AsrViaService(modelDir)
             }
 
             isInitialized = true
@@ -602,8 +601,7 @@ class VoiceInputManager(private val context: Context) {
     /**
      * Load the Qwen3-ASR recognizer in the `:voice` process via [VoiceService].
      *
-     * The recognizer itself uses Sherpa-ONNX's prebuilt INT8 export
-     * (sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25, PR #3409): a 3-stage
+     * Both INT8 exports use the same Sherpa-ONNX configuration: a 3-stage
      * pipeline of conv_frontend → AuT audio encoder → Qwen3 LLM decoder with
      * KV-cache. All of that runs out-of-process; this method just binds and
      * asks the service to initialize with our standard tuning
@@ -635,7 +633,7 @@ class VoiceInputManager(private val context: Context) {
      * avoid the Binder hop cost (and they're small enough to be safe there).
      */
     private fun usesOutOfProcessRecognizer(): Boolean =
-        currentModelType == VoiceModelType.QWEN3_ASR
+        currentModelType.isQwen3Asr
 
     /**
      * Eagerly bind to the `:voice` process so that when the user actually
@@ -650,7 +648,7 @@ class VoiceInputManager(private val context: Context) {
      * Idempotent: if a binding is already in place, this is a no-op.
      */
     fun prepareForModel(modelType: VoiceModelType) {
-        if (modelType != VoiceModelType.QWEN3_ASR) return
+        if (!modelType.isQwen3Asr) return
         if (voiceServiceBinder != null) return
         thread(name = "VoicePreBindThread") {
             // bindVoiceService blocks on the connection latch but won't load
@@ -707,7 +705,7 @@ class VoiceInputManager(private val context: Context) {
      * Only Qwen3-ASR qualifies — the other recognizers are <400 MB resident
      * and the reload cost would outweigh the memory savings.
      */
-    private fun usesIdleRelease(): Boolean = currentModelType == VoiceModelType.QWEN3_ASR
+    private fun usesIdleRelease(): Boolean = currentModelType.isQwen3Asr
 
     /**
      * Mark the recognizer as freshly used. Resets the idle clock so the
@@ -754,7 +752,7 @@ class VoiceInputManager(private val context: Context) {
 
                     if (canRelease) {
                         if (BuildConfig.DEBUG) {
-                            Log.i(TAG, "Qwen3-ASR idle for ${idleFor}ms; releasing recognizer to free ~700 MB in :voice process")
+                            Log.i(TAG, "${currentModelType.id} idle for ${idleFor}ms; releasing recognizer in :voice process")
                         }
                         releaseRecognizerOnly()
                         // Keep the monitor running. The next mic tap triggers a lazy
@@ -777,7 +775,7 @@ class VoiceInputManager(private val context: Context) {
     }
 
     /**
-     * Release only the recognizer (the heavy ~700 MB component), keeping
+     * Release only the recognizer (the heavy native weights), keeping
      * VAD, OpenCC and audio recording state alive. The next call to
      * [ensureRecognizerLoaded] rebuilds it.
      *
@@ -852,7 +850,8 @@ class VoiceInputManager(private val context: Context) {
                     VoiceModelType.SENSE_VOICE -> initSenseVoiceRecognizer(modelDir)
                     VoiceModelType.WHISPER_CANTONESE -> initWhisperRecognizer(modelDir)
                     VoiceModelType.U2PP_CONFORMER_YUE -> initU2ppConformerRecognizer(modelDir)
-                    VoiceModelType.QWEN3_ASR -> error("Qwen3-ASR is hosted out-of-process; unreachable")
+                    VoiceModelType.QWEN3_ASR, VoiceModelType.QWEN3_ASR_1_7B ->
+                        error("Qwen3-ASR is hosted out-of-process; unreachable")
                 }
                 if (BuildConfig.DEBUG) {
                     Log.i(TAG, "Recognizer reloaded after idle release")
@@ -1216,7 +1215,7 @@ class VoiceInputManager(private val context: Context) {
         // the <asr_text> literal separates the detected language label from
         // the transcription itself. We only want the transcription, so drop
         // everything up to and including the first <asr_text>.
-        if (currentModelType == VoiceModelType.QWEN3_ASR) {
+        if (currentModelType.isQwen3Asr) {
             cleaned = stripQwen3MetaPrefix(cleaned)
         }
 

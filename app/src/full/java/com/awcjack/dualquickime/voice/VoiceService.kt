@@ -17,8 +17,9 @@ import java.nio.ByteOrder
  *
  * Why a separate process: a loaded Qwen3-ASR-0.6B INT8 recognizer pins
  * ~700 MB of weights plus activation and KV-cache buffers in resident
- * memory. Android caps IME processes near 256–384 MB before LMK starts
- * killing them; an IME holding that model would routinely be killed
+ * memory; the 1.7B model needs substantially more. Keeping these weights
+ * in the IME increases memory pressure and the chance of Android
+ * killing it; an IME holding that model could be killed
  * mid-utterance, taking the keyboard with it. With the model in `:voice`,
  * LMK can kill the model process independently while the IME keeps
  * running — the user sees a slow reload, not a vanished keyboard.
@@ -36,15 +37,19 @@ class VoiceService : Service() {
     // Single Sherpa-ONNX recognizer for the lifetime of one initialize() call.
     // Guarded by [recognizerLock] — initialize/release/transcribe can race.
     private var recognizer: OfflineRecognizer? = null
+    private var loadedModelDir: String? = null
     private val recognizerLock = Any()
 
     private val binder = object : IVoiceRecognizer.Stub() {
         override fun initialize(modelDir: String, numThreads: Int, maxNewTokens: Int): Boolean {
             synchronized(recognizerLock) {
-                if (recognizer != null) {
+                if (recognizer != null && loadedModelDir == modelDir) {
                     if (BuildConfig.DEBUG) Log.i(TAG, "initialize() called but recognizer already loaded")
                     return true
                 }
+                // A new manager can bind before the old service is destroyed.
+                // Switching between 0.6B and 1.7B must replace the old weights.
+                releaseModel()
                 return try {
                     val qwen3Config = OfflineQwen3AsrModelConfig(
                         convFrontend = "$modelDir/conv_frontend.onnx",
@@ -68,6 +73,7 @@ class VoiceService : Service() {
                     // from a silent "Loading…" wait (bad UX) to the moment the
                     // user has already spoken and is expecting some processing.
                     recognizer = OfflineRecognizer(config = config)
+                    loadedModelDir = modelDir
                     if (BuildConfig.DEBUG) {
                         Log.i(TAG, "Qwen3-ASR loaded in :voice process (numThreads=$numThreads, maxNewTokens=$maxNewTokens)")
                     }
@@ -116,6 +122,7 @@ class VoiceService : Service() {
                     if (BuildConfig.DEBUG) Log.w(TAG, "recognizer.release() threw: ${e.message}")
                 }
                 recognizer = null
+                loadedModelDir = null
                 if (BuildConfig.DEBUG) Log.i(TAG, "Qwen3-ASR released; :voice process can now drop back to a few MB")
             }
         }

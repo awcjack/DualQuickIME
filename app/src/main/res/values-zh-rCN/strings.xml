@@ -122,8 +122,14 @@
     <string name="voice_model_whisper_cantonese_desc">针对广东话优化（7.93% CER），支持香港英语</string>
     <string name="voice_model_u2pp_conformer_yue_name">U2pp-Conformer 粤语</string>
     <string name="voice_model_u2pp_conformer_yue_desc">最佳精度体积比（5.05% MER，130M 参数）- 推荐</string>
-    <string name="voice_model_qwen3_asr_name">Qwen3-ASR（最佳粤语）</string>
-    <string name="voice_model_qwen3_asr_desc">粤语精度最高（~4.12% WER），支持粤英混合输入。需下载 942 MB，识别较慢。</string>
+    <string name="settings_voice_delete_old_models">删除旧语音模型</string>
+    <string name="settings_voice_delete_old_model_confirm">删除 %1$s 已下载的文件，包括未完成的下载？</string>
+    <string name="voice_model_retired">此模型已不再提供。请选择 SenseVoice 或 Qwen3-ASR。</string>
+    <string name="voice_model_qwen3_asr_name">Qwen3-ASR 0.6B</string>
+    <string name="voice_model_qwen3_asr_desc">支持粤语、英语等多种语言。需下载 942 MB，停顿后显示文字。</string>
+    <string name="voice_model_qwen3_asr_1_7b_name">Qwen3-ASR 1.7B</string>
+    <string name="voice_model_qwen3_asr_1_7b_desc">较大的多语言模型，支持粤语和英语。社区 INT8 转换版本，需下载约 2.4 GB，须使用 64 位 Android 和充足的可用内存。识别较慢，停顿后显示文字。</string>
+    <string name="voice_model_requires_64_bit">Qwen3-ASR 1.7B 须使用 64 位 Android。此设备请选择 0.6B 模型。</string>
 
     <!-- Candidate pronunciation -->
     <string name="settings_pronunciation">候选字词拼音</string>

@@ -5,6 +5,18 @@ All notable changes to DualQuickIME will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.10] - 2026-10-23
+### Added
+- **Qwen3-ASR 1.7B voice model**: Select a larger offline model alongside Qwen3-ASR 0.6B and SenseVoice. The community INT8 export requires a roughly 2.4 GB download, 64-bit Android, and substantial available RAM; downloads use a pinned revision and SHA-256 verification
+- **Old voice model cleanup**: Settings offers deletion of existing Whisper Cantonese and U2pp-Conformer Yue files, including unfinished downloads, while preserving other models and the shared voice activity detector
+
+### Changed
+- **Simpler voice model selection**: Retired Whisper Cantonese and U2pp-Conformer Yue from selection and new downloads. Saved selections fall back to SenseVoice; existing files remain until the user deletes them
+- **Clear Qwen model labels**: Show the 0.6B and 1.7B sizes explicitly, remove the incorrect 1.7B accuracy claim from the 0.6B description, and explain that Qwen transcribes after a pause
+
+### Fixed
+- **Switching Qwen model sizes**: Replace previously loaded weights when changing between 0.6B and 1.7B, with both variants using the separate voice process and idle memory release
+
 ## [1.9.9] - 2026-10-20
 ### Fixed
 - **Keyboard availability under memory pressure**: Load the core Quick table once with fewer temporary allocations, defer optional dictionaries to a shared background worker, cancel and release suggestions and pronunciation data when memory is tight, and retry a simpler keyboard layout without changing saved settings

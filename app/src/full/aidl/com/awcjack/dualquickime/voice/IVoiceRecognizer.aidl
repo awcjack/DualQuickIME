@@ -1,5 +1,5 @@
-// Cross-process API to the Qwen3-ASR recognizer. The recognizer holds ~700 MB
-// of INT8 weights resident the moment it loads; running it in the IME process
+// Cross-process API to the Qwen3-ASR recognizer. Both model sizes hold large
+// native weight and inference buffers; running them in the IME process
 // risks LMK killing the keyboard mid-utterance. Hosting it in a separate
 // :voice process insulates the IME from that memory peak.
 //
@@ -13,8 +13,9 @@ package com.awcjack.dualquickime.voice;
 interface IVoiceRecognizer {
     /**
      * Load the Qwen3-ASR recognizer with weights from the given absolute path
-     * and the standard 4-thread, 80-token, greedy-decode tuning. Idempotent:
-     * returns true if a recognizer is already loaded. Returns false on failure
+     * and the standard 4-thread, 80-token, greedy-decode tuning. Idempotent for
+     * the same directory; a different directory replaces the loaded model.
+     * Returns false on failure
      * (missing files, bad config, OOM).
      */
     boolean initialize(String modelDir, int numThreads, int maxNewTokens);

@@ -52,6 +52,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var switchVoiceNoiseSuppression: SwitchCompat
     private lateinit var switchVoiceDownloadWifiOnly: SwitchCompat
     private lateinit var btnVoiceModel: Button
+    private lateinit var btnDeleteOldVoiceModels: Button
     private lateinit var textVoiceModelStatus: TextView
     private lateinit var btnVoicePermission: Button
     private lateinit var textVoicePermissionStatus: TextView
@@ -79,6 +80,7 @@ class SettingsActivity : AppCompatActivity() {
         switchVoiceNoiseSuppression = findViewById(R.id.switchVoiceNoiseSuppression)
         switchVoiceDownloadWifiOnly = findViewById(R.id.switchVoiceDownloadWifiOnly)
         btnVoiceModel = findViewById(R.id.btnVoiceModel)
+        btnDeleteOldVoiceModels = findViewById(R.id.btnDeleteOldVoiceModels)
         textVoiceModelStatus = findViewById(R.id.textVoiceModelStatus)
         btnVoicePermission = findViewById(R.id.btnVoicePermission)
         textVoicePermissionStatus = findViewById(R.id.textVoicePermissionStatus)
@@ -224,6 +226,9 @@ class SettingsActivity : AppCompatActivity() {
         // Load saved model type
         val savedModelTypeId = ThemeManager.getVoiceModelType(this)
         selectedModelType = VoiceModelType.fromId(savedModelTypeId)
+        if (selectedModelType.id != savedModelTypeId) {
+            ThemeManager.setVoiceModelType(this, selectedModelType.id)
+        }
 
         // Set current value
         switchVoiceEnabled.isChecked = ThemeManager.getVoiceInputEnabled(this)
@@ -248,6 +253,9 @@ class SettingsActivity : AppCompatActivity() {
         // Model selection button
         btnSelectModel.setOnClickListener {
             showModelSelectionDialog()
+        }
+        btnDeleteOldVoiceModels.setOnClickListener {
+            showRetiredModelCleanupDialog()
         }
 
         // Model download/delete button
@@ -281,7 +289,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun showModelSelectionDialog() {
-        val modelTypes = VoiceModelType.entries.toTypedArray()
+        val modelTypes = VoiceModelType.entries.filter { it.isAvailable }.toTypedArray()
         val modelNames = modelTypes.map { modelType ->
             val downloaded = ModelDownloadManager.isModelDownloaded(this, modelType)
             val status = if (downloaded) getString(R.string.settings_voice_model_status_downloaded) else "${modelType.sizeDisplayMB} MB"
@@ -302,12 +310,42 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showRetiredModelCleanupDialog() {
+        val models = ModelDownloadManager.getRetiredModelsWithFiles(this)
+        if (models.isEmpty()) {
+            updateVoiceSettingsUI()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_voice_delete_old_models)
+            .setItems(models.map { getString(it.displayNameResId) }.toTypedArray()) { _, which ->
+                val model = models[which]
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.settings_voice_delete_confirm_title)
+                    .setMessage(getString(R.string.settings_voice_delete_old_model_confirm, getString(model.displayNameResId)))
+                    .setPositiveButton(R.string.settings_voice_delete_confirm_yes) { _, _ ->
+                        ModelDownloadManager.deleteModel(this, model)
+                        updateVoiceSettingsUI()
+                        Toast.makeText(this, R.string.settings_voice_model_deleted, Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun updateVoiceSettingsUI() {
         val modelDownloaded = ModelDownloadManager.isModelDownloaded(this, selectedModelType)
         val hasPermission = hasAudioPermission()
 
         // Update selected model display
         textSelectedModel.text = getString(selectedModelType.displayNameResId)
+        btnDeleteOldVoiceModels.visibility = if (ModelDownloadManager.getRetiredModelsWithFiles(this).isEmpty()) {
+            View.GONE
+        } else {
+            View.VISIBLE
+        }
 
         // Update model button and status
         if (modelDownloaded) {

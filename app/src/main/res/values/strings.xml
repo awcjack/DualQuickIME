@@ -87,7 +87,7 @@
     <string name="settings_voice_noise_suppression">Noise suppression</string>
     <string name="settings_voice_noise_suppression_desc">Filter background noise for clearer recognition in noisy places</string>
     <string name="settings_voice_download_wifi_only">Download on Wi-Fi only</string>
-    <string name="settings_voice_download_wifi_only_desc">Voice models are large (up to ~1 GB). Turn off to allow downloads over mobile data.</string>
+    <string name="settings_voice_download_wifi_only_desc">Voice models are large (up to ~2.4 GB). Turn off to allow downloads over mobile data.</string>
     <string name="voice_download_metered_blocked">Voice model download is set to Wi-Fi only. Connect to Wi-Fi, or allow mobile-data downloads in Settings.</string>
     <string name="voice_download_insufficient_space">Not enough free storage to download the voice model.</string>
     <string name="settings_voice_select_model">Select voice model</string>
@@ -99,6 +99,9 @@
     <string name="settings_voice_model_deleted">Voice model deleted</string>
     <string name="settings_voice_model_status_downloaded">Downloaded</string>
     <string name="settings_voice_delete_model">Delete voice model</string>
+    <string name="settings_voice_delete_old_models">Delete old voice models</string>
+    <string name="settings_voice_delete_old_model_confirm">Delete downloaded files for %1$s, including any unfinished download?</string>
+    <string name="voice_model_retired">This model is no longer available. Choose SenseVoice or Qwen3-ASR.</string>
     <string name="settings_voice_delete_confirm_title">Delete Voice Model?</string>
     <string name="settings_voice_delete_confirm_message">This will delete the 228 MB voice model. You can download it again later.</string>
     <string name="settings_voice_delete_confirm_message_format">This will delete %1$s (%2$d MB). You can download it again later.</string>
@@ -128,8 +131,11 @@
     <string name="voice_model_whisper_cantonese_desc">Optimized for Cantonese (7.93% CER) with HK English support</string>
     <string name="voice_model_u2pp_conformer_yue_name">U2pp-Conformer Yue</string>
     <string name="voice_model_u2pp_conformer_yue_desc">Best accuracy-to-size ratio (5.05% MER, 130M params) - Recommended</string>
-    <string name="voice_model_qwen3_asr_name">Qwen3-ASR (Best Cantonese)</string>
-    <string name="voice_model_qwen3_asr_desc">Highest accuracy for Cantonese (~4.12% WER) with Cantonese-English mixing. 942 MB download, slower transcription.</string>
+    <string name="voice_model_qwen3_asr_name">Qwen3-ASR 0.6B</string>
+    <string name="voice_model_qwen3_asr_desc">Multilingual recognition including Cantonese and English. 942 MB download; text appears after a pause.</string>
+    <string name="voice_model_qwen3_asr_1_7b_name">Qwen3-ASR 1.7B</string>
+    <string name="voice_model_qwen3_asr_1_7b_desc">Larger multilingual model including Cantonese and English. Community INT8 export, ~2.4 GB download; requires 64-bit Android and substantial free RAM. Slower transcription; text appears after a pause.</string>
+    <string name="voice_model_requires_64_bit">Qwen3-ASR 1.7B requires 64-bit Android. Choose the 0.6B model on this device.</string>
 
     <!-- Candidate pronunciation -->
     <string name="settings_pronunciation">Pronunciation above candidates</string>
